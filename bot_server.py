@@ -7,8 +7,26 @@
 from flask import Flask, request, jsonify
 import requests
 import os
+import threading
+import time
 
 app = Flask(__name__)
+
+# Keep-alive механизм для предотвращения остановки контейнера
+def keep_alive():
+    """Периодически делает запросы к health endpoint для поддержания активности"""
+    time.sleep(10)  # Ждём запуска сервера
+    while True:
+        try:
+            # Делаем запрос к себе для поддержания активности
+            requests.get('http://localhost:8080/health', timeout=5)
+            time.sleep(30)  # Каждые 30 секунд
+        except:
+            time.sleep(30)
+
+# Запускаем keep-alive в фоновом потоке
+keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+keep_alive_thread.start()
 
 # Конфигурация
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # ⚠️ НЕ ХРАНИТЕ ТОКЕН В КОДЕ! Используйте переменные окружения
