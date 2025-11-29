@@ -46,6 +46,7 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
     visibility: hidden; /* Дополнительно скрываем для предотвращения мелькания */
     opacity: 0; /* Скрываем через opacity для плавности */
+    background: var(--background-color); /* Явный темно-синий фон */
 }
 
 .screen.active {
@@ -70,6 +71,7 @@ h1, h2, h3, h4, h5, h6 {
     max-width: 500px;
     margin: 0 auto;
     padding: 20px;
+    background: transparent; /* Прозрачный, чтобы был виден фон экрана */
 }
 
 /* Loading Screen */
