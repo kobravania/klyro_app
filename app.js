@@ -12,43 +12,80 @@ const totalSteps = 4;
 let userData = null;
 
 // Инициализация приложения
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
     // Инициализация Telegram Web App (если доступно)
     if (window.Telegram?.WebApp) {
-        tg.ready();
-        tg.expand();
+        try {
+            tg.ready();
+            tg.expand();
+        } catch (e) {
+            console.log('Telegram WebApp not available:', e);
+        }
     }
     
-    // Показываем экран загрузки на 1.5 секунды
+    // Показываем экран загрузки на 1.5 секунды, затем проверяем авторизацию
     setTimeout(() => {
-        checkUserAuth();
+        try {
+            checkUserAuth();
+        } catch (e) {
+            console.error('Error in checkUserAuth:', e);
+            // В случае ошибки показываем экран авторизации
+            showAuthScreen();
+        }
     }, 1500);
-});
+}
+
+// Запускаем при загрузке DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    // DOM уже загружен
+    initApp();
+}
 
 // Проверка авторизации и загрузка данных
 function checkUserAuth() {
-    // Проверяем наличие сохранённых данных
-    const savedData = localStorage.getItem('klyro_user_data');
-    
-    if (savedData) {
-        userData = JSON.parse(savedData);
-        showProfileScreen();
-        return;
-    }
+    try {
+        // Проверяем наличие сохранённых данных
+        const savedData = localStorage.getItem('klyro_user_data');
+        
+        if (savedData) {
+            try {
+                userData = JSON.parse(savedData);
+                // Проверяем, что данные валидны
+                if (userData && (userData.age || userData.firstName)) {
+                    showProfileScreen();
+                    return;
+                }
+            } catch (e) {
+                console.error('Error parsing saved data:', e);
+                localStorage.removeItem('klyro_user_data');
+            }
+        }
 
-    // Проверяем Telegram авторизацию
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        const telegramUser = tg.initDataUnsafe.user;
-        userData = {
-            id: telegramUser.id,
-            firstName: telegramUser.first_name || 'Пользователь',
-            lastName: telegramUser.last_name || '',
-            username: telegramUser.username || '',
-            photoUrl: telegramUser.photo_url || ''
-        };
-        showAuthScreen();
-    } else {
+        // Проверяем Telegram авторизацию
+        if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+            const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
+            userData = {
+                id: telegramUser.id,
+                firstName: telegramUser.first_name || 'Пользователь',
+                lastName: telegramUser.last_name || '',
+                username: telegramUser.username || '',
+                photoUrl: telegramUser.photo_url || ''
+            };
+            // Если есть данные профиля, показываем профиль, иначе онбординг
+            if (userData.age || userData.height) {
+                showProfileScreen();
+            } else {
+                showOnboardingScreen();
+            }
+            return;
+        }
+        
         // Если нет данных Telegram, показываем экран авторизации
+        showAuthScreen();
+    } catch (e) {
+        console.error('Error in checkUserAuth:', e);
         showAuthScreen();
     }
 }
@@ -392,9 +429,13 @@ function recalculateCalories() {
 
 // Скрыть все экраны
 function hideAllScreens() {
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.remove('active');
-    });
+    try {
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+        });
+    } catch (e) {
+        console.error('Error hiding screens:', e);
+    }
 }
 
 // Экспорт функций для использования в HTML
