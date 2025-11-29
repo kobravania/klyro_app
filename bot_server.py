@@ -54,13 +54,21 @@ def webhook():
     if request.method == 'GET':
         return jsonify({'status': 'ok', 'message': 'Webhook is ready'}), 200
     
+    # Логируем входящий запрос
+    print(f'[WEBHOOK] Received {request.method} request')
+    print(f'[WEBHOOK] Headers: {dict(request.headers)}')
+    print(f'[WEBHOOK] Content-Type: {request.content_type}')
+    
     # Проверка заголовков от Telegram
     if not request.is_json:
+        print('[WEBHOOK] Request is not JSON, returning OK')
         return jsonify({'ok': True}), 200
     
     try:
         data = request.get_json()
+        print(f'[WEBHOOK] Received data: {data}')
         if not data:
+            print('[WEBHOOK] Empty data, returning OK')
             return jsonify({'ok': True}), 200
         
         # Проверяем, что это сообщение
@@ -71,6 +79,9 @@ def webhook():
             
             # Обработка команды /start
             if text == '/start' or text.startswith('/start'):
+                print(f'[WEBHOOK] Processing /start command from chat {chat_id}')
+                print(f'[WEBHOOK] BOT_TOKEN first 10 chars: {BOT_TOKEN[:10] if BOT_TOKEN else "EMPTY"}...')
+                
                 keyboard = {
                     'inline_keyboard': [[
                         {
