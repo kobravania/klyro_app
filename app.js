@@ -134,15 +134,6 @@ function startApp() {
 // Запускаем инициализацию
 startApp();
 
-// Аварийный fallback - через 2 секунды принудительно показываем auth
-setTimeout(() => {
-    const loadingScreen = document.getElementById('loading-screen');
-    if (loadingScreen && loadingScreen.classList.contains('active')) {
-        console.warn('EMERGENCY: Loading screen still active after 2s, forcing auth');
-        forceShowAuth();
-    }
-}, 2000);
-
 // Проверка авторизации и загрузка данных
 function checkUserAuth() {
     try {
