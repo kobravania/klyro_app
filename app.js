@@ -1,10 +1,17 @@
 // Telegram Web App API
-const tg = window.Telegram?.WebApp || {
-    ready: () => {},
-    expand: () => {},
-    initDataUnsafe: {},
-    showAlert: (message) => alert(message)
-};
+let tg;
+if (window.Telegram && window.Telegram.WebApp) {
+    tg = window.Telegram.WebApp;
+    console.log('Telegram WebApp API found');
+} else {
+    tg = {
+        ready: () => {},
+        expand: () => {},
+        initDataUnsafe: {},
+        showAlert: (message) => alert(message)
+    };
+    console.log('Telegram WebApp API not found, using fallback');
+}
 
 // Состояние приложения
 let currentStep = 1;
@@ -39,23 +46,31 @@ function forceShowAuth() {
 // Инициализация приложения - упрощённая версия
 function initApp() {
     console.log('=== Klyro App Initializing ===');
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Is Telegram:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
     
     // Инициализация Telegram Web App (если доступно)
-    if (window.Telegram?.WebApp) {
+    if (window.Telegram && window.Telegram.WebApp) {
         try {
+            tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
             console.log('Telegram WebApp initialized');
+            console.log('Telegram version:', tg.version);
+            console.log('Telegram platform:', tg.platform);
         } catch (e) {
-            console.log('Telegram WebApp not available:', e);
+            console.log('Telegram WebApp init error:', e);
         }
     } else {
-        console.log('Telegram WebApp API not found');
+        console.log('Telegram WebApp API not found - running in browser');
     }
     
-    // Принудительно показываем auth screen через 1 секунду
+    // В Telegram показываем экран быстрее
+    const delay = (window.Telegram && window.Telegram.WebApp) ? 500 : 1000;
+    
+    // Принудительно показываем auth screen
     setTimeout(() => {
-        console.log('1s timeout - showing auth screen');
+        console.log('Timeout - showing auth screen');
         forceShowAuth();
         
         // Проверяем, что экран действительно показался
@@ -75,23 +90,40 @@ function initApp() {
                 checkUserAuth();
             } catch (e) {
                 console.error('Error in checkUserAuth:', e);
+                // В случае ошибки показываем auth screen
+                forceShowAuth();
             }
-        }, 500);
-    }, 1000);
+        }, 300);
+    }, delay);
 }
 
 // Запускаем сразу при загрузке скрипта
 console.log('Script loaded, DOM state:', document.readyState);
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOMContentLoaded fired');
-        initApp();
-    });
+// Для Telegram Web App инициализируем сразу
+if (window.Telegram && window.Telegram.WebApp) {
+    console.log('Telegram detected - initializing immediately');
+    // В Telegram DOM обычно уже готов
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded fired (Telegram)');
+            initApp();
+        });
+    } else {
+        console.log('DOM ready (Telegram) - initializing');
+        setTimeout(initApp, 50);
+    }
 } else {
-    console.log('DOM already loaded, initializing immediately');
-    // Небольшая задержка для гарантии, что DOM готов
-    setTimeout(initApp, 100);
+    // Для браузера стандартная инициализация
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded fired (Browser)');
+            initApp();
+        });
+    } else {
+        console.log('DOM already loaded (Browser) - initializing');
+        setTimeout(initApp, 100);
+    }
 }
 
 // Аварийный fallback - через 2 секунды принудительно показываем auth
@@ -124,22 +156,32 @@ function checkUserAuth() {
         }
 
         // Проверяем Telegram авторизацию
-        if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-            const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
-            userData = {
-                id: telegramUser.id,
-                firstName: telegramUser.first_name || 'Пользователь',
-                lastName: telegramUser.last_name || '',
-                username: telegramUser.username || '',
-                photoUrl: telegramUser.photo_url || ''
-            };
-            // Если есть данные профиля, показываем профиль, иначе онбординг
-            if (userData.age || userData.height) {
-                showProfileScreen();
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+            const initData = window.Telegram.WebApp.initDataUnsafe;
+            console.log('Telegram initData:', initData);
+            
+            if (initData.user) {
+                const telegramUser = initData.user;
+                console.log('Telegram user found:', telegramUser);
+                userData = {
+                    id: telegramUser.id,
+                    firstName: telegramUser.first_name || 'Пользователь',
+                    lastName: telegramUser.last_name || '',
+                    username: telegramUser.username || '',
+                    photoUrl: telegramUser.photo_url || ''
+                };
+                // Если есть данные профиля, показываем профиль, иначе онбординг
+                if (userData.age || userData.height) {
+                    showProfileScreen();
+                } else {
+                    showOnboardingScreen();
+                }
+                return;
             } else {
-                showOnboardingScreen();
+                console.log('Telegram user not found in initData');
             }
-            return;
+        } else {
+            console.log('Telegram WebApp or initDataUnsafe not available');
         }
         
         // Если нет данных Telegram, показываем экран авторизации
