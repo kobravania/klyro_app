@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""
+Простой сервер для обработки команд Telegram бота Klyro
+Автоматически отвечает на /start сообщением с кнопкой Web App
+"""
+
+from flask import Flask, request, jsonify
+import requests
+import os
+
+app = Flask(__name__)
+
+# Конфигурация
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y')
+WEB_APP_URL = 'https://kobravania.github.io/klyro_app/'
+WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
+
+def send_message(chat_id, text, reply_markup=None):
+    """Отправляет сообщение пользователю"""
+    url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+    data = {
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': 'HTML'
+    }
+    if reply_markup:
+        data['reply_markup'] = reply_markup
+    
+    response = requests.post(url, json=data)
+    return response.json()
+
+@app.route('/', methods=['GET'])
+def index():
+    """Главная страница - проверка работы сервера"""
+    return jsonify({
+        'status': 'ok',
+        'bot': 'Klyro Bot',
+        'message': 'Server is running'
+    })
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Обработка webhook от Telegram"""
+    try:
+        data = request.get_json()
+        
+        # Проверяем, что это сообщение
+        if 'message' in data:
+            message = data['message']
+            chat_id = message['chat']['id']
+            text = message.get('text', '')
+            
+            # Обработка команды /start
+            if text == '/start' or text.startswith('/start'):
+                keyboard = {
+                    'inline_keyboard': [[
+                        {
+                            'text': 'ОТКРЫТЬ',
+                            'web_app': {
+                                'url': WEB_APP_URL
+                            }
+                        }
+                    ]]
+                }
+                
+                welcome_text = (
+                    '👋 <b>Добро пожаловать в Klyro!</b>\n\n'
+                    'Ваш персональный помощник по питанию и фитнесу.\n\n'
+                    '📊 Рассчитывайте калории\n'
+                    '🎯 Отслеживайте прогресс\n'
+                    '💪 Достигайте целей\n\n'
+                    'Нажмите кнопку ниже, чтобы начать:'
+                )
+                
+                send_message(chat_id, welcome_text, keyboard)
+                return jsonify({'ok': True})
+            
+            # Обработка других команд
+            elif text == '/help':
+                help_text = (
+                    'ℹ️ <b>Помощь по Klyro</b>\n\n'
+                    'Klyro помогает вам:\n'
+                    '• Рассчитывать дневную норму калорий\n'
+                    '• Отслеживать параметры тела\n'
+                    '• Достигать целей по весу\n\n'
+                    'Используйте /start для открытия приложения.'
+                )
+                send_message(chat_id, help_text)
+                return jsonify({'ok': True})
+        
+        return jsonify({'ok': True})
+    
+    except Exception as e:
+        print(f'Error: {e}')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+@app.route('/set_webhook', methods=['GET'])
+def set_webhook():
+    """Установка webhook (вызывается один раз)"""
+    webhook_url = request.args.get('url')
+    if not webhook_url:
+        return jsonify({'error': 'URL parameter required'}), 400
+    
+    url = f'https://api.telegram.org/bot{BOT_TOKEN}/setWebhook'
+    data = {
+        'url': webhook_url,
+        'allowed_updates': ['message']
+    }
+    
+    response = requests.post(url, json=data)
+    return jsonify(response.json())
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+
