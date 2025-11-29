@@ -78,6 +78,9 @@ function initApp() {
     console.log('User Agent:', navigator.userAgent);
     console.log('Is Telegram:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
     
+    // Скрываем все экраны сразу, чтобы не было мелькания
+    hideAllScreens();
+    
     // Инициализация Telegram Web App (если доступно)
     if (window.Telegram && window.Telegram.WebApp) {
         try {
@@ -94,36 +97,17 @@ function initApp() {
         console.log('Telegram WebApp API not found - running in browser');
     }
     
-    // В Telegram показываем экран быстрее
-    const delay = (window.Telegram && window.Telegram.WebApp) ? 500 : 1000;
-    
-    // Принудительно показываем auth screen
+    // Сразу проверяем данные пользователя (без задержки показа auth screen)
+    // Это предотвращает мелькание экрана авторизации
     setTimeout(() => {
-        console.log('Timeout - showing auth screen');
-        forceShowAuth();
-        
-        // Проверяем, что экран действительно показался
-        setTimeout(() => {
-            const authScreen = document.getElementById('auth-screen');
-            if (authScreen && authScreen.classList.contains('active')) {
-                console.log('✅ Auth screen is active');
-            } else {
-                console.error('❌ Auth screen is NOT active, trying again...');
-                forceShowAuth();
-            }
-        }, 100);
-        
-        // Затем проверяем данные
-        setTimeout(() => {
-            try {
-                checkUserAuth();
-            } catch (e) {
-                console.error('Error in checkUserAuth:', e);
-                // В случае ошибки показываем auth screen
-                forceShowAuth();
-            }
-        }, 300);
-    }, delay);
+        try {
+            checkUserAuth();
+        } catch (e) {
+            console.error('Error in checkUserAuth:', e);
+            // В случае ошибки показываем auth screen
+            showAuthScreen();
+        }
+    }, 100); // Минимальная задержка только для инициализации Telegram API
 }
 
 // Функция для запуска инициализации
