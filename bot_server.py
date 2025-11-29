@@ -91,6 +91,13 @@ def webhook():
                 
                 result = send_message(chat_id, welcome_text, keyboard)
                 print(f'[WEBHOOK] Sent /start response to {chat_id}: {result}')
+                
+                # Убеждаемся, что сообщение отправлено успешно
+                if result.get('ok'):
+                    print(f'[WEBHOOK] ✅ Message sent successfully, message_id: {result.get("result", {}).get("message_id")}')
+                else:
+                    print(f'[WEBHOOK] ❌ Failed to send message: {result}')
+                
                 return jsonify({'ok': True})
             
             # Обработка других команд
