@@ -16,12 +16,15 @@ app = Flask(__name__)
 def keep_alive():
     """Периодически делает запросы к health endpoint для поддержания активности"""
     time.sleep(10)  # Ждём запуска сервера
+    port = os.environ.get('PORT', '8080')
     while True:
         try:
             # Делаем запрос к себе для поддержания активности
-            requests.get('http://localhost:8080/health', timeout=5)
+            requests.get(f'http://localhost:{port}/health', timeout=5)
+            print('[KEEP-ALIVE] Health check ping sent')
             time.sleep(30)  # Каждые 30 секунд
-        except:
+        except Exception as e:
+            print(f'[KEEP-ALIVE] Error: {e}')
             time.sleep(30)
 
 # Запускаем keep-alive в фоновом потоке
