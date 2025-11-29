@@ -22,6 +22,18 @@ else:
 WEB_APP_URL = os.environ.get('WEB_APP_URL', 'https://kobravania.github.io/klyro_app/')
 WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
 
+# Функция для проверки конфигурации при первом запросе
+def check_config():
+    """Проверяет конфигурацию и логирует статус"""
+    if not BOT_TOKEN:
+        print('[ERROR] BOT_TOKEN environment variable is not set!')
+        print('[ERROR] Please set BOT_TOKEN in Railway variables')
+        return False
+    else:
+        print(f'[INFO] BOT_TOKEN loaded (first 10 chars: {BOT_TOKEN[:10]}...)')
+        print(f'[INFO] WEB_APP_URL: {WEB_APP_URL}')
+        return True
+
 def send_message(chat_id, text, reply_markup=None, parse_mode=None):
     """Отправляет сообщение пользователю"""
     url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
