@@ -72,11 +72,17 @@ def index():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint для Railway"""
+    print('[HEALTH] Health check requested')
     return jsonify({
         'status': 'healthy',
         'bot': 'Klyro Bot',
         'token_set': bool(BOT_TOKEN)
     }), 200
+
+@app.route('/ping', methods=['GET'])
+def ping():
+    """Простой ping endpoint для keep-alive"""
+    return jsonify({'status': 'pong'}), 200
 
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
