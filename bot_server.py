@@ -48,18 +48,26 @@ def send_message(chat_id, text, reply_markup=None, parse_mode=None):
 @app.route('/', methods=['GET'])
 def index():
     """Главная страница - проверка работы сервера"""
+    # Проверяем конфигурацию при первом запросе
+    check_config()
     return jsonify({
         'status': 'ok',
         'bot': 'Klyro Bot',
-        'message': 'Server is running'
+        'message': 'Server is running',
+        'token_set': bool(BOT_TOKEN)
     })
 
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
     """Обработка webhook от Telegram"""
+    # Проверяем конфигурацию при первом запросе
+    if not hasattr(webhook, '_config_checked'):
+        check_config()
+        webhook._config_checked = True
+    
     # Обработка GET запросов (для проверки)
     if request.method == 'GET':
-        return jsonify({'status': 'ok', 'message': 'Webhook is ready'}), 200
+        return jsonify({'status': 'ok', 'message': 'Webhook is ready', 'token_set': bool(BOT_TOKEN)}), 200
     
     # Логируем входящий запрос
     print(f'[WEBHOOK] Received {request.method} request')
