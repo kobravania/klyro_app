@@ -24,7 +24,9 @@ function initApp() {
     }
     
     // Показываем экран загрузки на 1.5 секунды, затем проверяем авторизацию
+    console.log('App initialized, waiting 1.5s...');
     setTimeout(() => {
+        console.log('Timeout finished, checking auth...');
         try {
             checkUserAuth();
         } catch (e) {
@@ -33,6 +35,15 @@ function initApp() {
             showAuthScreen();
         }
     }, 1500);
+    
+    // Fallback: если через 3 секунды ничего не произошло, показываем auth screen
+    setTimeout(() => {
+        const activeScreen = document.querySelector('.screen.active');
+        if (activeScreen && activeScreen.id === 'loading-screen') {
+            console.warn('Still on loading screen after 3s, forcing auth screen');
+            showAuthScreen();
+        }
+    }, 3000);
 }
 
 // Запускаем при загрузке DOM
@@ -83,6 +94,7 @@ function checkUserAuth() {
         }
         
         // Если нет данных Telegram, показываем экран авторизации
+        console.log('No saved data or Telegram user, showing auth screen');
         showAuthScreen();
     } catch (e) {
         console.error('Error in checkUserAuth:', e);
@@ -92,9 +104,15 @@ function checkUserAuth() {
 
 // Показать экран авторизации
 function showAuthScreen() {
+    console.log('Showing auth screen');
     hideAllScreens();
     const authScreen = document.getElementById('auth-screen');
-    authScreen.classList.add('active');
+    if (authScreen) {
+        authScreen.classList.add('active');
+        console.log('Auth screen activated');
+    } else {
+        console.error('Auth screen element not found!');
+    }
     
     const authButton = document.getElementById('auth-button');
     authButton.addEventListener('click', () => {
@@ -430,9 +448,16 @@ function recalculateCalories() {
 // Скрыть все экраны
 function hideAllScreens() {
     try {
-        document.querySelectorAll('.screen').forEach(screen => {
+        const screens = document.querySelectorAll('.screen');
+        console.log('Hiding', screens.length, 'screens');
+        screens.forEach(screen => {
             screen.classList.remove('active');
         });
+        // Убеждаемся, что loading screen скрыт
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('active');
+        }
     } catch (e) {
         console.error('Error hiding screens:', e);
     }
