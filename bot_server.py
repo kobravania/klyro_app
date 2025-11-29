@@ -12,6 +12,13 @@ app = Flask(__name__)
 
 # Конфигурация
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # ⚠️ НЕ ХРАНИТЕ ТОКЕН В КОДЕ! Используйте переменные окружения
+
+# Проверка токена при запуске
+if not BOT_TOKEN:
+    print('[ERROR] BOT_TOKEN environment variable is not set!')
+    print('[ERROR] Please set BOT_TOKEN in Railway variables')
+else:
+    print(f'[INFO] BOT_TOKEN loaded (first 10 chars: {BOT_TOKEN[:10]}...)')
 WEB_APP_URL = os.environ.get('WEB_APP_URL', 'https://kobravania.github.io/klyro_app/')
 WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
 
