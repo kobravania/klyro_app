@@ -80,15 +80,17 @@ def webhook():
                     ]]
                 }
                 
-                # Короткое сообщение для лучшего отображения в списке чатов
-                welcome_text = '🚀 Klyro - ваш помощник по питанию'
+                # Очень короткое сообщение - как у Crypto Bot и BotFather
+                # Это важно для отображения кнопки в списке чатов
+                welcome_text = 'Klyro'
                 
                 result = send_message(chat_id, welcome_text, keyboard)
                 print(f'[WEBHOOK] Sent /start response to {chat_id}: {result}')
                 
                 # Убеждаемся, что сообщение отправлено успешно
                 if result.get('ok'):
-                    print(f'[WEBHOOK] ✅ Message sent successfully, message_id: {result.get("result", {}).get("message_id")}')
+                    message_id = result.get("result", {}).get("message_id")
+                    print(f'[WEBHOOK] ✅ Message sent successfully, message_id: {message_id}')
                 else:
                     print(f'[WEBHOOK] ❌ Failed to send message: {result}')
                 
