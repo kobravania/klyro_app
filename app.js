@@ -11,58 +11,76 @@ let currentStep = 1;
 const totalSteps = 4;
 let userData = null;
 
-// Инициализация приложения
+// Простая функция для скрытия loading и показа auth
+function forceShowAuth() {
+    console.log('Force showing auth screen');
+    const loadingScreen = document.getElementById('loading-screen');
+    const authScreen = document.getElementById('auth-screen');
+    
+    if (loadingScreen) {
+        loadingScreen.classList.remove('active');
+        loadingScreen.style.display = 'none';
+    }
+    
+    if (authScreen) {
+        authScreen.classList.add('active');
+        authScreen.style.display = 'block';
+    }
+}
+
+// Инициализация приложения - упрощённая версия
 function initApp() {
+    console.log('=== Klyro App Initializing ===');
+    
     // Инициализация Telegram Web App (если доступно)
     if (window.Telegram?.WebApp) {
         try {
             tg.ready();
             tg.expand();
+            console.log('Telegram WebApp initialized');
         } catch (e) {
             console.log('Telegram WebApp not available:', e);
         }
+    } else {
+        console.log('Telegram WebApp API not found');
     }
     
-    // Показываем экран загрузки на 1.5 секунды, затем проверяем авторизацию
-    console.log('App initialized, waiting 1.5s...');
+    // Принудительно показываем auth screen через 1 секунду
     setTimeout(() => {
-        console.log('Timeout finished, checking auth...');
-        try {
-            checkUserAuth();
-        } catch (e) {
-            console.error('Error in checkUserAuth:', e);
-            // В случае ошибки показываем экран авторизации
-            showAuthScreen();
-        }
-    }, 1500);
-    
-    // Fallback: если через 3 секунды ничего не произошло, показываем auth screen
-    setTimeout(() => {
-        const activeScreen = document.querySelector('.screen.active');
-        if (activeScreen && activeScreen.id === 'loading-screen') {
-            console.warn('Still on loading screen after 3s, forcing auth screen');
-            showAuthScreen();
-        }
-    }, 3000);
+        console.log('1s timeout - showing auth screen');
+        forceShowAuth();
+        
+        // Затем проверяем данные
+        setTimeout(() => {
+            try {
+                checkUserAuth();
+            } catch (e) {
+                console.error('Error in checkUserAuth:', e);
+            }
+        }, 500);
+    }, 1000);
 }
 
-// Запускаем при загрузке DOM
+// Запускаем сразу при загрузке скрипта
+console.log('Script loaded, DOM state:', document.readyState);
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOMContentLoaded fired');
+        initApp();
+    });
 } else {
-    // DOM уже загружен
-    initApp();
+    console.log('DOM already loaded, initializing immediately');
+    // Небольшая задержка для гарантии, что DOM готов
+    setTimeout(initApp, 100);
 }
 
-// Дополнительная проверка через небольшую задержку
+// Аварийный fallback - через 2 секунды принудительно показываем auth
 setTimeout(() => {
-    if (document.querySelector('#loading-screen.active')) {
-        console.warn('Loading screen still active, forcing transition');
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.classList.remove('active');
-        }
-        showAuthScreen();
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen && loadingScreen.classList.contains('active')) {
+        console.warn('EMERGENCY: Loading screen still active after 2s, forcing auth');
+        forceShowAuth();
     }
 }, 2000);
 
@@ -116,14 +134,21 @@ function checkUserAuth() {
 
 // Показать экран авторизации
 function showAuthScreen() {
-    console.log('Showing auth screen');
-    hideAllScreens();
-    const authScreen = document.getElementById('auth-screen');
-    if (authScreen) {
-        authScreen.classList.add('active');
-        console.log('Auth screen activated');
-    } else {
-        console.error('Auth screen element not found!');
+    console.log('showAuthScreen() called');
+    try {
+        hideAllScreens();
+        const authScreen = document.getElementById('auth-screen');
+        if (authScreen) {
+            authScreen.classList.add('active');
+            authScreen.style.display = 'block';
+            console.log('Auth screen activated');
+        } else {
+            console.error('Auth screen element not found!');
+            forceShowAuth();
+        }
+    } catch (e) {
+        console.error('Error in showAuthScreen:', e);
+        forceShowAuth();
     }
     
     const authButton = document.getElementById('auth-button');
@@ -464,11 +489,13 @@ function hideAllScreens() {
         console.log('Hiding', screens.length, 'screens');
         screens.forEach(screen => {
             screen.classList.remove('active');
+            screen.style.display = 'none';
         });
         // Убеждаемся, что loading screen скрыт
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.remove('active');
+            loadingScreen.style.display = 'none';
         }
     } catch (e) {
         console.error('Error hiding screens:', e);
