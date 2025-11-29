@@ -37,14 +37,16 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Screen Management */
 .screen {
-    display: none;
+    display: none !important;
     min-height: 100vh;
     padding: 20px;
     animation: fadeIn 0.3s ease-in-out;
+    position: relative;
+    width: 100%;
 }
 
 .screen.active {
-    display: block;
+    display: block !important;
 }
 
 @keyframes fadeIn {

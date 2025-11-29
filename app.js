@@ -14,17 +14,25 @@ let userData = null;
 // Простая функция для скрытия loading и показа auth
 function forceShowAuth() {
     console.log('Force showing auth screen');
-    const loadingScreen = document.getElementById('loading-screen');
-    const authScreen = document.getElementById('auth-screen');
-    
-    if (loadingScreen) {
-        loadingScreen.classList.remove('active');
-        loadingScreen.style.display = 'none';
-    }
-    
-    if (authScreen) {
-        authScreen.classList.add('active');
-        authScreen.style.display = 'block';
+    try {
+        // Скрываем все экраны
+        const allScreens = document.querySelectorAll('.screen');
+        allScreens.forEach(screen => {
+            screen.classList.remove('active');
+            screen.style.display = 'none';
+        });
+        
+        // Показываем auth screen
+        const authScreen = document.getElementById('auth-screen');
+        if (authScreen) {
+            authScreen.classList.add('active');
+            authScreen.style.display = 'block';
+            console.log('Auth screen should be visible now');
+        } else {
+            console.error('Auth screen element not found!');
+        }
+    } catch (e) {
+        console.error('Error in forceShowAuth:', e);
     }
 }
 
@@ -49,6 +57,17 @@ function initApp() {
     setTimeout(() => {
         console.log('1s timeout - showing auth screen');
         forceShowAuth();
+        
+        // Проверяем, что экран действительно показался
+        setTimeout(() => {
+            const authScreen = document.getElementById('auth-screen');
+            if (authScreen && authScreen.classList.contains('active')) {
+                console.log('✅ Auth screen is active');
+            } else {
+                console.error('❌ Auth screen is NOT active, trying again...');
+                forceShowAuth();
+            }
+        }, 100);
         
         // Затем проверяем данные
         setTimeout(() => {
