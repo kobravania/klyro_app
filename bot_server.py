@@ -82,7 +82,8 @@ def webhook():
                     'Нажмите кнопку ниже, чтобы начать:'
                 )
                 
-                send_message(chat_id, welcome_text, keyboard)
+                result = send_message(chat_id, welcome_text, keyboard)
+                print(f'[WEBHOOK] Sent /start response to {chat_id}: {result}')
                 return jsonify({'ok': True})
             
             # Обработка других команд
