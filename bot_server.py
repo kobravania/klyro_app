@@ -103,9 +103,19 @@ def polling_loop():
             print(f'[POLLING] Exception: {e}')
             time.sleep(5)
 
-# Запускаем polling в фоновом потоке
-polling_thread = threading.Thread(target=polling_loop, daemon=True)
-polling_thread.start()
+# Запускаем polling в фоновом потоке (после загрузки токена)
+def start_polling():
+    """Запускает polling после проверки токена"""
+    time.sleep(2)  # Даём время на загрузку токена
+    if BOT_TOKEN:
+        polling_thread = threading.Thread(target=polling_loop, daemon=True)
+        polling_thread.start()
+        print('[INIT] Polling thread started')
+    else:
+        print('[INIT] BOT_TOKEN not available, polling not started')
+
+polling_start_thread = threading.Thread(target=start_polling, daemon=True)
+polling_start_thread.start()
 
 # Конфигурация
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # ⚠️ НЕ ХРАНИТЕ ТОКЕН В КОДЕ! Используйте переменные окружения
