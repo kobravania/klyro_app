@@ -237,6 +237,31 @@
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // Дополнительная проверка после загрузки скрипта
+        window.addEventListener('load', function() {
+            console.log('Window loaded, checking state...');
+            setTimeout(function() {
+                var loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen && loadingScreen.classList.contains('active')) {
+                    console.warn('Loading screen still active after page load, forcing transition');
+                    if (typeof forceShowAuth === 'function') {
+                        forceShowAuth();
+                    } else if (typeof showAuthScreen === 'function') {
+                        showAuthScreen();
+                    } else {
+                        loadingScreen.classList.remove('active');
+                        loadingScreen.style.display = 'none';
+                        var authScreen = document.getElementById('auth-screen');
+                        if (authScreen) {
+                            authScreen.classList.add('active');
+                            authScreen.style.display = 'block';
+                        }
+                    }
+                }
+            }, 1500);
+        });
+    </script>
 </body>
 </html>
 
