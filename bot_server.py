@@ -15,14 +15,16 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN', '8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbX
 WEB_APP_URL = os.environ.get('WEB_APP_URL', 'https://kobravania.github.io/klyro_app/')
 WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
 
-def send_message(chat_id, text, reply_markup=None):
+def send_message(chat_id, text, reply_markup=None, parse_mode=None):
     """Отправляет сообщение пользователю"""
     url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
     data = {
         'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'HTML'
+        'text': text
     }
+    # Добавляем parse_mode только если нужен (для HTML форматирования)
+    if parse_mode:
+        data['parse_mode'] = parse_mode
     if reply_markup:
         data['reply_markup'] = reply_markup
     
@@ -82,9 +84,10 @@ def webhook():
                 
                 # Очень короткое сообщение - как у Crypto Bot и BotFather
                 # Это важно для отображения кнопки в списке чатов
+                # БЕЗ parse_mode - это критично для отображения кнопки в списке чатов!
                 welcome_text = 'Klyro'
                 
-                result = send_message(chat_id, welcome_text, keyboard)
+                result = send_message(chat_id, welcome_text, keyboard, parse_mode=None)
                 print(f'[WEBHOOK] Sent /start response to {chat_id}: {result}')
                 
                 # Убеждаемся, что сообщение отправлено успешно
@@ -106,7 +109,7 @@ def webhook():
                     '• Достигать целей по весу\n\n'
                     'Используйте /start для открытия приложения.'
                 )
-                send_message(chat_id, help_text)
+                send_message(chat_id, help_text, parse_mode='HTML')
                 return jsonify({'ok': True})
         
         return jsonify({'ok': True})
