@@ -46,7 +46,7 @@ fi
 
 # Устанавливаем webhook
 echo "4️⃣ Установка webhook..."
-RESPONSE=$(curl -s "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=${NGROK_URL}/webhook&drop_pending_updates=true")
+RESPONSE=$(curl -s "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${NGROK_URL}/webhook&drop_pending_updates=true")
 
 if echo "$RESPONSE" | grep -q '"ok":true'; then
     echo "   ✅ Webhook установлен!"
@@ -59,7 +59,7 @@ fi
 # Проверяем webhook
 echo "5️⃣ Проверка webhook..."
 sleep 2
-WEBHOOK_INFO=$(curl -s "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/getWebhookInfo")
+WEBHOOK_INFO=$(curl -s "https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo")
 WEBHOOK_URL=$(echo "$WEBHOOK_INFO" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('result', {}).get('url', ''))" 2>/dev/null)
 ERROR=$(echo "$WEBHOOK_INFO" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('result', {}).get('last_error_message', 'Нет'))" 2>/dev/null)
 

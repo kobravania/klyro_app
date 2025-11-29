@@ -12,7 +12,7 @@ Ngrok бесплатный туннель нестабилен и часто о�
 3. Подключите GitHub репозиторий `kobravania/klyro_app`
 4. Railway автоматически определит Python
 5. Добавьте переменную окружения:
-   - `BOT_TOKEN` = `8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y`
+   - `BOT_TOKEN` = `YOUR_BOT_TOKEN_HERE`
 6. Railway даст вам постоянный URL (например: `https://klyro-bot.railway.app`)
 7. Установите webhook:
    ```bash
@@ -20,7 +20,7 @@ Ngrok бесплатный туннель нестабилен и часто о�
    ```
 8. Обновите webhook в Telegram:
    ```bash
-   curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=https://klyro-bot.railway.app/webhook"
+   curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=https://klyro-bot.railway.app/webhook"
    ```
 
 ### Render (бесплатно)
@@ -40,7 +40,7 @@ ngrok http 5002
 
 # Скопировать HTTPS URL из вывода
 # Обновить webhook:
-curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=ВАШ_NGROK_URL/webhook"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=ВАШ_NGROK_URL/webhook"
 ```
 
 ## Проверка работы

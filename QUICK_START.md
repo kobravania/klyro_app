@@ -72,7 +72,7 @@ curl "https://abc123.ngrok.io/set_webhook?url=https://abc123.ngrok.io/webhook"
 ## Проверка webhook:
 
 ```bash
-curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/getWebhookInfo"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/getWebhookInfo"
 ```
 
 ## Остановка:

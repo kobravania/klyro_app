@@ -26,7 +26,7 @@
 Обновите webhook командой (замените на ваш полный URL):
 
 ```bash
-curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=https://web-production-f770.up.railway.app/webhook&drop_pending_updates=true"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=https://web-production-f770.up.railway.app/webhook&drop_pending_updates=true"
 ```
 
 Или я могу сделать это автоматически, если вы дадите мне URL!

@@ -38,13 +38,13 @@ railway up
 1. Откройте ваш проект
 2. Перейдите в **Settings** → **Variables**
 3. Добавьте переменные:
-   - `BOT_TOKEN` = `8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y`
+   - `BOT_TOKEN` = `YOUR_BOT_TOKEN_HERE`
    - `WEB_APP_URL` = `https://kobravania.github.io/klyro_app/`
    - `PORT` = `5000` (Railway установит автоматически)
 
 Или через CLI:
 ```bash
-railway variables set BOT_TOKEN=8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y
+railway variables set BOT_TOKEN=YOUR_BOT_TOKEN_HERE
 railway variables set WEB_APP_URL=https://kobravania.github.io/klyro_app/
 ```
 
@@ -63,19 +63,19 @@ railway domain
 Замените `ВАШ_RAILWAY_URL` на ваш URL:
 
 ```bash
-curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=ВАШ_RAILWAY_URL/webhook&drop_pending_updates=true"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=ВАШ_RAILWAY_URL/webhook&drop_pending_updates=true"
 ```
 
 Например:
 ```bash
-curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=https://klyro-bot-production.up.railway.app/webhook&drop_pending_updates=true"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=https://klyro-bot-production.up.railway.app/webhook&drop_pending_updates=true"
 ```
 
 ## Шаг 6: Проверка
 
 1. Проверьте webhook:
 ```bash
-curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/getWebhookInfo"
+curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/getWebhookInfo"
 ```
 
 2. Отправьте `/start` боту - он должен автоматически ответить!

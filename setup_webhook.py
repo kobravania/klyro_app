@@ -6,8 +6,9 @@
 
 import requests
 import json
+import os
 
-BOT_TOKEN = "8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y"
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # ⚠️ НЕ ХРАНИТЕ ТОКЕН В КОДЕ! Используйте: export BOT_TOKEN="ваш_токен"
 WEB_APP_URL = "https://kobravania.github.io/klyro_app/"
 
 def set_commands():

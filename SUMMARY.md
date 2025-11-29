@@ -29,11 +29,11 @@
 3. New Project → Deploy from GitHub repo
 4. Выберите `kobravania/klyro_app`
 5. Settings → Variables → Добавьте:
-   - `BOT_TOKEN` = `8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y`
+   - `BOT_TOKEN` = `YOUR_BOT_TOKEN_HERE`
 6. Скопируйте URL из Domains
 7. Обновите webhook:
    ```bash
-   curl "https://api.telegram.org/bot8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y/setWebhook?url=ВАШ_RAILWAY_URL/webhook"
+   curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=ВАШ_RAILWAY_URL/webhook"
    ```
 
 **Подробная инструкция:** `QUICK_RAILWAY_SETUP.md`

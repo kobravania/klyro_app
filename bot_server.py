@@ -11,7 +11,7 @@ import os
 app = Flask(__name__)
 
 # Конфигурация
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # ⚠️ НЕ ХРАНИТЕ ТОКЕН В КОДЕ! Используйте переменные окружения
 WEB_APP_URL = os.environ.get('WEB_APP_URL', 'https://kobravania.github.io/klyro_app/')
 WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
 

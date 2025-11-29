@@ -4,6 +4,7 @@
 """
 import requests
 import json
+import os
 import time
 
 # Render API (нужен API ключ)
@@ -27,7 +28,7 @@ def create_render_service():
         "envVars": [
             {
                 "key": "BOT_TOKEN",
-                "value": "8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y"
+                "value": os.environ.get('BOT_TOKEN', '')  # ⚠️ Используйте переменную окружения!
             },
             {
                 "key": "WEB_APP_URL",
