@@ -155,19 +155,29 @@ function checkUserAuth() {
 function showAuthScreen() {
     console.log('showAuthScreen() called');
     try {
-        hideAllScreens();
+        // Скрываем все экраны явно
+        const allScreens = document.querySelectorAll('.screen');
+        console.log('Hiding', allScreens.length, 'screens');
+        allScreens.forEach(screen => {
+            screen.classList.remove('active');
+            screen.style.display = 'none';
+        });
+        
+        // Показываем auth screen
         const authScreen = document.getElementById('auth-screen');
         if (authScreen) {
             authScreen.classList.add('active');
             authScreen.style.display = 'block';
-            console.log('Auth screen activated');
+            console.log('✅ Auth screen activated and visible');
         } else {
-            console.error('Auth screen element not found!');
+            console.error('❌ Auth screen element not found!');
             forceShowAuth();
+            return;
         }
     } catch (e) {
         console.error('Error in showAuthScreen:', e);
         forceShowAuth();
+        return;
     }
     
     const authButton = document.getElementById('auth-button');
