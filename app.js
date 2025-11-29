@@ -54,6 +54,18 @@ if (document.readyState === 'loading') {
     initApp();
 }
 
+// Дополнительная проверка через небольшую задержку
+setTimeout(() => {
+    if (document.querySelector('#loading-screen.active')) {
+        console.warn('Loading screen still active, forcing transition');
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('active');
+        }
+        showAuthScreen();
+    }
+}, 2000);
+
 // Проверка авторизации и загрузка данных
 function checkUserAuth() {
     try {
