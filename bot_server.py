@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 # Конфигурация
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8515314140:AAHdCnEUIxYRoJqRRA9k5byj2wbXMj79C_Y')
-WEB_APP_URL = 'https://kobravania.github.io/klyro_app/'
+WEB_APP_URL = os.environ.get('WEB_APP_URL', 'https://kobravania.github.io/klyro_app/')
 WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
 
 def send_message(chat_id, text, reply_markup=None):
