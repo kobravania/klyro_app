@@ -9,6 +9,33 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        // Ждём загрузки Telegram Web App API
+        (function() {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 секунд максимум
+            
+            function checkTelegramAPI() {
+                attempts++;
+                if (window.Telegram && window.Telegram.WebApp) {
+                    console.log('Telegram WebApp API loaded after', attempts * 100, 'ms');
+                    window.telegramReady = true;
+                } else if (attempts < maxAttempts) {
+                    setTimeout(checkTelegramAPI, 100);
+                } else {
+                    console.log('Telegram WebApp API not loaded after timeout');
+                    window.telegramReady = false;
+                }
+            }
+            
+            // Начинаем проверку сразу
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', checkTelegramAPI);
+            } else {
+                checkTelegramAPI();
+            }
+        })();
+    </script>
 </head>
 <body>
     <div id="app">

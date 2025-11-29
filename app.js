@@ -97,34 +97,29 @@ function initApp() {
     }, delay);
 }
 
-// Запускаем сразу при загрузке скрипта
-console.log('Script loaded, DOM state:', document.readyState);
-
-// Для Telegram Web App инициализируем сразу
-if (window.Telegram && window.Telegram.WebApp) {
-    console.log('Telegram detected - initializing immediately');
-    // В Telegram DOM обычно уже готов
+// Функция для запуска инициализации
+function startApp() {
+    console.log('Starting app initialization...');
+    console.log('DOM state:', document.readyState);
+    console.log('Telegram API available:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
+    
+    // Ждём готовности DOM
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (Telegram)');
-            initApp();
+            console.log('DOMContentLoaded fired');
+            // Небольшая задержка для Telegram API
+            setTimeout(initApp, 200);
         });
     } else {
-        console.log('DOM ready (Telegram) - initializing');
-        setTimeout(initApp, 50);
-    }
-} else {
-    // Для браузера стандартная инициализация
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (Browser)');
-            initApp();
-        });
-    } else {
-        console.log('DOM already loaded (Browser) - initializing');
-        setTimeout(initApp, 100);
+        console.log('DOM already loaded');
+        // Для Telegram даём больше времени на загрузку API
+        const delay = (window.Telegram && window.Telegram.WebApp) ? 100 : 200;
+        setTimeout(initApp, delay);
     }
 }
+
+// Запускаем инициализацию
+startApp();
 
 // Аварийный fallback - через 2 секунды принудительно показываем auth
 setTimeout(() => {
