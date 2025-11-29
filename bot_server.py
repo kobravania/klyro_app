@@ -55,7 +55,16 @@ def index():
         'bot': 'Klyro Bot',
         'message': 'Server is running',
         'token_set': bool(BOT_TOKEN)
-    })
+    }), 200
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint для Railway"""
+    return jsonify({
+        'status': 'healthy',
+        'bot': 'Klyro Bot',
+        'token_set': bool(BOT_TOKEN)
+    }), 200
 
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
