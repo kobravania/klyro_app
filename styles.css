@@ -43,10 +43,14 @@ h1, h2, h3, h4, h5, h6 {
     animation: fadeIn 0.3s ease-in-out;
     position: relative;
     width: 100%;
+    visibility: hidden; /* Дополнительно скрываем для предотвращения мелькания */
+    opacity: 0; /* Скрываем через opacity для плавности */
 }
 
 .screen.active {
     display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 @keyframes fadeIn {

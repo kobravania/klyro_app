@@ -97,17 +97,15 @@ function initApp() {
         console.log('Telegram WebApp API not found - running in browser');
     }
     
-    // Сразу проверяем данные пользователя (без задержки показа auth screen)
+    // Сразу проверяем данные пользователя СИНХРОННО (без задержки)
     // Это предотвращает мелькание экрана авторизации
-    setTimeout(() => {
-        try {
-            checkUserAuth();
-        } catch (e) {
-            console.error('Error in checkUserAuth:', e);
-            // В случае ошибки показываем auth screen
-            showAuthScreen();
-        }
-    }, 100); // Минимальная задержка только для инициализации Telegram API
+    try {
+        checkUserAuth();
+    } catch (e) {
+        console.error('Error in checkUserAuth:', e);
+        // В случае ошибки показываем auth screen
+        showAuthScreen();
+    }
 }
 
 // Функция для запуска инициализации
@@ -137,14 +135,18 @@ startApp();
 // Проверка авторизации и загрузка данных
 function checkUserAuth() {
     try {
+        // Сначала скрываем все экраны, чтобы не было мелькания
+        hideAllScreens();
+        
         // Проверяем наличие сохранённых данных
         const savedData = localStorage.getItem('klyro_user_data');
         
         if (savedData) {
             try {
                 userData = JSON.parse(savedData);
-                // Проверяем, что данные валидны
+                // Проверяем, что данные валидны (есть хотя бы возраст или имя)
                 if (userData && (userData.age || userData.firstName)) {
+                    // Сразу показываем профиль, без задержек
                     showProfileScreen();
                     return;
                 }
