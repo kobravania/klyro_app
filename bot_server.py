@@ -31,6 +31,82 @@ def keep_alive():
 keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
 keep_alive_thread.start()
 
+# Polling механизм для получения обновлений от Telegram
+last_update_id = 0
+
+def process_update(update):
+    """Обрабатывает одно обновление от Telegram"""
+    global last_update_id
+    try:
+        update_id = update.get('update_id', 0)
+        last_update_id = max(last_update_id, update_id)
+        
+        if 'message' in update:
+            message = update['message']
+            chat_id = message['chat']['id']
+            text = message.get('text', '')
+            
+            if text == '/start' or text.startswith('/start'):
+                print(f'[POLLING] Processing /start from chat {chat_id}')
+                keyboard = {
+                    'inline_keyboard': [[
+                        {
+                            'text': 'ОТКРЫТЬ',
+                            'web_app': {
+                                'url': WEB_APP_URL
+                            }
+                        }
+                    ]]
+                }
+                welcome_text = (
+                    '👋 Добро пожаловать в Klyro!\n\n'
+                    'Ваш персональный помощник по питанию и фитнесу.\n\n'
+                    '📊 Рассчитывайте калории\n'
+                    '🎯 Отслеживайте прогресс\n'
+                    '💪 Достигайте целей\n\n'
+                    'Нажмите кнопку ниже, чтобы начать:'
+                )
+                result = send_message(chat_id, welcome_text, keyboard, parse_mode=None)
+                print(f'[POLLING] Sent response: {result.get("ok", False)}')
+    except Exception as e:
+        print(f'[POLLING] Error processing update: {e}')
+
+def polling_loop():
+    """Основной цикл polling для получения обновлений"""
+    global last_update_id
+    if not BOT_TOKEN:
+        print('[POLLING] BOT_TOKEN not set, skipping polling')
+        return
+    
+    print('[POLLING] Starting polling loop...')
+    time.sleep(5)  # Ждём запуска сервера
+    
+    while True:
+        try:
+            url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
+            params = {
+                'offset': last_update_id + 1,
+                'timeout': 30,
+                'allowed_updates': ['message']
+            }
+            response = requests.get(url, params=params, timeout=35)
+            result = response.json()
+            
+            if result.get('ok') and result.get('result'):
+                updates = result['result']
+                for update in updates:
+                    process_update(update)
+            elif not result.get('ok'):
+                print(f'[POLLING] Error: {result.get("description", "Unknown")}')
+                time.sleep(5)
+        except Exception as e:
+            print(f'[POLLING] Exception: {e}')
+            time.sleep(5)
+
+# Запускаем polling в фоновом потоке
+polling_thread = threading.Thread(target=polling_loop, daemon=True)
+polling_thread.start()
+
 # Конфигурация
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')  # ⚠️ НЕ ХРАНИТЕ ТОКЕН В КОДЕ! Используйте переменные окружения
 
