@@ -167,8 +167,13 @@ def webhook():
         return jsonify({'ok': True})
     
     except Exception as e:
-        print(f'Error: {e}')
-        return jsonify({'ok': False, 'error': str(e)}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f'[WEBHOOK] ❌ ERROR: {e}')
+        print(f'[WEBHOOK] Traceback: {error_trace}')
+        # Всегда возвращаем 200 OK для Telegram, даже при ошибке
+        # Иначе Telegram будет считать webhook нерабочим
+        return jsonify({'ok': True}), 200
 
 @app.route('/set_webhook', methods=['GET'])
 def set_webhook():
