@@ -108,6 +108,14 @@ def ping():
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
     """Обработка webhook от Telegram"""
+    # Логируем ВСЕ входящие запросы сразу
+    print(f'[WEBHOOK] ===== NEW REQUEST =====')
+    print(f'[WEBHOOK] Method: {request.method}')
+    print(f'[WEBHOOK] URL: {request.url}')
+    print(f'[WEBHOOK] Headers: {dict(request.headers)}')
+    print(f'[WEBHOOK] Content-Type: {request.content_type}')
+    print(f'[WEBHOOK] Data: {request.get_data(as_text=True)[:200]}')  # Первые 200 символов
+    
     # Проверяем конфигурацию при первом запросе
     if not hasattr(webhook, '_config_checked'):
         check_config()
@@ -115,12 +123,8 @@ def webhook():
     
     # Обработка GET запросов (для проверки)
     if request.method == 'GET':
+        print('[WEBHOOK] GET request - returning OK')
         return jsonify({'status': 'ok', 'message': 'Webhook is ready', 'token_set': bool(BOT_TOKEN)}), 200
-    
-    # Логируем входящий запрос
-    print(f'[WEBHOOK] Received {request.method} request')
-    print(f'[WEBHOOK] Headers: {dict(request.headers)}')
-    print(f'[WEBHOOK] Content-Type: {request.content_type}')
     
     # Проверка заголовков от Telegram
     if not request.is_json:
