@@ -26,8 +26,15 @@ def send_message(chat_id, text, reply_markup=None):
     if reply_markup:
         data['reply_markup'] = reply_markup
     
-    response = requests.post(url, json=data)
-    return response.json()
+    try:
+        response = requests.post(url, json=data, timeout=5)
+        result = response.json()
+        if not result.get('ok'):
+            print(f'[ERROR] Failed to send message: {result}')
+        return result
+    except Exception as e:
+        print(f'[ERROR] Exception sending message: {e}')
+        return {'ok': False, 'error': str(e)}
 
 @app.route('/', methods=['GET'])
 def index():
