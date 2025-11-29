@@ -38,11 +38,21 @@ def index():
         'message': 'Server is running'
     })
 
-@app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
     """Обработка webhook от Telegram"""
+    # Обработка GET запросов (для проверки)
+    if request.method == 'GET':
+        return jsonify({'status': 'ok', 'message': 'Webhook is ready'}), 200
+    
+    # Проверка заголовков от Telegram
+    if not request.is_json:
+        return jsonify({'ok': True}), 200
+    
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'ok': True}), 200
         
         # Проверяем, что это сообщение
         if 'message' in data:
@@ -110,7 +120,25 @@ def set_webhook():
     response = requests.post(url, json=data)
     return jsonify(response.json())
 
+@app.route('/log', methods=['POST'])
+def log():
+    """Приём логов от клиента для отладки"""
+    try:
+        data = request.get_json()
+        print(f"[CLIENT LOG] {data.get('level', 'info').upper()}: {data.get('message', '')}")
+        print(f"  User Agent: {data.get('userAgent', 'Unknown')}")
+        print(f"  Telegram: {data.get('telegram', 'Unknown')}")
+        print(f"  Time: {data.get('timestamp', 'Unknown')}")
+        return jsonify({'ok': True})
+    except Exception as e:
+        print(f"Error processing log: {e}")
+        return jsonify({'ok': False}), 500
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    port = int(os.environ.get('PORT', 5001))  # Используем 5001 если 5000 занят
+    try:
+        app.run(host='0.0.0.0', port=port, debug=False)
+    except OSError:
+        # Если порт занят, пробуем другой
+        app.run(host='0.0.0.0', port=5002, debug=False)
 

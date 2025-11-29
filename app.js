@@ -43,6 +43,35 @@ function forceShowAuth() {
     }
 }
 
+// Функция для отправки логов на сервер (для отладки)
+function sendLogToServer(level, message) {
+    try {
+        // Отправляем только важные логи
+        if (level === 'error' || message.includes('ERROR') || message.includes('❌')) {
+            fetch('https://9d8bc4492f90.ngrok-free.app/log', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    level,
+                    message,
+                    userAgent: navigator.userAgent,
+                    timestamp: new Date().toISOString(),
+                    telegram: window.Telegram && window.Telegram.WebApp ? 'yes' : 'no'
+                })
+            }).catch(() => {}); // Игнорируем ошибки отправки
+        }
+    } catch (e) {
+        // Игнорируем ошибки
+    }
+}
+
+// Перехватываем console.error для отправки на сервер
+const originalError = console.error;
+console.error = function(...args) {
+    originalError.apply(console, args);
+    sendLogToServer('error', args.join(' '));
+};
+
 // Инициализация приложения - упрощённая версия
 function initApp() {
     console.log('=== Klyro App Initializing ===');
