@@ -610,7 +610,26 @@ if (typeof window !== 'undefined') {
 
 // Обновление Dashboard с данными за сегодня
 function updateDashboard() {
-    if (!userData) return;
+    if (!userData) {
+        console.log('[DASHBOARD] No userData, skipping');
+        return;
+    }
+    
+    // Проверяем наличие элементов
+    const consumedEl = document.getElementById('consumed-calories');
+    const targetEl = document.getElementById('target-calories');
+    const progressEl = document.getElementById('calories-progress-fill');
+    const dateEl = document.getElementById('today-date');
+    const chartEl = document.getElementById('macros-chart');
+    
+    if (!consumedEl || !targetEl || !progressEl) {
+        console.error('[DASHBOARD] Required elements not found!', {
+            consumed: !!consumedEl,
+            target: !!targetEl,
+            progress: !!progressEl
+        });
+        return;
+    }
     
     const today = new Date().toISOString().split('T')[0];
     const diary = getDiaryForDate(today);
@@ -622,22 +641,25 @@ function updateDashboard() {
     const targetCalories = calculateCalories();
     
     // Обновляем калории сегодня
-    document.getElementById('consumed-calories').textContent = Math.round(totalKcal);
-    document.getElementById('target-calories').textContent = Math.round(targetCalories);
+    consumedEl.textContent = Math.round(totalKcal);
+    targetEl.textContent = Math.round(targetCalories);
     
     // Прогресс-бар калорий
-    const progress = Math.min((totalKcal / targetCalories) * 100, 100);
-    document.getElementById('calories-progress-fill').style.width = `${progress}%`;
+    const progress = targetCalories > 0 ? Math.min((totalKcal / targetCalories) * 100, 100) : 0;
+    progressEl.style.width = `${progress}%`;
     
     // Обновляем дату
-    const dateEl = document.getElementById('today-date');
     if (dateEl) {
         const date = new Date();
         dateEl.textContent = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     }
     
-    // Обновляем макросы
-    updateMacrosChart(totalProtein, totalFat, totalCarbs);
+    // Обновляем макросы только если canvas существует
+    if (chartEl) {
+        updateMacrosChart(totalProtein, totalFat, totalCarbs);
+    } else {
+        console.warn('[DASHBOARD] Macros chart canvas not found');
+    }
 }
 
 // Обновление графика макросов (donut chart)
@@ -696,18 +718,16 @@ const originalShowProfileScreen = showProfileScreen;
 // Переопределяем showProfileScreen для обновления Dashboard
 function showProfileScreenExtended() {
     originalShowProfileScreen();
+    // Увеличиваем задержку для гарантии загрузки DOM
     setTimeout(() => {
-        updateDashboard();
-        // Обновляем макросы если график уже создан
-        if (macrosChart) {
-            const today = new Date().toISOString().split('T')[0];
-            const diary = getDiaryForDate(today);
-            const totalProtein = diary.reduce((sum, item) => sum + item.protein, 0);
-            const totalFat = diary.reduce((sum, item) => sum + item.fat, 0);
-            const totalCarbs = diary.reduce((sum, item) => sum + item.carbs, 0);
-            updateMacrosChart(totalProtein, totalFat, totalCarbs);
+        console.log('[DASHBOARD] Updating dashboard...');
+        try {
+            updateDashboard();
+            console.log('[DASHBOARD] Dashboard updated successfully');
+        } catch (e) {
+            console.error('[DASHBOARD] Error updating dashboard:', e);
         }
-    }, 100);
+    }, 300);
 }
 
 // Заменяем функцию
