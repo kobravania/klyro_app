@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Klyro - Персональный помощник по питанию</title>
-        <link rel="stylesheet" href="styles.css?v=4">
+        <link rel="stylesheet" href="styles.css?v=5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
@@ -207,11 +207,56 @@
                     <h2 id="user-name" class="profile-name"></h2>
                 </div>
 
+                <!-- Расширенный Dashboard: калории сегодня -->
                 <div class="stats-card">
                     <div class="stat-item">
                         <div class="stat-label">Рекомендуемые калории</div>
                         <div class="stat-value" id="calories-value">0</div>
                         <div class="stat-unit">ккал/день</div>
+                    </div>
+                </div>
+
+                <!-- Блок "Сегодня употреблено" -->
+                <div class="today-stats-card">
+                    <div class="today-header">
+                        <h3>Сегодня</h3>
+                        <span class="today-date" id="today-date"></span>
+                    </div>
+                    <div class="calories-progress">
+                        <div class="calories-consumed">
+                            <span class="consumed-value" id="consumed-calories">0</span>
+                            <span class="consumed-label">из <span id="target-calories">0</span> ккал</span>
+                        </div>
+                        <div class="progress-bar-calories">
+                            <div class="progress-fill-calories" id="calories-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Макросы (donut chart) -->
+                <div class="macros-card">
+                    <h3 class="macros-title">Макронутриенты</h3>
+                    <div class="macros-container">
+                        <div class="macros-chart">
+                            <canvas id="macros-chart"></canvas>
+                        </div>
+                        <div class="macros-legend">
+                            <div class="macro-item">
+                                <span class="macro-color" style="background: #5DADE2;"></span>
+                                <span class="macro-label">Белки</span>
+                                <span class="macro-value" id="protein-value">0г</span>
+                            </div>
+                            <div class="macro-item">
+                                <span class="macro-color" style="background: #82E0AA;"></span>
+                                <span class="macro-label">Углеводы</span>
+                                <span class="macro-value" id="carbs-value">0г</span>
+                            </div>
+                            <div class="macro-item">
+                                <span class="macro-color" style="background: #F39C12;"></span>
+                                <span class="macro-label">Жиры</span>
+                                <span class="macro-value" id="fat-value">0г</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -242,13 +287,42 @@
                     </div>
                 </div>
 
-                <div class="action-buttons">
-                    <button class="btn btn-icon" onclick="editProfile()" title="Редактировать">
+                <!-- Быстрые кнопки -->
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-add-food" onclick="showAddFoodScreen()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            <path d="M12 5v14m7-7H5"></path>
                         </svg>
-                        Редактировать
+                        Добавить приём пищи
+                    </button>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-icon" onclick="showDiaryScreen()" title="Дневник">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"></path>
+                        </svg>
+                        Дневник
+                    </button>
+                    <button class="btn btn-icon" onclick="showHistoryScreen()" title="История">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3v18h18M7 16l4-4 4 4 6-6"></path>
+                        </svg>
+                        История
+                    </button>
+                    <button class="btn btn-icon" onclick="showActivityScreen()" title="Тренировки">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"></path>
+                        </svg>
+                        Тренировки
+                    </button>
+                    <button class="btn btn-icon" onclick="showSettingsScreen()" title="Настройки">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+                        </svg>
+                        Настройки
                     </button>
                     <button class="btn btn-icon" onclick="recalculateCalories()" title="Пересчитать">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -261,8 +335,343 @@
                 </div>
             </div>
         </div>
+
+        <!-- Экран добавления еды -->
+        <div id="add-food-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Добавить приём пищи</h2>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="food-search" class="input" placeholder="Поиск продукта..." oninput="searchProducts(this.value)">
+                </div>
+
+                <div id="products-list" class="products-list">
+                    <!-- Список продуктов будет загружен динамически -->
+                </div>
+
+                <div id="add-custom-product" class="add-custom-section" style="display: none;">
+                    <button class="btn btn-secondary" onclick="showCustomProductForm()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14m7-7H5"></path>
+                        </svg>
+                        Добавить свой продукт
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Форма добавления своего продукта -->
+        <div id="custom-product-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showAddFoodScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Новый продукт</h2>
+                </div>
+
+                <div class="form-group">
+                    <label for="custom-name">Название</label>
+                    <input type="text" id="custom-name" class="input" placeholder="Название продукта">
+                </div>
+                <div class="form-group">
+                    <label for="custom-kcal">Калории (на 100г)</label>
+                    <input type="number" id="custom-kcal" class="input" placeholder="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="custom-protein">Белки (г на 100г)</label>
+                    <input type="number" id="custom-protein" class="input" placeholder="0" min="0" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="custom-fat">Жиры (г на 100г)</label>
+                    <input type="number" id="custom-fat" class="input" placeholder="0" min="0" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="custom-carbs">Углеводы (г на 100г)</label>
+                    <input type="number" id="custom-carbs" class="input" placeholder="0" min="0" step="0.1">
+                </div>
+
+                <button class="btn btn-primary" onclick="saveCustomProduct()">Сохранить</button>
+            </div>
+        </div>
+
+        <!-- Экран выбора количества продукта -->
+        <div id="product-amount-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showAddFoodScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title" id="product-amount-title">Количество</h2>
+                </div>
+
+                <div class="product-info-card">
+                    <h3 id="selected-product-name"></h3>
+                    <div class="product-macros-preview">
+                        <span id="preview-kcal">0 ккал</span>
+                        <span id="preview-protein">0г белка</span>
+                        <span id="preview-fat">0г жиров</span>
+                        <span id="preview-carbs">0г углеводов</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="product-grams">Вес (граммы)</label>
+                    <input type="number" id="product-grams" class="input" placeholder="100" min="1" value="100" oninput="updateProductPreview()">
+                </div>
+
+                <div class="quick-amounts">
+                    <button class="btn-quick" onclick="setQuickAmount(50)">50г</button>
+                    <button class="btn-quick" onclick="setQuickAmount(100)">100г</button>
+                    <button class="btn-quick" onclick="setQuickAmount(150)">150г</button>
+                    <button class="btn-quick" onclick="setQuickAmount(200)">200г</button>
+                </div>
+
+                <button class="btn btn-primary" onclick="addFoodToDiary()">Добавить в день</button>
+            </div>
+        </div>
+
+        <!-- Экран дневника питания -->
+        <div id="diary-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Дневник питания</h2>
+                    <button class="btn-icon-small" onclick="changeDiaryDate(-1)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6"></path>
+                        </svg>
+                    </button>
+                    <span class="diary-date" id="diary-date"></span>
+                    <button class="btn-icon-small" onclick="changeDiaryDate(1)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="diary-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Калории</span>
+                        <span class="summary-value" id="diary-total-kcal">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Белки</span>
+                        <span class="summary-value" id="diary-total-protein">0г</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Жиры</span>
+                        <span class="summary-value" id="diary-total-fat">0г</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Углеводы</span>
+                        <span class="summary-value" id="diary-total-carbs">0г</span>
+                    </div>
+                </div>
+
+                <div id="diary-meals" class="diary-meals">
+                    <!-- Приёмы пищи будут загружены динамически -->
+                </div>
+
+                <button class="btn btn-primary btn-fab" onclick="showAddFoodScreen()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14m7-7H5"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран истории и трендов -->
+        <div id="history-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">История</h2>
+                </div>
+
+                <div class="history-periods">
+                    <button class="btn-period active" onclick="setHistoryPeriod(7)">7 дней</button>
+                    <button class="btn-period" onclick="setHistoryPeriod(14)">14 дней</button>
+                    <button class="btn-period" onclick="setHistoryPeriod(30)">30 дней</button>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="calories-chart"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="weight-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран тренировок -->
+        <div id="activity-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Тренировки</h2>
+                </div>
+
+                <div class="activity-list" id="activity-list">
+                    <!-- Список активностей будет загружен динамически -->
+                </div>
+
+                <button class="btn btn-primary" onclick="showAddActivityForm()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14m7-7H5"></path>
+                    </svg>
+                    Добавить активность
+                </button>
+            </div>
+        </div>
+
+        <!-- Форма добавления активности -->
+        <div id="add-activity-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showActivityScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Новая тренировка</h2>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity-name">Вид активности</label>
+                    <select id="activity-name" class="input" onchange="updateActivityCalories()">
+                        <option value="">Выберите активность</option>
+                        <option value="running" data-met="11.5">Бег (10 км/ч)</option>
+                        <option value="running-fast" data-met="16">Бег (15 км/ч)</option>
+                        <option value="walking" data-met="3.5">Ходьба</option>
+                        <option value="cycling" data-met="8">Велосипед</option>
+                        <option value="swimming" data-met="8">Плавание</option>
+                        <option value="gym" data-met="5">Тренажёрный зал</option>
+                        <option value="yoga" data-met="3">Йога</option>
+                        <option value="pilates" data-met="3">Пилатес</option>
+                        <option value="dancing" data-met="6">Танцы</option>
+                        <option value="basketball" data-met="8">Баскетбол</option>
+                        <option value="football" data-met="7">Футбол</option>
+                        <option value="tennis" data-met="7">Теннис</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity-duration">Длительность (минуты)</label>
+                    <input type="number" id="activity-duration" class="input" placeholder="30" min="1" value="30" oninput="updateActivityCalories()">
+                </div>
+
+                <div class="activity-preview">
+                    <div class="preview-calories">
+                        Сожжено: <span id="activity-calories">0</span> ккал
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="add-to-diary" checked>
+                        <span>Учесть калории в дневнике</span>
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveActivity()">Сохранить</button>
+            </div>
+        </div>
+
+        <!-- Экран настроек -->
+        <div id="settings-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Настройки</h2>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Профиль</h3>
+                    <button class="btn btn-secondary" onclick="editProfile()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        Редактировать профиль
+                    </button>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Данные</h3>
+                    <button class="btn btn-secondary" onclick="exportData()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Экспорт данных (CSV)
+                    </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Импорт данных (CSV)
+                    </button>
+                    <input type="file" id="import-file" accept=".csv" style="display: none;" onchange="importData(event)">
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Единицы измерения</h3>
+                    <div class="form-group">
+                        <label class="radio-label">
+                            <input type="radio" name="units" value="metric" checked class="radio-input" onchange="setUnits('metric')">
+                            <span class="radio-custom">Метрические (кг, см)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="units" value="imperial" class="radio-input" onchange="setUnits('imperial')">
+                            <span class="radio-custom">Имперские (фунты, дюймы)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">О приложении</h3>
+                    <div class="info-text">
+                        <p>Klyro v1.0</p>
+                        <p>Персональный помощник по питанию и фитнесу</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="app.js"></script>
     <script>
         // Скрываем все экраны сразу при загрузке, чтобы не было мелькания

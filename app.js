@@ -574,10 +574,776 @@ function hideAllScreens() {
     }
 }
 
+// ============================================
+// НОВЫЕ МОДУЛИ: Трекер питания и активности
+// ============================================
+
+// Глобальные переменные для новых модулей
+let productsDatabase = [];
+let selectedProduct = null;
+let macrosChart = null;
+let caloriesChart = null;
+let weightChart = null;
+let currentDiaryDate = new Date().toISOString().split('T')[0];
+let currentHistoryPeriod = 7;
+
+// Загрузка базы продуктов
+async function loadProductsDatabase() {
+    try {
+        const response = await fetch('data/products.json');
+        productsDatabase = await response.json();
+        console.log(`Загружено ${productsDatabase.length} продуктов`);
+    } catch (e) {
+        console.error('Ошибка загрузки продуктов:', e);
+        productsDatabase = [];
+    }
+}
+
+// Инициализация новых модулей при загрузке
+if (typeof window !== 'undefined') {
+    loadProductsDatabase();
+}
+
+// ============================================
+// РАСШИРЕНИЕ DASHBOARD (профиля)
+// ============================================
+
+// Обновление Dashboard с данными за сегодня
+function updateDashboard() {
+    if (!userData) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const diary = getDiaryForDate(today);
+    const totalKcal = diary.reduce((sum, item) => sum + item.kcal, 0);
+    const totalProtein = diary.reduce((sum, item) => sum + item.protein, 0);
+    const totalFat = diary.reduce((sum, item) => sum + item.fat, 0);
+    const totalCarbs = diary.reduce((sum, item) => sum + item.carbs, 0);
+    
+    const targetCalories = calculateCalories();
+    
+    // Обновляем калории сегодня
+    document.getElementById('consumed-calories').textContent = Math.round(totalKcal);
+    document.getElementById('target-calories').textContent = Math.round(targetCalories);
+    
+    // Прогресс-бар калорий
+    const progress = Math.min((totalKcal / targetCalories) * 100, 100);
+    document.getElementById('calories-progress-fill').style.width = `${progress}%`;
+    
+    // Обновляем дату
+    const dateEl = document.getElementById('today-date');
+    if (dateEl) {
+        const date = new Date();
+        dateEl.textContent = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    }
+    
+    // Обновляем макросы
+    updateMacrosChart(totalProtein, totalFat, totalCarbs);
+}
+
+// Обновление графика макросов (donut chart)
+function updateMacrosChart(protein, fat, carbs) {
+    const ctx = document.getElementById('macros-chart');
+    if (!ctx) return;
+    
+    // Удаляем старый график если есть
+    if (macrosChart) {
+        macrosChart.destroy();
+    }
+    
+    const total = protein + fat + carbs;
+    const proteinPercent = total > 0 ? (protein / total * 100).toFixed(1) : 0;
+    const fatPercent = total > 0 ? (fat / total * 100).toFixed(1) : 0;
+    const carbsPercent = total > 0 ? (carbs / total * 100).toFixed(1) : 0;
+    
+    macrosChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Белки', 'Жиры', 'Углеводы'],
+            datasets: [{
+                data: [protein, fat, carbs],
+                backgroundColor: ['#5DADE2', '#F39C12', '#82E0AA'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const percent = context.parsed / (protein + fat + carbs) * 100;
+                            return `${label}: ${value.toFixed(1)}г (${percent.toFixed(1)}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Обновляем значения в легенде
+    document.getElementById('protein-value').textContent = `${protein.toFixed(1)}г`;
+    document.getElementById('fat-value').textContent = `${fat.toFixed(1)}г`;
+    document.getElementById('carbs-value').textContent = `${carbs.toFixed(1)}г`;
+}
+
+// Сохраняем оригинальную функцию showProfileScreen
+const originalShowProfileScreen = showProfileScreen;
+
+// Переопределяем showProfileScreen для обновления Dashboard
+function showProfileScreenExtended() {
+    originalShowProfileScreen();
+    setTimeout(() => {
+        updateDashboard();
+        // Обновляем макросы если график уже создан
+        if (macrosChart) {
+            const today = new Date().toISOString().split('T')[0];
+            const diary = getDiaryForDate(today);
+            const totalProtein = diary.reduce((sum, item) => sum + item.protein, 0);
+            const totalFat = diary.reduce((sum, item) => sum + item.fat, 0);
+            const totalCarbs = diary.reduce((sum, item) => sum + item.carbs, 0);
+            updateMacrosChart(totalProtein, totalFat, totalCarbs);
+        }
+    }, 100);
+}
+
+// Заменяем функцию
+showProfileScreen = showProfileScreenExtended;
+
+// ============================================
+// ЭКРАН ДОБАВЛЕНИЯ ЕДЫ
+// ============================================
+
+function showAddFoodScreen() {
+    hideAllScreens();
+    const screen = document.getElementById('add-food-screen');
+    screen.classList.add('active');
+    document.getElementById('food-search').value = '';
+    document.getElementById('food-search').focus();
+    renderProductsList(productsDatabase);
+}
+
+function searchProducts(query) {
+    const searchTerm = query.toLowerCase().trim();
+    if (!searchTerm) {
+        renderProductsList(productsDatabase);
+        document.getElementById('add-custom-product').style.display = 'none';
+        return;
+    }
+    
+    const filtered = productsDatabase.filter(product => 
+        product.name.toLowerCase().includes(searchTerm)
+    );
+    
+    renderProductsList(filtered);
+    document.getElementById('add-custom-product').style.display = filtered.length === 0 ? 'block' : 'none';
+}
+
+function renderProductsList(products) {
+    const list = document.getElementById('products-list');
+    if (!list) return;
+    
+    if (products.length === 0) {
+        list.innerHTML = '<div class="empty-state">Продукты не найдены</div>';
+        return;
+    }
+    
+    list.innerHTML = products.slice(0, 50).map(product => `
+        <div class="product-card" onclick="selectProduct(${product.id})">
+            <div class="product-name">${product.name}</div>
+            <div class="product-macros">
+                <span>${product.kcal} ккал</span>
+                <span>Б: ${product.protein}г</span>
+                <span>Ж: ${product.fat}г</span>
+                <span>У: ${product.carbs}г</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectProduct(productId) {
+    selectedProduct = productsDatabase.find(p => p.id === String(productId));
+    if (!selectedProduct) return;
+    
+    showProductAmountScreen();
+}
+
+function showProductAmountScreen() {
+    if (!selectedProduct) return;
+    
+    hideAllScreens();
+    const screen = document.getElementById('product-amount-screen');
+    screen.classList.add('active');
+    
+    document.getElementById('selected-product-name').textContent = selectedProduct.name;
+    document.getElementById('product-grams').value = 100;
+    updateProductPreview();
+}
+
+function updateProductPreview() {
+    if (!selectedProduct) return;
+    
+    const grams = parseFloat(document.getElementById('product-grams').value) || 100;
+    const multiplier = grams / 100;
+    
+    const kcal = selectedProduct.kcal * multiplier;
+    const protein = selectedProduct.protein * multiplier;
+    const fat = selectedProduct.fat * multiplier;
+    const carbs = selectedProduct.carbs * multiplier;
+    
+    document.getElementById('preview-kcal').textContent = `${kcal.toFixed(1)} ккал`;
+    document.getElementById('preview-protein').textContent = `${protein.toFixed(1)}г белка`;
+    document.getElementById('preview-fat').textContent = `${fat.toFixed(1)}г жиров`;
+    document.getElementById('preview-carbs').textContent = `${carbs.toFixed(1)}г углеводов`;
+}
+
+function setQuickAmount(grams) {
+    document.getElementById('product-grams').value = grams;
+    updateProductPreview();
+}
+
+function addFoodToDiary() {
+    if (!selectedProduct) return;
+    
+    const grams = parseFloat(document.getElementById('product-grams').value) || 100;
+    const multiplier = grams / 100;
+    
+    const entry = {
+        id: Date.now().toString(),
+        name: selectedProduct.name,
+        grams: grams,
+        kcal: selectedProduct.kcal * multiplier,
+        protein: selectedProduct.protein * multiplier,
+        fat: selectedProduct.fat * multiplier,
+        carbs: selectedProduct.carbs * multiplier,
+        timestamp: new Date().toISOString()
+    };
+    
+    addDiaryEntry(currentDiaryDate, entry);
+    showNotification('Продукт добавлен в дневник!');
+    showDiaryScreen();
+}
+
+function showCustomProductForm() {
+    hideAllScreens();
+    document.getElementById('custom-product-screen').classList.add('active');
+}
+
+function saveCustomProduct() {
+    const name = document.getElementById('custom-name').value.trim();
+    const kcal = parseFloat(document.getElementById('custom-kcal').value) || 0;
+    const protein = parseFloat(document.getElementById('custom-protein').value) || 0;
+    const fat = parseFloat(document.getElementById('custom-fat').value) || 0;
+    const carbs = parseFloat(document.getElementById('custom-carbs').value) || 0;
+    
+    if (!name) {
+        showNotification('Введите название продукта');
+        return;
+    }
+    
+    const newProduct = {
+        id: `custom_${Date.now()}`,
+        name: name,
+        kcal: kcal,
+        protein: protein,
+        fat: fat,
+        carbs: carbs
+    };
+    
+    productsDatabase.push(newProduct);
+    selectedProduct = newProduct;
+    showProductAmountScreen();
+}
+
+// ============================================
+// ДНЕВНИК ПИТАНИЯ
+// ============================================
+
+function getDiary() {
+    const diaryStr = localStorage.getItem('klyro_diary');
+    return diaryStr ? JSON.parse(diaryStr) : {};
+}
+
+function saveDiary(diary) {
+    localStorage.setItem('klyro_diary', JSON.stringify(diary));
+}
+
+function getDiaryForDate(date) {
+    const diary = getDiary();
+    return diary[date] || [];
+}
+
+function addDiaryEntry(date, entry) {
+    const diary = getDiary();
+    if (!diary[date]) {
+        diary[date] = [];
+    }
+    diary[date].push(entry);
+    saveDiary(diary);
+}
+
+function removeDiaryEntry(date, entryId) {
+    const diary = getDiary();
+    if (diary[date]) {
+        diary[date] = diary[date].filter(item => item.id !== entryId);
+        saveDiary(diary);
+    }
+}
+
+function showDiaryScreen() {
+    hideAllScreens();
+    const screen = document.getElementById('diary-screen');
+    screen.classList.add('active');
+    renderDiary();
+}
+
+function renderDiary() {
+    const date = currentDiaryDate;
+    const entries = getDiaryForDate(date);
+    
+    // Обновляем дату
+    const dateObj = new Date(date);
+    document.getElementById('diary-date').textContent = dateObj.toLocaleDateString('ru-RU', { 
+        day: 'numeric', 
+        month: 'long',
+        weekday: 'long'
+    });
+    
+    // Подсчитываем итоги
+    const totalKcal = entries.reduce((sum, item) => sum + item.kcal, 0);
+    const totalProtein = entries.reduce((sum, item) => sum + item.protein, 0);
+    const totalFat = entries.reduce((sum, item) => sum + item.fat, 0);
+    const totalCarbs = entries.reduce((sum, item) => sum + item.carbs, 0);
+    
+    document.getElementById('diary-total-kcal').textContent = Math.round(totalKcal);
+    document.getElementById('diary-total-protein').textContent = `${totalProtein.toFixed(1)}г`;
+    document.getElementById('diary-total-fat').textContent = `${totalFat.toFixed(1)}г`;
+    document.getElementById('diary-total-carbs').textContent = `${totalCarbs.toFixed(1)}г`;
+    
+    // Рендерим приёмы пищи
+    const mealsContainer = document.getElementById('diary-meals');
+    if (entries.length === 0) {
+        mealsContainer.innerHTML = '<div class="empty-state">Нет записей за этот день</div>';
+        return;
+    }
+    
+    // Группируем по времени (можно улучшить)
+    mealsContainer.innerHTML = entries.map(entry => {
+        const time = new Date(entry.timestamp).toLocaleTimeString('ru-RU', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        return `
+            <div class="diary-entry">
+                <div class="entry-header">
+                    <div class="entry-name">${entry.name}</div>
+                    <button class="btn-delete" onclick="deleteDiaryEntry('${entry.id}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="entry-details">
+                    <span class="entry-time">${time}</span>
+                    <span class="entry-grams">${entry.grams}г</span>
+                </div>
+                <div class="entry-macros">
+                    <span>${Math.round(entry.kcal)} ккал</span>
+                    <span>Б: ${entry.protein.toFixed(1)}г</span>
+                    <span>Ж: ${entry.fat.toFixed(1)}г</span>
+                    <span>У: ${entry.carbs.toFixed(1)}г</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function changeDiaryDate(days) {
+    const date = new Date(currentDiaryDate);
+    date.setDate(date.getDate() + days);
+    currentDiaryDate = date.toISOString().split('T')[0];
+    renderDiary();
+}
+
+function deleteDiaryEntry(entryId) {
+    if (confirm('Удалить эту запись?')) {
+        removeDiaryEntry(currentDiaryDate, entryId);
+        renderDiary();
+        updateDashboard();
+    }
+}
+
+// ============================================
+// ИСТОРИЯ И ГРАФИКИ
+// ============================================
+
+function showHistoryScreen() {
+    hideAllScreens();
+    const screen = document.getElementById('history-screen');
+    screen.classList.add('active');
+    setTimeout(() => {
+        renderHistoryCharts();
+    }, 100);
+}
+
+function setHistoryPeriod(days) {
+    currentHistoryPeriod = days;
+    document.querySelectorAll('.btn-period').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    renderHistoryCharts();
+}
+
+function renderHistoryCharts() {
+    const diary = getDiary();
+    const dates = [];
+    const calories = [];
+    const weights = [];
+    
+    for (let i = currentHistoryPeriod - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        dates.push(date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
+        
+        const entries = diary[dateStr] || [];
+        const totalKcal = entries.reduce((sum, item) => sum + item.kcal, 0);
+        calories.push(Math.round(totalKcal));
+        
+        // Вес можно добавить позже в userData
+        weights.push(null);
+    }
+    
+    // График калорий
+    const caloriesCtx = document.getElementById('calories-chart');
+    if (caloriesCtx) {
+        if (caloriesChart) caloriesChart.destroy();
+        caloriesChart = new Chart(caloriesCtx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Калории',
+                    data: calories,
+                    borderColor: '#5DADE2',
+                    backgroundColor: 'rgba(93, 173, 226, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // График веса (если есть данные)
+    const weightCtx = document.getElementById('weight-chart');
+    if (weightCtx && weights.some(w => w !== null)) {
+        if (weightChart) weightChart.destroy();
+        weightChart = new Chart(weightCtx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Вес (кг)',
+                    data: weights,
+                    borderColor: '#82E0AA',
+                    backgroundColor: 'rgba(130, 224, 170, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+}
+
+// ============================================
+// ТРЕНИРОВКИ И АКТИВНОСТЬ
+// ============================================
+
+const activityMET = {
+    'running': 11.5,
+    'running-fast': 16,
+    'walking': 3.5,
+    'cycling': 8,
+    'swimming': 8,
+    'gym': 5,
+    'yoga': 3,
+    'pilates': 3,
+    'dancing': 6,
+    'basketball': 8,
+    'football': 7,
+    'tennis': 7
+};
+
+function showActivityScreen() {
+    hideAllScreens();
+    const screen = document.getElementById('activity-screen');
+    screen.classList.add('active');
+    renderActivities();
+}
+
+function renderActivities() {
+    const activities = getActivities();
+    const container = document.getElementById('activity-list');
+    
+    if (activities.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет записей о тренировках</div>';
+        return;
+    }
+    
+    container.innerHTML = activities.map(activity => {
+        const date = new Date(activity.timestamp).toLocaleDateString('ru-RU');
+        return `
+            <div class="activity-card">
+                <div class="activity-name">${activity.name}</div>
+                <div class="activity-details">
+                    <span>${date}</span>
+                    <span>${activity.duration} мин</span>
+                    <span>${activity.calories} ккал</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getActivities() {
+    const activitiesStr = localStorage.getItem('klyro_activities');
+    return activitiesStr ? JSON.parse(activitiesStr) : [];
+}
+
+function saveActivity() {
+    const name = document.getElementById('activity-name').value;
+    const duration = parseFloat(document.getElementById('activity-duration').value) || 0;
+    const addToDiary = document.getElementById('add-to-diary').checked;
+    
+    if (!name || !duration) {
+        showNotification('Заполните все поля');
+        return;
+    }
+    
+    const met = activityMET[name] || 5;
+    const weight = userData?.weight || 70;
+    const calories = Math.round(met * weight * (duration / 60));
+    
+    const activity = {
+        id: Date.now().toString(),
+        name: document.querySelector(`#activity-name option[value="${name}"]`).textContent,
+        duration: duration,
+        calories: calories,
+        timestamp: new Date().toISOString()
+    };
+    
+    const activities = getActivities();
+    activities.push(activity);
+    localStorage.setItem('klyro_activities', JSON.stringify(activities));
+    
+    if (addToDiary) {
+        // Добавляем как отрицательные калории (можно улучшить)
+        const entry = {
+            id: `activity_${activity.id}`,
+            name: `Тренировка: ${activity.name}`,
+            grams: 0,
+            kcal: -calories,
+            protein: 0,
+            fat: 0,
+            carbs: 0,
+            timestamp: activity.timestamp
+        };
+        addDiaryEntry(currentDiaryDate, entry);
+    }
+    
+    showNotification('Тренировка сохранена!');
+    showActivityScreen();
+}
+
+function showAddActivityForm() {
+    hideAllScreens();
+    document.getElementById('add-activity-screen').classList.add('active');
+    document.getElementById('activity-duration').value = 30;
+    updateActivityCalories();
+}
+
+function updateActivityCalories() {
+    const name = document.getElementById('activity-name').value;
+    const duration = parseFloat(document.getElementById('activity-duration').value) || 0;
+    
+    if (!name || !duration) {
+        document.getElementById('activity-calories').textContent = '0';
+        return;
+    }
+    
+    const met = activityMET[name] || 5;
+    const weight = userData?.weight || 70;
+    const calories = Math.round(met * weight * (duration / 60));
+    document.getElementById('activity-calories').textContent = calories;
+}
+
 // Экспорт функций для использования в HTML
 window.nextStep = nextStep;
 window.prevStep = prevStep;
 window.completeOnboarding = completeOnboarding;
 window.editProfile = editProfile;
 window.recalculateCalories = recalculateCalories;
+
+// Новые функции
+window.showAddFoodScreen = showAddFoodScreen;
+window.showDiaryScreen = showDiaryScreen;
+window.showHistoryScreen = showHistoryScreen;
+window.showActivityScreen = showActivityScreen;
+window.searchProducts = searchProducts;
+window.selectProduct = selectProduct;
+window.setQuickAmount = setQuickAmount;
+window.updateProductPreview = updateProductPreview;
+window.addFoodToDiary = addFoodToDiary;
+window.showCustomProductForm = showCustomProductForm;
+window.saveCustomProduct = saveCustomProduct;
+window.changeDiaryDate = changeDiaryDate;
+window.deleteDiaryEntry = deleteDiaryEntry;
+window.setHistoryPeriod = setHistoryPeriod;
+window.showAddActivityForm = showAddActivityForm;
+window.updateActivityCalories = updateActivityCalories;
+window.saveActivity = saveActivity;
+window.showProfileScreen = showProfileScreenExtended;
+
+// ============================================
+// НАСТРОЙКИ
+// ============================================
+
+function showSettingsScreen() {
+    hideAllScreens();
+    const screen = document.getElementById('settings-screen');
+    screen.classList.add('active');
+    
+    // Загружаем сохранённые единицы измерения
+    const units = localStorage.getItem('klyro_units') || 'metric';
+    document.querySelector(`input[name="units"][value="${units}"]`).checked = true;
+}
+
+function setUnits(units) {
+    localStorage.setItem('klyro_units', units);
+    showNotification('Единицы измерения изменены');
+}
+
+function exportData() {
+    const diary = getDiary();
+    const activities = getActivities();
+    const userData = JSON.parse(localStorage.getItem('klyro_user_data') || '{}');
+    
+    // Создаём CSV для дневника
+    let csv = 'Дата,Продукт,Вес (г),Калории,Белки (г),Жиры (г),Углеводы (г),Время\n';
+    
+    Object.keys(diary).forEach(date => {
+        diary[date].forEach(entry => {
+            const time = new Date(entry.timestamp).toLocaleTimeString('ru-RU');
+            csv += `${date},"${entry.name}",${entry.grams},${entry.kcal.toFixed(1)},${entry.protein.toFixed(1)},${entry.fat.toFixed(1)},${entry.carbs.toFixed(1)},${time}\n`;
+        });
+    });
+    
+    // Добавляем тренировки
+    csv += '\nТренировки\n';
+    csv += 'Дата,Активность,Длительность (мин),Калории\n';
+    activities.forEach(activity => {
+        const date = new Date(activity.timestamp).toISOString().split('T')[0];
+        csv += `${date},"${activity.name}",${activity.duration},${activity.calories}\n`;
+    });
+    
+    // Создаём и скачиваем файл
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `klyro_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showNotification('Данные экспортированы!');
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const text = e.target.result;
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            if (lines.length < 2) {
+                showNotification('Неверный формат файла');
+                return;
+            }
+            
+            // Парсим CSV (упрощённая версия)
+            const diary = getDiary();
+            let imported = 0;
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.startsWith('Тренировки') || line.startsWith('Дата,Активность')) break;
+                
+                const parts = line.split(',');
+                if (parts.length >= 6) {
+                    const date = parts[0].trim();
+                    const name = parts[1].replace(/"/g, '').trim();
+                    const grams = parseFloat(parts[2]) || 0;
+                    const kcal = parseFloat(parts[3]) || 0;
+                    const protein = parseFloat(parts[4]) || 0;
+                    const fat = parseFloat(parts[5]) || 0;
+                    const carbs = parseFloat(parts[6]) || 0;
+                    
+                    const entry = {
+                        id: `import_${Date.now()}_${i}`,
+                        name: name,
+                        grams: grams,
+                        kcal: kcal,
+                        protein: protein,
+                        fat: fat,
+                        carbs: carbs,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    if (!diary[date]) diary[date] = [];
+                    diary[date].push(entry);
+                    imported++;
+                }
+            }
+            
+            saveDiary(diary);
+            showNotification(`Импортировано ${imported} записей`);
+            
+            // Очищаем input
+            event.target.value = '';
+        } catch (error) {
+            console.error('Ошибка импорта:', error);
+            showNotification('Ошибка при импорте данных');
+        }
+    };
+    reader.readAsText(file);
+}
+
+window.showSettingsScreen = showSettingsScreen;
+window.setUnits = setUnits;
+window.exportData = exportData;
+window.importData = importData;
 
