@@ -109,57 +109,101 @@ function loadFromStorageSync(key) {
     }
 }
 
-// Периодическая синхронизация данных из CloudStorage
+// Отслеживание изменений для оптимизированной синхронизации
+let lastDiaryHash = null;
+let lastUserDataHash = null;
+let pendingSync = false;
+
+// Вычисление хэша данных для отслеживания изменений
+function getDataHash(data) {
+    return btoa(JSON.stringify(data)).substring(0, 16);
+}
+
+// Оптимизированная синхронизация данных из CloudStorage (только при изменениях)
 function startDataSync() {
     if (!tg || !tg.CloudStorage) return;
     
-    // Синхронизация каждые 30 секунд
+    // Инициализируем хэши при старте
+    const currentDiary = getDiary();
+    lastDiaryHash = getDataHash(currentDiary);
+    if (userData) {
+        lastUserDataHash = getDataHash(userData);
+    }
+    
+    // Синхронизация только при изменениях (проверка каждые 60 секунд)
     setInterval(async () => {
+        if (pendingSync) {
+            console.log('[SYNC] Sync already in progress, skipping...');
+            return;
+        }
+        
         try {
-            console.log('[SYNC] Starting data sync...');
+            // Проверяем, были ли изменения локально
+            const currentDiary = getDiary();
+            const currentDiaryHash = getDataHash(currentDiary);
+            const currentUserDataHash = userData ? getDataHash(userData) : null;
             
-            // Синхронизируем дневник
-            const diaryStr = await loadFromStorage('klyro_diary');
-            if (diaryStr) {
-                localStorage.setItem('klyro_diary', diaryStr);
-                // Обновляем отображение если нужно
-                if (document.getElementById('diary-screen')?.classList.contains('active')) {
-                    const today = new Date().toISOString().split('T')[0];
-                    renderDiary(today);
-                }
-                if (typeof updateDashboard === 'function') {
-                    updateDashboard();
-                }
+            let needsSync = false;
+            
+            // Проверяем изменения дневника
+            if (currentDiaryHash !== lastDiaryHash) {
+                console.log('[SYNC] Diary changed locally, syncing...');
+                pendingSync = true;
+                await saveToStorage('klyro_diary', JSON.stringify(currentDiary));
+                lastDiaryHash = currentDiaryHash;
+                needsSync = true;
+                pendingSync = false;
             }
             
-            // Синхронизируем данные пользователя
-            const userDataStr = await loadFromStorage('klyro_user_data');
-            if (userDataStr) {
-                const cloudUserData = JSON.parse(userDataStr);
-                // Обновляем только если данные новее
-                if (userData && cloudUserData) {
-                    const localTime = userData.lastSync || 0;
-                    const cloudTime = cloudUserData.lastSync || 0;
-                    if (cloudTime > localTime) {
-                        userData = cloudUserData;
-                        localStorage.setItem('klyro_user_data', userDataStr);
+            // Проверяем изменения данных пользователя
+            if (userData && currentUserDataHash !== lastUserDataHash) {
+                console.log('[SYNC] User data changed locally, syncing...');
+                pendingSync = true;
+                await saveToStorage('klyro_user_data', JSON.stringify(userData));
+                lastUserDataHash = currentUserDataHash;
+                needsSync = true;
+                pendingSync = false;
+            }
+            
+            // Загружаем изменения из CloudStorage (только если нет локальных изменений)
+            if (!needsSync) {
+                const cloudDiaryStr = await loadFromStorage('klyro_diary');
+                if (cloudDiaryStr) {
+                    const cloudDiary = JSON.parse(cloudDiaryStr);
+                    const cloudDiaryHash = getDataHash(cloudDiary);
+                    if (cloudDiaryHash !== lastDiaryHash) {
+                        console.log('[SYNC] Cloud diary updated, applying...');
+                        localStorage.setItem('klyro_diary', cloudDiaryStr);
+                        lastDiaryHash = cloudDiaryHash;
+                        // Обновляем отображение если нужно
+                        if (document.getElementById('diary-screen')?.classList.contains('active')) {
+                            const today = new Date().toISOString().split('T')[0];
+                            renderDiary(today);
+                        }
                         if (typeof updateDashboard === 'function') {
                             updateDashboard();
                         }
                     }
                 }
             }
-            
-            console.log('[SYNC] Data sync completed');
         } catch (e) {
             console.error('[SYNC] Sync error:', e);
+            pendingSync = false;
         }
-    }, 30000); // 30 секунд
+    }, 60000); // 60 секунд (увеличено с 30)
     
-    // Также синхронизируем при фокусе окна
+    // Синхронизируем при фокусе окна
     window.addEventListener('focus', async () => {
-        console.log('[SYNC] Window focused, syncing data...');
+        console.log('[SYNC] Window focused, checking for updates...');
         await loadDiaryFromCloud();
+    });
+    
+    // Синхронизируем при видимости страницы
+    document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden) {
+            console.log('[SYNC] Page visible, checking for updates...');
+            await loadDiaryFromCloud();
+        }
     });
 }
 
@@ -683,7 +727,15 @@ function calculateCalories() {
 // Сохранение данных пользователя
 async function saveUserData() {
     if (userData) {
-        await saveToStorage('klyro_user_data', JSON.stringify(userData));
+        const userDataStr = JSON.stringify(userData);
+        // Сохраняем в localStorage для быстрого доступа
+        localStorage.setItem('klyro_user_data', userDataStr);
+        // Обновляем хэш для отслеживания изменений
+        lastUserDataHash = getDataHash(userData);
+        // Сохраняем в CloudStorage для синхронизации (асинхронно)
+        saveToStorage('klyro_user_data', userDataStr).catch(e => {
+            console.warn('[USERDATA] CloudStorage save failed:', e);
+        });
     }
 }
 
@@ -782,23 +834,93 @@ let caloriesChart = null;
 let weightChart = null;
 let currentDiaryDate = new Date().toISOString().split('T')[0];
 let currentHistoryPeriod = 7;
+let productsDatabaseLoaded = false; // Флаг загрузки базы продуктов
 
-// Загрузка базы продуктов
+// Версия базы продуктов для кэширования (увеличивать при обновлении базы)
+const PRODUCTS_DB_VERSION = '1.0';
+const PRODUCTS_CACHE_KEY = 'klyro_products_db';
+const PRODUCTS_CACHE_VERSION_KEY = 'klyro_products_db_version';
+
+// Загрузка базы продуктов с кэшированием и lazy loading
 async function loadProductsDatabase() {
+    // Если уже загружена, не загружаем снова
+    if (productsDatabaseLoaded && productsDatabase.length > 0) {
+        console.log('[PRODUCTS] Database already loaded from memory');
+        return;
+    }
+    
     try {
-        const response = await fetch('data/products.json');
+        // Проверяем кэш в localStorage
+        const cachedVersion = localStorage.getItem(PRODUCTS_CACHE_VERSION_KEY);
+        const cachedData = localStorage.getItem(PRODUCTS_CACHE_KEY);
+        
+        if (cachedVersion === PRODUCTS_DB_VERSION && cachedData) {
+            try {
+                productsDatabase = JSON.parse(cachedData);
+                productsDatabaseLoaded = true;
+                console.log(`[PRODUCTS] Loaded ${productsDatabase.length} products from cache`);
+                // Загружаем в фоне для обновления кэша
+                updateProductsCache();
+                return;
+            } catch (e) {
+                console.warn('[PRODUCTS] Cache parse error, loading from server:', e);
+                localStorage.removeItem(PRODUCTS_CACHE_KEY);
+                localStorage.removeItem(PRODUCTS_CACHE_VERSION_KEY);
+            }
+        }
+        
+        // Загружаем с сервера
+        console.log('[PRODUCTS] Loading from server...');
+        const response = await fetch('data/products.json?v=' + PRODUCTS_DB_VERSION);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         productsDatabase = await response.json();
-        console.log(`Загружено ${productsDatabase.length} продуктов`);
+        productsDatabaseLoaded = true;
+        
+        // Сохраняем в кэш
+        try {
+            localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsDatabase));
+            localStorage.setItem(PRODUCTS_CACHE_VERSION_KEY, PRODUCTS_DB_VERSION);
+            console.log(`[PRODUCTS] Loaded ${productsDatabase.length} products and cached`);
+        } catch (e) {
+            console.warn('[PRODUCTS] Cache save failed (quota exceeded?):', e);
+            // Если localStorage переполнен, удаляем старые данные
+            try {
+                localStorage.removeItem('klyro_products_db');
+                localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsDatabase));
+                localStorage.setItem(PRODUCTS_CACHE_VERSION_KEY, PRODUCTS_DB_VERSION);
+            } catch (e2) {
+                console.error('[PRODUCTS] Failed to save cache:', e2);
+            }
+        }
     } catch (e) {
-        console.error('Ошибка загрузки продуктов:', e);
+        console.error('[PRODUCTS] Error loading products:', e);
         productsDatabase = [];
+        productsDatabaseLoaded = false;
     }
 }
 
-// Инициализация новых модулей при загрузке
-if (typeof window !== 'undefined') {
-    loadProductsDatabase();
+// Обновление кэша в фоне (без блокировки UI)
+async function updateProductsCache() {
+    try {
+        const response = await fetch('data/products.json?v=' + PRODUCTS_DB_VERSION + '&t=' + Date.now());
+        if (response.ok) {
+            const freshData = await response.json();
+            if (freshData.length > 0) {
+                productsDatabase = freshData;
+                localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(freshData));
+                localStorage.setItem(PRODUCTS_CACHE_VERSION_KEY, PRODUCTS_DB_VERSION);
+                console.log('[PRODUCTS] Cache updated in background');
+            }
+        }
+    } catch (e) {
+        console.warn('[PRODUCTS] Background cache update failed:', e);
+    }
 }
+
+// Lazy loading: база продуктов загружается только при открытии экрана поиска
+// Не загружаем при старте приложения для быстрой первой загрузки
 
 // ============================================
 // РАСШИРЕНИЕ DASHBOARD (профиля)
@@ -933,12 +1055,23 @@ showProfileScreen = showProfileScreenExtended;
 // ЭКРАН ДОБАВЛЕНИЯ ЕДЫ
 // ============================================
 
-function showAddFoodScreen() {
+async function showAddFoodScreen() {
     hideAllScreens();
     const screen = document.getElementById('add-food-screen');
     screen.classList.add('active');
     document.getElementById('food-search').value = '';
     document.getElementById('food-search').focus();
+    
+    // Lazy loading: загружаем базу продуктов только при открытии экрана
+    if (!productsDatabaseLoaded || productsDatabase.length === 0) {
+        // Показываем индикатор загрузки
+        const productsList = document.getElementById('products-list');
+        if (productsList) {
+            productsList.innerHTML = '<div class="loading-indicator">Загрузка базы продуктов...</div>';
+        }
+        await loadProductsDatabase();
+    }
+    
     renderProductsList(productsDatabase);
 }
 
@@ -1087,6 +1220,8 @@ async function loadDiaryFromCloud() {
                 const diary = JSON.parse(diaryStr);
                 // Обновляем локальный кэш
                 localStorage.setItem('klyro_diary', diaryStr);
+                // Обновляем хэш
+                lastDiaryHash = getDataHash(diary);
                 // Обновляем отображение если на экране дневника
                 if (document.getElementById('diary-screen')?.classList.contains('active')) {
                     const today = new Date().toISOString().split('T')[0];
@@ -1110,10 +1245,14 @@ function getDiary() {
 
 async function saveDiary(diary) {
     const diaryStr = JSON.stringify(diary);
-    // Сохраняем в CloudStorage для синхронизации
-    await saveToStorage('klyro_diary', diaryStr);
-    // Также сохраняем в localStorage для быстрого доступа
+    // Сохраняем в localStorage для быстрого доступа
     localStorage.setItem('klyro_diary', diaryStr);
+    // Обновляем хэш для отслеживания изменений
+    lastDiaryHash = getDataHash(diary);
+    // Сохраняем в CloudStorage для синхронизации (асинхронно, не блокируем UI)
+    saveToStorage('klyro_diary', diaryStr).catch(e => {
+        console.warn('[DIARY] CloudStorage save failed:', e);
+    });
 }
 
 function getDiaryForDate(date) {
