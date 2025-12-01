@@ -868,12 +868,12 @@ function validateCurrentStep() {
             const weightSlider = document.getElementById('weight');
             const height = heightSlider ? parseInt(heightSlider.value) : 0;
             const weight = weightSlider ? parseFloat(weightSlider.value) : 0;
-            if (!height || height < 100 || height > 250) {
-                showNotification('Пожалуйста, выберите корректный рост (100-250 см)');
+            if (!height || height < 120 || height > 220) {
+                showNotification('Пожалуйста, выберите корректный рост (120-220 см)');
                 return false;
             }
-            if (!weight || weight < 30 || weight > 300) {
-                showNotification('Пожалуйста, выберите корректный вес (30-300 кг)');
+            if (!weight || weight < 40 || weight > 200) {
+                showNotification('Пожалуйста, выберите корректный вес (40-200 кг)');
                 return false;
             }
             return true;
