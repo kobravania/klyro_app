@@ -397,11 +397,13 @@ h1, h2, h3, h4, h5, h6 {
 
 .wheel-picker-scroll {
     height: 100%;
-    overflow-y: scroll;
+    overflow-y: auto;
+    overflow-x: hidden;
     scroll-snap-type: y mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    overscroll-behavior: contain;
 }
 
 .wheel-picker-scroll::-webkit-scrollbar {
@@ -422,6 +424,8 @@ h1, h2, h3, h4, h5, h6 {
     position: relative;
     transform: scale(0.9);
     opacity: 0.5;
+    padding: 0 8px;
+    text-align: center;
 }
 
 .wheel-item.selected {
@@ -431,6 +435,14 @@ h1, h2, h3, h4, h5, h6 {
     transform: scale(1);
     opacity: 1;
     z-index: 1;
+}
+
+.wheel-item-month {
+    font-size: 0.9rem;
+}
+
+.wheel-item-month.selected {
+    font-size: 1.1rem;
 }
 
 /* Эффект перспективы для элементов выше и ниже центра */

@@ -514,8 +514,6 @@ function initDateWheelPickers() {
     
     const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
                         'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-    const monthNamesShort = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 
-                             'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
     
     // Инициализация значений из userData или дефолтные
     let year = 1990, month = 1, day = 1;
@@ -546,9 +544,9 @@ function initDateWheelPickers() {
     
     // Создаем элементы для месяцев
     monthScroll.innerHTML = '';
-    monthNamesShort.forEach((name, index) => {
+    monthNames.forEach((name, index) => {
         const item = document.createElement('div');
-        item.className = 'wheel-item';
+        item.className = 'wheel-item wheel-item-month';
         item.textContent = name;
         item.dataset.value = index + 1;
         monthScroll.appendChild(item);
