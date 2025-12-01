@@ -255,13 +255,32 @@ function initApp() {
         console.log('Telegram WebApp API not found - running in browser');
     }
     
-    // Сразу проверяем данные пользователя СИНХРОННО (без задержки)
-    // Это предотвращает мелькание экрана авторизации
+    // Проверяем данные пользователя (асинхронно для CloudStorage)
+    // Сначала проверяем localStorage для быстрой загрузки
     try {
-        checkUserAuth();
+        const quickCheck = loadFromStorageSync('klyro_user_data');
+        if (quickCheck) {
+            try {
+                const quickUserData = JSON.parse(quickCheck);
+                if (quickUserData && (quickUserData.age || quickUserData.firstName)) {
+                    userData = quickUserData;
+                    showProfileScreen();
+                    updateUsernameDisplay();
+                }
+            } catch (e) {
+                console.error('Error parsing quick check:', e);
+            }
+        }
+        
+        // Затем загружаем из CloudStorage для синхронизации
+        checkUserAuth().catch(e => {
+            console.error('Error in checkUserAuth:', e);
+            if (!userData) {
+                showAuthScreen();
+            }
+        });
     } catch (e) {
-        console.error('Error in checkUserAuth:', e);
-        // В случае ошибки показываем auth screen
+        console.error('Error in init:', e);
         showAuthScreen();
     }
 }
