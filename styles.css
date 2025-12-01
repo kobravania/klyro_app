@@ -350,20 +350,19 @@ h1, h2, h3, h4, h5, h6 {
     display: flex;
     gap: 0;
     margin: 20px 0;
-    height: 250px;
-    background: var(--background-color);
+    height: 216px;
+    background: var(--background-card);
     border-radius: 12px;
     overflow: hidden;
     position: relative;
-    border: 1px solid #3a4a5f;
 }
 
 .wheel-picker {
     flex: 1;
     position: relative;
-    height: 250px;
+    height: 216px;
     overflow: hidden;
-    border-right: 1px solid rgba(58, 74, 95, 0.3);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .wheel-picker:last-child {
@@ -374,15 +373,13 @@ h1, h2, h3, h4, h5, h6 {
 .wheel-picker::before {
     content: '';
     position: absolute;
-    left: 4px;
-    right: 4px;
-    top: 100px;
-    height: 50px;
-    z-index: 1;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 83px;
+    z-index: 2;
     pointer-events: none;
-    border-radius: 8px;
-    background: rgba(93, 173, 226, 0.1);
-    border: 1px solid rgba(93, 173, 226, 0.2);
+    background: linear-gradient(to bottom, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
 }
 
 .wheel-picker::after {
@@ -390,24 +387,11 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     left: 0;
     right: 0;
-    top: 0;
-    height: 100px;
-    z-index: 2;
-    pointer-events: none;
-    background: linear-gradient(to bottom, var(--background-color) 0%, rgba(26, 35, 50, 0) 100%);
-}
-
-/* Нижний градиент через дополнительный элемент */
-.wheel-picker-container::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
     bottom: 0;
-    height: 100px;
+    height: 83px;
     z-index: 2;
     pointer-events: none;
-    background: linear-gradient(to top, var(--background-color) 0%, rgba(26, 35, 50, 0) 100%);
+    background: linear-gradient(to top, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
 }
 
 .wheel-picker-scroll {
@@ -426,65 +410,56 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .wheel-item {
-    height: 50px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     scroll-snap-align: center;
     font-size: 1rem;
-    color: var(--text-secondary);
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    color: rgba(232, 244, 248, 0.4);
+    transition: all 0.2s ease;
     cursor: pointer;
     user-select: none;
     position: relative;
-    padding: 0 12px;
+    padding: 0 8px;
     text-align: center;
-    opacity: 0.4;
-    transform: scale(0.9);
+    line-height: 36px;
 }
 
 .wheel-item.selected {
     color: var(--text-primary);
-    font-weight: 500;
-    font-size: 1.1rem;
-    opacity: 1;
-    transform: scale(1);
-    z-index: 1;
-    background: rgba(93, 173, 226, 0.15);
-    border-radius: 8px;
+    font-weight: 400;
+    font-size: 1rem;
+    background: rgba(93, 173, 226, 0.2);
+    border-radius: 6px;
     margin: 0 4px;
-}
-
-/* Эффект перспективы для элементов выше и ниже центра */
-.wheel-item:not(.selected) {
-    transform: scale(0.88);
+    z-index: 1;
 }
 
 .wheel-item-month {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
 }
 
 .wheel-item-month.selected {
-    font-size: 1rem;
+    font-size: 0.95rem;
 }
 
 /* Адаптивность */
 @media (max-width: 480px) {
     .wheel-picker-container {
-        height: 220px;
+        height: 216px;
     }
     
     .wheel-picker {
-        height: 220px;
+        height: 216px;
     }
     
-    .wheel-item {
-        height: 44px;
-        font-size: 1rem;
+    .wheel-picker::before {
+        height: 90px;
     }
     
-    .wheel-item.selected {
-        font-size: 1.2rem;
+    .wheel-picker::after {
+        height: 90px;
     }
 }
 

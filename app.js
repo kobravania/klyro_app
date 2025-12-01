@@ -595,7 +595,7 @@ function initDateWheelPickers() {
     
         // Инициализация wheel picker для каждого колеса
     function initWheelPicker(scrollElement, selectedValue, onSelect) {
-        const itemHeight = 50; // Высота одного элемента
+        const itemHeight = 36; // Высота одного элемента (как в Telegram)
         
         // Устанавливаем начальную позицию
         const items = scrollElement.querySelectorAll('.wheel-item');
@@ -604,15 +604,15 @@ function initDateWheelPickers() {
         );
         
         if (selectedIndex >= 0) {
-            // Добавляем отступ сверху и снизу для центрирования
-            scrollElement.style.paddingTop = '100px';
-            scrollElement.style.paddingBottom = '100px';
+            // Добавляем отступ сверху и снизу для центрирования (как в Telegram)
+            scrollElement.style.paddingTop = '90px';
+            scrollElement.style.paddingBottom = '90px';
             scrollElement.scrollTop = selectedIndex * itemHeight;
             items[selectedIndex].classList.add('selected');
         } else {
             // Все равно добавляем padding для скроллинга
-            scrollElement.style.paddingTop = '100px';
-            scrollElement.style.paddingBottom = '100px';
+            scrollElement.style.paddingTop = '90px';
+            scrollElement.style.paddingBottom = '90px';
         }
         
         // Обработка прокрутки
