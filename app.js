@@ -953,7 +953,7 @@ function completeOnboarding() {
     userData.calories = calculateCalories();
     
     // Сохраняем данные
-    saveUserData();
+    await saveUserData();
     
     // Показываем профиль
     showProfileScreen();
