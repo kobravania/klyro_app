@@ -271,6 +271,10 @@ h1, h2, h3, h4, h5, h6 {
     cursor: pointer;
 }
 
+.form-group {
+    position: relative;
+}
+
 .date-picker {
     position: absolute;
     z-index: 1000;
@@ -282,6 +286,8 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     width: 100%;
     max-width: 400px;
+    left: 0;
+    top: 100%;
 }
 
 .date-picker-header {
