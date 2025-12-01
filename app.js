@@ -306,7 +306,7 @@ function initApp() {
         if (quickCheck) {
             try {
                 const quickUserData = JSON.parse(quickCheck);
-                if (quickUserData && (quickUserData.age || quickUserData.firstName)) {
+                if (quickUserData && (quickUserData.dateOfBirth || quickUserData.age || quickUserData.firstName)) {
                     userData = quickUserData;
                     showProfileScreen();
                     updateUsernameDisplay();
@@ -377,8 +377,8 @@ async function checkUserAuth() {
         if (savedData) {
             try {
                 userData = JSON.parse(savedData);
-                // Проверяем, что данные валидны (есть хотя бы возраст или имя)
-                if (userData && (userData.age || userData.firstName)) {
+                // Проверяем, что данные валидны (есть хотя бы дата рождения/возраст или имя)
+                if (userData && (userData.dateOfBirth || userData.age || userData.firstName)) {
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
                     const diary = getDiary();
@@ -423,7 +423,7 @@ async function checkUserAuth() {
                     lastDiaryHash = getDataHash(diary);
                 }
                 // Если есть данные профиля, показываем профиль, иначе онбординг
-                if (userData.age || userData.height) {
+                if (userData.dateOfBirth || userData.age || userData.height) {
                     showProfileScreen();
                 } else {
                     showOnboardingScreen();
@@ -511,6 +511,23 @@ function showOnboardingScreen() {
     currentStep = 1;
     updateProgress();
     showStep(1);
+    
+    // Устанавливаем максимальную дату (сегодня) для input даты рождения
+    const dateOfBirthInput = document.getElementById('dateOfBirth');
+    if (dateOfBirthInput) {
+        const today = new Date();
+        const maxDate = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate());
+        dateOfBirthInput.max = maxDate.toISOString().split('T')[0];
+        
+        // Заполняем дату рождения если есть в userData
+        if (userData && userData.dateOfBirth) {
+            dateOfBirthInput.value = userData.dateOfBirth;
+        } else if (userData && userData.age) {
+            // Обратная совместимость: вычисляем примерную дату рождения из возраста
+            const birthYear = today.getFullYear() - userData.age;
+            dateOfBirthInput.value = `${birthYear}-01-01`;
+        }
+    }
 }
 
 // Показать экран профиля
@@ -528,8 +545,9 @@ function showProfileScreen() {
         updateUsernameDisplay();
         
         // Показываем параметры
-        if (userData.age) {
-            document.getElementById('profile-age').textContent = userData.age;
+        const age = getUserAge();
+        if (age !== null) {
+            document.getElementById('profile-age').textContent = age;
         }
         
         if (userData.gender) {
@@ -606,15 +624,49 @@ function updateProgress() {
     document.getElementById('progress-fill').style.width = `${progress}%`;
 }
 
+// Вычисление возраста из даты рождения
+function calculateAge(dateOfBirth) {
+    if (!dateOfBirth) return null;
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+// Получение возраста пользователя (из dateOfBirth или age для обратной совместимости)
+function getUserAge() {
+    if (userData && userData.dateOfBirth) {
+        return calculateAge(userData.dateOfBirth);
+    }
+    // Обратная совместимость: если есть age, используем его
+    if (userData && userData.age) {
+        return userData.age;
+    }
+    return null;
+}
+
 function validateCurrentStep() {
     switch (currentStep) {
         case 1:
-            const age = document.getElementById('age').value;
+            const dateOfBirthInput = document.getElementById('dateOfBirth');
+            const dateOfBirth = dateOfBirthInput ? dateOfBirthInput.value : null;
             const gender = document.querySelector('input[name="gender"]:checked');
-            if (!age || age < 10 || age > 120) {
-                showNotification('Пожалуйста, введите корректный возраст (10-120 лет)');
+            
+            if (!dateOfBirth) {
+                showNotification('Пожалуйста, введите дату рождения');
                 return false;
             }
+            
+            const age = calculateAge(dateOfBirth);
+            if (age === null || age < 10 || age > 120) {
+                showNotification('Пожалуйста, введите корректную дату рождения (возраст должен быть от 10 до 120 лет)');
+                return false;
+            }
+            
             if (!gender) {
                 showNotification('Пожалуйста, выберите пол');
                 return false;
@@ -671,7 +723,7 @@ function completeOnboarding() {
     }
     
     // Собираем все данные
-    const ageInput = document.getElementById('age');
+    const dateOfBirthInput = document.getElementById('dateOfBirth');
     const genderInput = document.querySelector('input[name="gender"]:checked');
     const heightInput = document.getElementById('height');
     const weightInput = document.getElementById('weight');
@@ -682,7 +734,12 @@ function completeOnboarding() {
         userData = {};
     }
     
-    if (ageInput) userData.age = parseInt(ageInput.value);
+    // Сохраняем дату рождения (не возраст)
+    if (dateOfBirthInput && dateOfBirthInput.value) {
+        userData.dateOfBirth = dateOfBirthInput.value;
+        // Вычисляем и сохраняем возраст для обратной совместимости
+        userData.age = calculateAge(dateOfBirthInput.value);
+    }
     if (genderInput) userData.gender = genderInput.value;
     if (heightInput) userData.height = parseInt(heightInput.value);
     if (weightInput) userData.weight = parseFloat(weightInput.value);
@@ -701,16 +758,17 @@ function completeOnboarding() {
 
 // Расчёт калорий по формуле Mifflin-St Jeor
 function calculateCalories() {
-    if (!userData || !userData.age || !userData.gender || !userData.height || !userData.weight) {
+    const age = getUserAge();
+    if (!userData || age === null || !userData.gender || !userData.height || !userData.weight) {
         return 0;
     }
     
     // BMR (Basal Metabolic Rate) по формуле Mifflin-St Jeor
     let bmr;
     if (userData.gender === 'male') {
-        bmr = 10 * userData.weight + 6.25 * userData.height - 5 * userData.age + 5;
+        bmr = 10 * userData.weight + 6.25 * userData.height - 5 * age + 5;
     } else {
-        bmr = 10 * userData.weight + 6.25 * userData.height - 5 * userData.age - 161;
+        bmr = 10 * userData.weight + 6.25 * userData.height - 5 * age - 161;
     }
     
     // Коэффициент активности
@@ -764,8 +822,16 @@ async function loadUserData() {
 // Редактирование профиля
 function editProfile() {
     // Заполняем форму текущими данными
-    if (userData.age) {
-        document.getElementById('age').value = userData.age;
+    const dateOfBirthInput = document.getElementById('dateOfBirth');
+    if (dateOfBirthInput) {
+        if (userData.dateOfBirth) {
+            dateOfBirthInput.value = userData.dateOfBirth;
+        } else if (userData.age) {
+            // Обратная совместимость: если есть только age, вычисляем примерную дату рождения
+            const today = new Date();
+            const birthYear = today.getFullYear() - userData.age;
+            dateOfBirthInput.value = `${birthYear}-01-01`;
+        }
     }
     if (userData.gender) {
         const genderInput = document.querySelector(`input[name="gender"][value="${userData.gender}"]`);
