@@ -266,6 +266,103 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 0.8;
 }
 
+/* Sliders (Range Inputs) */
+.slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: #3a4a5f;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 20px 0;
+    transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(93, 173, 226, 0.4);
+    transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+    background: var(--secondary-color);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(93, 173, 226, 0.6);
+}
+
+.slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(93, 173, 226, 0.4);
+    transition: all 0.3s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+    background: var(--secondary-color);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(93, 173, 226, 0.6);
+}
+
+.slider:focus {
+    outline: none;
+}
+
+.slider:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(93, 173, 226, 0.2);
+}
+
+.slider:focus::-moz-range-thumb {
+    box-shadow: 0 0 0 4px rgba(93, 173, 226, 0.2);
+}
+
+.slider-value {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.slider-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+/* Date Picker Container */
+.date-picker-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.date-picker-item {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.date-picker-item .slider {
+    margin: 10px 0;
+}
+
 /* Radio Buttons */
 .radio-group {
     display: flex;

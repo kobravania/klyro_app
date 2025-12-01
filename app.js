@@ -503,6 +503,130 @@ function showAuthScreen() {
     });
 }
 
+// Инициализация слайдеров даты рождения
+function initDateSliders() {
+    const birthYearSlider = document.getElementById('birthYear');
+    const birthMonthSlider = document.getElementById('birthMonth');
+    const birthDaySlider = document.getElementById('birthDay');
+    const birthYearValue = document.getElementById('birthYearValue');
+    const birthMonthValue = document.getElementById('birthMonthValue');
+    const birthDayValue = document.getElementById('birthDayValue');
+    const dateOfBirthInput = document.getElementById('dateOfBirth');
+    
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    
+    // Инициализация значений из userData или дефолтные
+    let year = 1990, month = 1, day = 1;
+    if (userData && userData.dateOfBirth) {
+        const date = new Date(userData.dateOfBirth);
+        year = date.getFullYear();
+        month = date.getMonth() + 1;
+        day = date.getDate();
+    } else if (userData && userData.age) {
+        const today = new Date();
+        year = today.getFullYear() - userData.age;
+    }
+    
+    // Устанавливаем максимальный год (сегодня - 10 лет)
+    const today = new Date();
+    const maxYear = today.getFullYear() - 10;
+    if (birthYearSlider) {
+        birthYearSlider.max = maxYear;
+        birthYearSlider.min = 1904;
+        birthYearSlider.value = Math.max(1904, Math.min(maxYear, year));
+        birthYearValue.textContent = birthYearSlider.value;
+    }
+    
+    if (birthMonthSlider) {
+        birthMonthSlider.value = month;
+        birthMonthValue.textContent = monthNames[month - 1];
+    }
+    
+    if (birthDaySlider) {
+        birthDaySlider.value = day;
+        birthDayValue.textContent = day;
+    }
+    
+    // Обновление даты при изменении слайдеров
+    function updateDate() {
+        const y = parseInt(birthYearSlider.value);
+        const m = parseInt(birthMonthSlider.value);
+        const d = parseInt(birthDaySlider.value);
+        
+        // Проверка корректности дня для выбранного месяца
+        const daysInMonth = new Date(y, m, 0).getDate();
+        if (d > daysInMonth) {
+            birthDaySlider.value = daysInMonth;
+            birthDayValue.textContent = daysInMonth;
+        }
+        
+        const date = new Date(y, m - 1, Math.min(d, daysInMonth));
+        const dateStr = date.toISOString().split('T')[0];
+        if (dateOfBirthInput) {
+            dateOfBirthInput.value = dateStr;
+        }
+        
+        // Обновление максимального дня при смене месяца/года
+        const maxDay = new Date(y, m, 0).getDate();
+        birthDaySlider.max = maxDay;
+    }
+    
+    if (birthYearSlider) {
+        birthYearSlider.addEventListener('input', function() {
+            birthYearValue.textContent = this.value;
+            updateDate();
+        });
+    }
+    
+    if (birthMonthSlider) {
+        birthMonthSlider.addEventListener('input', function() {
+            birthMonthValue.textContent = monthNames[this.value - 1];
+            updateDate();
+        });
+    }
+    
+    if (birthDaySlider) {
+        birthDaySlider.addEventListener('input', function() {
+            birthDayValue.textContent = this.value;
+            updateDate();
+        });
+    }
+    
+    updateDate();
+}
+
+// Инициализация слайдеров роста и веса
+function initHeightWeightSliders() {
+    const heightSlider = document.getElementById('height');
+    const weightSlider = document.getElementById('weight');
+    const heightValue = document.getElementById('heightValue');
+    const weightValue = document.getElementById('weightValue');
+    
+    // Инициализация значений из userData или дефолтные
+    if (userData && userData.height) {
+        if (heightSlider) heightSlider.value = userData.height;
+        if (heightValue) heightValue.textContent = userData.height + ' см';
+    }
+    
+    if (userData && userData.weight) {
+        if (weightSlider) weightSlider.value = userData.weight;
+        if (weightValue) weightValue.textContent = userData.weight.toFixed(1) + ' кг';
+    }
+    
+    if (heightSlider && heightValue) {
+        heightSlider.addEventListener('input', function() {
+            heightValue.textContent = this.value + ' см';
+        });
+    }
+    
+    if (weightSlider && weightValue) {
+        weightSlider.addEventListener('input', function() {
+            weightValue.textContent = parseFloat(this.value).toFixed(1) + ' кг';
+        });
+    }
+}
+
 // Показать экран онбординга
 function showOnboardingScreen() {
     hideAllScreens();
@@ -512,22 +636,9 @@ function showOnboardingScreen() {
     updateProgress();
     showStep(1);
     
-    // Устанавливаем максимальную дату (сегодня) для input даты рождения
-    const dateOfBirthInput = document.getElementById('dateOfBirth');
-    if (dateOfBirthInput) {
-        const today = new Date();
-        const maxDate = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate());
-        dateOfBirthInput.max = maxDate.toISOString().split('T')[0];
-        
-        // Заполняем дату рождения если есть в userData
-        if (userData && userData.dateOfBirth) {
-            dateOfBirthInput.value = userData.dateOfBirth;
-        } else if (userData && userData.age) {
-            // Обратная совместимость: вычисляем примерную дату рождения из возраста
-            const birthYear = today.getFullYear() - userData.age;
-            dateOfBirthInput.value = `${birthYear}-01-01`;
-        }
-    }
+    // Инициализируем слайдеры
+    initDateSliders();
+    initHeightWeightSliders();
 }
 
 // Показать экран профиля
@@ -657,13 +768,13 @@ function validateCurrentStep() {
             const gender = document.querySelector('input[name="gender"]:checked');
             
             if (!dateOfBirth) {
-                showNotification('Пожалуйста, введите дату рождения');
+                showNotification('Пожалуйста, выберите дату рождения');
                 return false;
             }
             
             const age = calculateAge(dateOfBirth);
             if (age === null || age < 10 || age > 120) {
-                showNotification('Пожалуйста, введите корректную дату рождения (возраст должен быть от 10 до 120 лет)');
+                showNotification('Пожалуйста, выберите корректную дату рождения (возраст должен быть от 10 до 120 лет)');
                 return false;
             }
             
@@ -674,14 +785,16 @@ function validateCurrentStep() {
             return true;
         
         case 2:
-            const height = document.getElementById('height').value;
-            const weight = document.getElementById('weight').value;
+            const heightSlider = document.getElementById('height');
+            const weightSlider = document.getElementById('weight');
+            const height = heightSlider ? parseInt(heightSlider.value) : 0;
+            const weight = weightSlider ? parseFloat(weightSlider.value) : 0;
             if (!height || height < 100 || height > 250) {
-                showNotification('Пожалуйста, введите корректный рост (100-250 см)');
+                showNotification('Пожалуйста, выберите корректный рост (100-250 см)');
                 return false;
             }
             if (!weight || weight < 30 || weight > 300) {
-                showNotification('Пожалуйста, введите корректный вес (30-300 кг)');
+                showNotification('Пожалуйста, выберите корректный вес (30-300 кг)');
                 return false;
             }
             return true;
@@ -722,11 +835,11 @@ function completeOnboarding() {
         return;
     }
     
-    // Собираем все данные
+    // Собираем все данные из слайдеров
     const dateOfBirthInput = document.getElementById('dateOfBirth');
     const genderInput = document.querySelector('input[name="gender"]:checked');
-    const heightInput = document.getElementById('height');
-    const weightInput = document.getElementById('weight');
+    const heightSlider = document.getElementById('height');
+    const weightSlider = document.getElementById('weight');
     const activityInput = document.querySelector('input[name="activity"]:checked');
     const goalInput = document.querySelector('input[name="goal"]:checked');
     
@@ -741,8 +854,8 @@ function completeOnboarding() {
         userData.age = calculateAge(dateOfBirthInput.value);
     }
     if (genderInput) userData.gender = genderInput.value;
-    if (heightInput) userData.height = parseInt(heightInput.value);
-    if (weightInput) userData.weight = parseFloat(weightInput.value);
+    if (heightSlider) userData.height = parseInt(heightSlider.value);
+    if (weightSlider) userData.weight = parseFloat(weightSlider.value);
     if (activityInput) userData.activity = activityInput.value;
     if (goalInput) userData.goal = goalInput.value;
     
