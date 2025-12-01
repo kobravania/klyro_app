@@ -351,10 +351,11 @@ h1, h2, h3, h4, h5, h6 {
     gap: 0;
     margin: 20px 0;
     height: 250px;
-    background: var(--background-card);
+    background: var(--background-color);
     border-radius: 12px;
     overflow: hidden;
     position: relative;
+    border: 1px solid #3a4a5f;
 }
 
 .wheel-picker {
@@ -362,25 +363,24 @@ h1, h2, h3, h4, h5, h6 {
     position: relative;
     height: 250px;
     overflow: hidden;
-    border-right: 1px solid #3a4a5f;
+    border-right: 1px solid rgba(58, 74, 95, 0.3);
 }
 
 .wheel-picker:last-child {
     border-right: none;
 }
 
+/* Верхний и нижний градиенты */
 .wheel-picker::before {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
-    top: 100px;
-    height: 50px;
-    z-index: 1;
+    top: 0;
+    height: 100px;
+    z-index: 2;
     pointer-events: none;
-    border-top: 1px solid rgba(93, 173, 226, 0.4);
-    border-bottom: 1px solid rgba(93, 173, 226, 0.4);
-    background: rgba(93, 173, 226, 0.05);
+    background: linear-gradient(to bottom, var(--background-color) 0%, rgba(26, 35, 50, 0) 100%);
 }
 
 .wheel-picker::after {
@@ -392,7 +392,7 @@ h1, h2, h3, h4, h5, h6 {
     height: 100px;
     z-index: 2;
     pointer-events: none;
-    background: linear-gradient(to top, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
+    background: linear-gradient(to top, var(--background-color) 0%, rgba(26, 35, 50, 0) 100%);
 }
 
 .wheel-picker-scroll {
@@ -416,25 +416,33 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
     justify-content: center;
     scroll-snap-align: center;
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: var(--text-secondary);
-    transition: all 0.2s ease;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     user-select: none;
     position: relative;
-    transform: scale(0.9);
-    opacity: 0.5;
-    padding: 0 8px;
+    padding: 0 12px;
     text-align: center;
+    opacity: 0.4;
+    transform: scale(0.9);
 }
 
 .wheel-item.selected {
     color: var(--text-primary);
-    font-weight: 600;
-    font-size: 1.3rem;
-    transform: scale(1);
+    font-weight: 500;
+    font-size: 1.1rem;
     opacity: 1;
+    transform: scale(1);
     z-index: 1;
+    background: rgba(93, 173, 226, 0.15);
+    border-radius: 8px;
+    margin: 0 4px;
+}
+
+/* Эффект перспективы для элементов выше и ниже центра */
+.wheel-item:not(.selected) {
+    transform: scale(0.88);
 }
 
 .wheel-item-month {
@@ -442,12 +450,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .wheel-item-month.selected {
-    font-size: 1.1rem;
-}
-
-/* Эффект перспективы для элементов выше и ниже центра */
-.wheel-item:not(.selected) {
-    transform: scale(0.85);
+    font-size: 1rem;
 }
 
 .wheel-picker::before {
