@@ -56,6 +56,12 @@ h1, h2, h3, h4, h5, h6 {
     background: var(--background-color); /* Явный темно-синий фон */
 }
 
+/* Исключения для экранов, которые должны быть на весь экран */
+#loading-screen,
+#auth-screen {
+    padding-top: 20px; /* Меньший отступ для этих экранов */
+}
+
 .screen.active {
     display: block !important;
     visibility: visible !important;
@@ -94,6 +100,7 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
     height: 100%;
     z-index: 1000;
+    padding-top: 20px; /* Переопределяем padding-top для loading screen */
 }
 
 #loading-screen.active {
