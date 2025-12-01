@@ -345,22 +345,136 @@ h1, h2, h3, h4, h5, h6 {
     text-align: center;
 }
 
-/* Date Picker Container */
-.date-picker-container {
+/* Wheel Picker (как в Telegram) */
+.wheel-picker-container {
     display: flex;
-    flex-direction: column;
-    gap: 20px;
+    gap: 0;
     margin: 20px 0;
+    height: 250px;
+    background: var(--background-card);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
 }
 
-.date-picker-item {
+.wheel-picker {
+    flex: 1;
+    position: relative;
+    height: 250px;
+    overflow: hidden;
+    border-right: 1px solid #3a4a5f;
+}
+
+.wheel-picker:last-child {
+    border-right: none;
+}
+
+.wheel-picker::before,
+.wheel-picker::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 100px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.wheel-picker::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
+}
+
+.wheel-picker::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
+}
+
+.wheel-picker-scroll {
+    height: 100%;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.wheel-picker-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.wheel-item {
+    height: 50px;
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    scroll-snap-align: center;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transform: scale(0.9);
+    opacity: 0.5;
 }
 
-.date-picker-item .slider {
-    margin: 10px 0;
+.wheel-item.selected {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1.3rem;
+    transform: scale(1);
+    opacity: 1;
+    z-index: 1;
+}
+
+/* Эффект перспективы для элементов выше и ниже центра */
+.wheel-item:not(.selected) {
+    transform: scale(0.85);
+}
+
+/* Центральная линия выделения */
+.wheel-picker::before,
+.wheel-picker::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 50px;
+    z-index: 1;
+    pointer-events: none;
+    border-top: 1px solid rgba(93, 173, 226, 0.3);
+    border-bottom: 1px solid rgba(93, 173, 226, 0.3);
+}
+
+.wheel-picker::before {
+    top: 100px;
+}
+
+.wheel-picker::after {
+    bottom: 100px;
+    border-top: 1px solid rgba(93, 173, 226, 0.3);
+    border-bottom: 1px solid rgba(93, 173, 226, 0.3);
+}
+
+/* Адаптивность */
+@media (max-width: 480px) {
+    .wheel-picker-container {
+        height: 220px;
+    }
+    
+    .wheel-picker {
+        height: 220px;
+    }
+    
+    .wheel-item {
+        height: 44px;
+        font-size: 1rem;
+    }
+    
+    .wheel-item.selected {
+        font-size: 1.2rem;
+    }
 }
 
 /* Radio Buttons */

@@ -503,18 +503,19 @@ function showAuthScreen() {
     });
 }
 
-// Инициализация слайдеров даты рождения
-function initDateSliders() {
-    const birthYearSlider = document.getElementById('birthYear');
-    const birthMonthSlider = document.getElementById('birthMonth');
-    const birthDaySlider = document.getElementById('birthDay');
-    const birthYearValue = document.getElementById('birthYearValue');
-    const birthMonthValue = document.getElementById('birthMonthValue');
-    const birthDayValue = document.getElementById('birthDayValue');
+// Инициализация wheel picker для даты рождения
+function initDateWheelPickers() {
+    const dayScroll = document.getElementById('dayScroll');
+    const monthScroll = document.getElementById('monthScroll');
+    const yearScroll = document.getElementById('yearScroll');
     const dateOfBirthInput = document.getElementById('dateOfBirth');
+    
+    if (!dayScroll || !monthScroll || !yearScroll) return;
     
     const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
                         'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const monthNamesShort = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 
+                             'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
     
     // Инициализация значений из userData или дефолтные
     let year = 1990, month = 1, day = 1;
@@ -531,69 +532,154 @@ function initDateSliders() {
     // Устанавливаем максимальный год (сегодня - 10 лет)
     const today = new Date();
     const maxYear = today.getFullYear() - 10;
-    if (birthYearSlider) {
-        birthYearSlider.max = maxYear;
-        birthYearSlider.min = 1904;
-        birthYearSlider.value = Math.max(1904, Math.min(maxYear, year));
-        birthYearValue.textContent = birthYearSlider.value;
+    const minYear = 1904;
+    
+    // Создаем элементы для дней (1-31)
+    dayScroll.innerHTML = '';
+    for (let i = 1; i <= 31; i++) {
+        const item = document.createElement('div');
+        item.className = 'wheel-item';
+        item.textContent = i;
+        item.dataset.value = i;
+        dayScroll.appendChild(item);
     }
     
-    if (birthMonthSlider) {
-        birthMonthSlider.value = month;
-        birthMonthValue.textContent = monthNames[month - 1];
+    // Создаем элементы для месяцев
+    monthScroll.innerHTML = '';
+    monthNamesShort.forEach((name, index) => {
+        const item = document.createElement('div');
+        item.className = 'wheel-item';
+        item.textContent = name;
+        item.dataset.value = index + 1;
+        monthScroll.appendChild(item);
+    });
+    
+    // Создаем элементы для годов
+    yearScroll.innerHTML = '';
+    for (let i = maxYear; i >= minYear; i--) {
+        const item = document.createElement('div');
+        item.className = 'wheel-item';
+        item.textContent = i;
+        item.dataset.value = i;
+        yearScroll.appendChild(item);
     }
     
-    if (birthDaySlider) {
-        birthDaySlider.value = day;
-        birthDayValue.textContent = day;
-    }
-    
-    // Обновление даты при изменении слайдеров
+    // Функция для обновления даты
     function updateDate() {
-        const y = parseInt(birthYearSlider.value);
-        const m = parseInt(birthMonthSlider.value);
-        const d = parseInt(birthDaySlider.value);
+        const selectedDay = parseInt(dayScroll.querySelector('.wheel-item.selected')?.dataset.value || day);
+        const selectedMonth = parseInt(monthScroll.querySelector('.wheel-item.selected')?.dataset.value || month);
+        const selectedYear = parseInt(yearScroll.querySelector('.wheel-item.selected')?.dataset.value || year);
         
         // Проверка корректности дня для выбранного месяца
-        const daysInMonth = new Date(y, m, 0).getDate();
-        if (d > daysInMonth) {
-            birthDaySlider.value = daysInMonth;
-            birthDayValue.textContent = daysInMonth;
-        }
+        const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+        const validDay = Math.min(selectedDay, daysInMonth);
         
-        const date = new Date(y, m - 1, Math.min(d, daysInMonth));
+        const date = new Date(selectedYear, selectedMonth - 1, validDay);
         const dateStr = date.toISOString().split('T')[0];
         if (dateOfBirthInput) {
             dateOfBirthInput.value = dateStr;
         }
         
-        // Обновление максимального дня при смене месяца/года
-        const maxDay = new Date(y, m, 0).getDate();
-        birthDaySlider.max = maxDay;
+        // Обновляем количество дней если нужно
+        if (selectedDay > daysInMonth) {
+            const dayItems = dayScroll.querySelectorAll('.wheel-item');
+            dayItems.forEach(item => {
+                const val = parseInt(item.dataset.value);
+                if (val > daysInMonth) {
+                    item.style.display = 'none';
+                } else {
+                    item.style.display = 'block';
+                }
+            });
+        }
     }
     
-    if (birthYearSlider) {
-        birthYearSlider.addEventListener('input', function() {
-            birthYearValue.textContent = this.value;
-            updateDate();
+    // Инициализация wheel picker для каждого колеса
+    function initWheelPicker(scrollElement, selectedValue, onSelect) {
+        let isScrolling = false;
+        let startY = 0;
+        let scrollTop = 0;
+        const itemHeight = 50; // Высота одного элемента
+        const visibleItems = 5; // Количество видимых элементов
+        
+        // Устанавливаем начальную позицию
+        const items = scrollElement.querySelectorAll('.wheel-item');
+        const selectedIndex = Array.from(items).findIndex(item => 
+            parseInt(item.dataset.value) === selectedValue
+        );
+        
+        if (selectedIndex >= 0) {
+            scrollElement.scrollTop = selectedIndex * itemHeight;
+            items[selectedIndex].classList.add('selected');
+        }
+        
+        // Обработка прокрутки
+        scrollElement.addEventListener('scroll', () => {
+            if (isScrolling) return;
+            
+            const scrollTop = scrollElement.scrollTop;
+            const index = Math.round(scrollTop / itemHeight);
+            const item = items[index];
+            
+            if (item) {
+                items.forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+                
+                // Плавная прокрутка к центру
+                const targetScroll = index * itemHeight;
+                if (Math.abs(scrollElement.scrollTop - targetScroll) > 1) {
+                    scrollElement.scrollTo({
+                        top: targetScroll,
+                        behavior: 'smooth'
+                    });
+                }
+                
+                if (onSelect) {
+                    onSelect(parseInt(item.dataset.value));
+                }
+            }
+        });
+        
+        // Обработка touch событий для мобильных
+        let touchStartY = 0;
+        scrollElement.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            isScrolling = true;
+        });
+        
+        scrollElement.addEventListener('touchmove', (e) => {
+            isScrolling = true;
+        });
+        
+        scrollElement.addEventListener('touchend', () => {
+            isScrolling = false;
+            const scrollTop = scrollElement.scrollTop;
+            const index = Math.round(scrollTop / itemHeight);
+            const targetScroll = index * itemHeight;
+            scrollElement.scrollTo({
+                top: targetScroll,
+                behavior: 'smooth'
+            });
+        });
+        
+        // Обработка клика на элемент
+        items.forEach((item, index) => {
+            item.addEventListener('click', () => {
+                scrollElement.scrollTo({
+                    top: index * itemHeight,
+                    behavior: 'smooth'
+                });
+            });
         });
     }
     
-    if (birthMonthSlider) {
-        birthMonthSlider.addEventListener('input', function() {
-            birthMonthValue.textContent = monthNames[this.value - 1];
-            updateDate();
-        });
-    }
+    // Инициализируем каждое колесо
+    initWheelPicker(dayScroll, day, () => updateDate());
+    initWheelPicker(monthScroll, month, () => updateDate());
+    initWheelPicker(yearScroll, year, () => updateDate());
     
-    if (birthDaySlider) {
-        birthDaySlider.addEventListener('input', function() {
-            birthDayValue.textContent = this.value;
-            updateDate();
-        });
-    }
-    
-    updateDate();
+    // Обновляем дату при инициализации
+    setTimeout(updateDate, 100);
 }
 
 // Инициализация слайдеров роста и веса
@@ -636,8 +722,8 @@ function showOnboardingScreen() {
     updateProgress();
     showStep(1);
     
-    // Инициализируем слайдеры
-    initDateSliders();
+    // Инициализируем wheel pickers и слайдеры
+    initDateWheelPickers();
     initHeightWeightSliders();
 }
 
