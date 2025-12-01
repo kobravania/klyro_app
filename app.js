@@ -920,7 +920,7 @@ function showNotification(message) {
 }
 
 // Завершение онбординга
-function completeOnboarding() {
+async function completeOnboarding() {
     if (!validateCurrentStep()) {
         return;
     }
