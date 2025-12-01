@@ -612,9 +612,8 @@ function initDateWheelPickers() {
         }
         
         // Обработка прокрутки
+        let scrollTimeout = null;
         scrollElement.addEventListener('scroll', () => {
-            if (isScrolling) return;
-            
             const scrollTop = scrollElement.scrollTop;
             const index = Math.round(scrollTop / itemHeight);
             const item = items[index];
@@ -623,41 +622,25 @@ function initDateWheelPickers() {
                 items.forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
                 
-                // Плавная прокрутка к центру
-                const targetScroll = index * itemHeight;
-                if (Math.abs(scrollElement.scrollTop - targetScroll) > 1) {
+                if (onSelect) {
+                    onSelect(parseInt(item.dataset.value));
+                }
+            }
+            
+            // Автоматическое выравнивание после остановки прокрутки
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                const currentScroll = scrollElement.scrollTop;
+                const currentIndex = Math.round(currentScroll / itemHeight);
+                const targetScroll = currentIndex * itemHeight;
+                
+                if (Math.abs(currentScroll - targetScroll) > 1) {
                     scrollElement.scrollTo({
                         top: targetScroll,
                         behavior: 'smooth'
                     });
                 }
-                
-                if (onSelect) {
-                    onSelect(parseInt(item.dataset.value));
-                }
-            }
-        });
-        
-        // Обработка touch событий для мобильных
-        let touchStartY = 0;
-        scrollElement.addEventListener('touchstart', (e) => {
-            touchStartY = e.touches[0].clientY;
-            isScrolling = true;
-        });
-        
-        scrollElement.addEventListener('touchmove', (e) => {
-            isScrolling = true;
-        });
-        
-        scrollElement.addEventListener('touchend', () => {
-            isScrolling = false;
-            const scrollTop = scrollElement.scrollTop;
-            const index = Math.round(scrollTop / itemHeight);
-            const targetScroll = index * itemHeight;
-            scrollElement.scrollTo({
-                top: targetScroll,
-                behavior: 'smooth'
-            });
+            }, 150);
         });
         
         // Обработка клика на элемент
