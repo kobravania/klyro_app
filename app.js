@@ -379,6 +379,12 @@ async function checkUserAuth() {
                 userData = JSON.parse(savedData);
                 // Проверяем, что данные валидны (есть хотя бы возраст или имя)
                 if (userData && (userData.age || userData.firstName)) {
+                    // Инициализируем хэши для синхронизации
+                    lastUserDataHash = getDataHash(userData);
+                    const diary = getDiary();
+                    if (diary && Object.keys(diary).length > 0) {
+                        lastDiaryHash = getDataHash(diary);
+                    }
                     // Сразу показываем профиль, без задержек
                     showProfileScreen();
                     // Обновляем username
