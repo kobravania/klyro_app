@@ -271,9 +271,8 @@ function showProfileScreen() {
         document.getElementById('user-name').textContent = 
             `${userData.firstName} ${userData.lastName || ''}`.trim();
         
-        if (userData.photoUrl) {
-            document.getElementById('user-avatar').src = userData.photoUrl;
-        }
+        // Обновляем аватарку
+        updateAvatarDisplay();
         
         // Показываем параметры
         if (userData.age) {
@@ -1366,4 +1365,236 @@ window.showSettingsScreen = showSettingsScreen;
 window.setUnits = setUnits;
 window.exportData = exportData;
 window.importData = importData;
+
+// ============================================
+// ФУНКЦИИ ДЛЯ РАБОТЫ С АВАТАРОМ
+// ============================================
+
+let selectedAvatarFile = null;
+let selectedEmoji = null;
+
+// Обновление отображения аватара
+function updateAvatarDisplay() {
+    if (!userData) return;
+    
+    const avatarImg = document.getElementById('user-avatar');
+    const avatarPlaceholder = document.getElementById('avatar-placeholder');
+    const avatarEmoji = document.getElementById('avatar-emoji');
+    
+    // Проверяем наличие фото из Telegram
+    if (userData.photoUrl) {
+        avatarImg.src = userData.photoUrl;
+        avatarImg.style.display = 'block';
+        avatarPlaceholder.style.display = 'none';
+    }
+    // Проверяем загруженное фото
+    else if (userData.customAvatar) {
+        avatarImg.src = userData.customAvatar;
+        avatarImg.style.display = 'block';
+        avatarPlaceholder.style.display = 'none';
+    }
+    // Проверяем выбранный эмодзи
+    else if (userData.avatarEmoji) {
+        avatarImg.style.display = 'none';
+        avatarPlaceholder.style.display = 'flex';
+        avatarEmoji.textContent = userData.avatarEmoji;
+        avatarEmoji.style.fontSize = '48px';
+    }
+    // Показываем placeholder по умолчанию
+    else {
+        avatarImg.style.display = 'none';
+        avatarPlaceholder.style.display = 'flex';
+        avatarEmoji.textContent = '👤';
+        avatarEmoji.style.fontSize = '48px';
+    }
+}
+
+// Открыть модальное окно выбора аватара
+function openAvatarModal() {
+    const modal = document.getElementById('avatar-modal');
+    modal.style.display = 'flex';
+    // Сбрасываем выбор
+    selectedAvatarFile = null;
+    selectedEmoji = null;
+    document.getElementById('photo-upload-section').style.display = 'none';
+    document.getElementById('emoji-picker-section').style.display = 'none';
+    document.getElementById('save-photo-btn').style.display = 'none';
+    document.getElementById('photo-preview').innerHTML = '';
+}
+
+// Закрыть модальное окно
+function closeAvatarModal() {
+    const modal = document.getElementById('avatar-modal');
+    modal.style.display = 'none';
+    selectedAvatarFile = null;
+    selectedEmoji = null;
+}
+
+// Показать секцию загрузки фото
+function showPhotoUpload() {
+    document.getElementById('photo-upload-section').style.display = 'block';
+    document.getElementById('emoji-picker-section').style.display = 'none';
+    selectedEmoji = null;
+}
+
+// Показать секцию выбора эмодзи
+function showEmojiPicker() {
+    document.getElementById('emoji-picker-section').style.display = 'block';
+    document.getElementById('photo-upload-section').style.display = 'none';
+    selectedAvatarFile = null;
+    document.getElementById('save-photo-btn').style.display = 'none';
+    document.getElementById('photo-preview').innerHTML = '';
+    
+    // Заполняем сетку эмодзи, если еще не заполнена
+    const emojiGrid = document.getElementById('emoji-grid');
+    if (emojiGrid.children.length === 0) {
+        const emojis = [
+            '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',
+            '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙',
+            '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
+            '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥',
+            '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮',
+            '🤧', '🥵', '🥶', '😶‍🌫️', '😵', '🤯', '🤠', '🥳', '😎', '🤓',
+            '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺',
+            '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣',
+            '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈',
+            '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾',
+            '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾',
+            '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
+            '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+            '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+            '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃',
+            '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋',
+            '💘', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❣️', '💔',
+            '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💯',
+            '🔥', '⭐', '🌟', '✨', '💫', '💥', '💢', '💤', '💨', '🕳️',
+            '🎯', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎮', '🎰', '🎲',
+            '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫', '🎟️',
+            '🎫', '🎟️', '🎫', '🎟️', '🎫', '🎟️', '🎫', '🎟️', '🎫', '🎟️'
+        ];
+        
+        emojis.forEach(emoji => {
+            const emojiBtn = document.createElement('button');
+            emojiBtn.className = 'emoji-btn';
+            emojiBtn.textContent = emoji;
+            emojiBtn.onclick = () => selectEmoji(emoji);
+            emojiGrid.appendChild(emojiBtn);
+        });
+    }
+}
+
+// Обработка выбора файла
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Проверяем размер файла (макс 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        if (typeof showNotification === 'function') {
+            showNotification('Файл слишком большой. Максимальный размер: 5MB');
+        } else {
+            alert('Файл слишком большой. Максимальный размер: 5MB');
+        }
+        return;
+    }
+    
+    // Проверяем тип файла
+    if (!file.type.startsWith('image/')) {
+        if (typeof showNotification === 'function') {
+            showNotification('Пожалуйста, выберите изображение');
+        } else {
+            alert('Пожалуйста, выберите изображение');
+        }
+        return;
+    }
+    
+    selectedAvatarFile = file;
+    
+    // Показываем превью
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const preview = document.getElementById('photo-preview');
+        preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="width: 100%; max-width: 200px; border-radius: 50%; object-fit: cover;">`;
+        document.getElementById('save-photo-btn').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+// Сохранение фото аватара
+function savePhotoAvatar() {
+    if (!selectedAvatarFile) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        if (!userData) {
+            userData = {};
+        }
+        
+        // Сохраняем фото как base64
+        userData.customAvatar = e.target.result;
+        userData.avatarEmoji = null; // Убираем эмодзи, если был выбран
+        
+        // Сохраняем в localStorage
+        localStorage.setItem('klyro_user_data', JSON.stringify(userData));
+        
+        // Обновляем отображение
+        updateAvatarDisplay();
+        
+        // Закрываем модальное окно
+        closeAvatarModal();
+        
+        if (typeof showNotification === 'function') {
+            showNotification('Фото сохранено!');
+        } else {
+            alert('Фото сохранено!');
+        }
+    };
+    reader.readAsDataURL(selectedAvatarFile);
+}
+
+// Выбор эмодзи
+function selectEmoji(emoji) {
+    selectedEmoji = emoji;
+    
+    if (!userData) {
+        userData = {};
+    }
+    
+    // Сохраняем эмодзи
+    userData.avatarEmoji = emoji;
+    userData.customAvatar = null; // Убираем фото, если было загружено
+    
+    // Сохраняем в localStorage
+    localStorage.setItem('klyro_user_data', JSON.stringify(userData));
+    
+    // Обновляем отображение
+    updateAvatarDisplay();
+    
+    // Закрываем модальное окно
+    closeAvatarModal();
+    
+        if (typeof showNotification === 'function') {
+            showNotification('Эмодзи сохранен!');
+        } else {
+            alert('Эмодзи сохранен!');
+        }
+}
+
+// Закрытие модального окна при клике вне его
+window.onclick = function(event) {
+    const modal = document.getElementById('avatar-modal');
+    if (event.target === modal) {
+        closeAvatarModal();
+    }
+}
+
+// Экспорт функций для использования в HTML
+window.openAvatarModal = openAvatarModal;
+window.closeAvatarModal = closeAvatarModal;
+window.showPhotoUpload = showPhotoUpload;
+window.showEmojiPicker = showEmojiPicker;
+window.handleFileSelect = handleFileSelect;
+window.savePhotoAvatar = savePhotoAvatar;
+window.updateAvatarDisplay = updateAvatarDisplay;
+window.selectEmoji = selectEmoji;
 
