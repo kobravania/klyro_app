@@ -503,24 +503,105 @@ function showAuthScreen() {
     });
 }
 
-// Инициализация input для даты рождения
-function initDateInput() {
+// Инициализация слайдеров для даты рождения
+function initDateSliders() {
+    const daySlider = document.getElementById('birthDay');
+    const monthSlider = document.getElementById('birthMonth');
+    const yearSlider = document.getElementById('birthYear');
+    const dayValue = document.getElementById('birthDayValue');
+    const monthValue = document.getElementById('birthMonthValue');
+    const yearValue = document.getElementById('birthYearValue');
     const dateOfBirthInput = document.getElementById('dateOfBirth');
-    if (!dateOfBirthInput) return;
     
-    // Устанавливаем максимальную дату (сегодня - 10 лет)
+    if (!daySlider || !monthSlider || !yearSlider) return;
+    
+    // Названия месяцев
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    
+    // Инициализация значений из userData или дефолтные
     const today = new Date();
-    const maxDate = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate());
-    dateOfBirthInput.max = maxDate.toISOString().split('T')[0];
+    let year = 1990, month = 1, day = 1;
     
-    // Заполняем дату рождения если есть в userData
     if (userData && userData.dateOfBirth) {
-        dateOfBirthInput.value = userData.dateOfBirth;
+        const date = new Date(userData.dateOfBirth);
+        year = date.getFullYear();
+        month = date.getMonth() + 1;
+        day = date.getDate();
     } else if (userData && userData.age) {
-        // Обратная совместимость: вычисляем примерную дату рождения из возраста
-        const birthYear = today.getFullYear() - userData.age;
-        dateOfBirthInput.value = `${birthYear}-01-01`;
+        // Обратная совместимость: вычисляем примерный год рождения из возраста
+        year = today.getFullYear() - userData.age;
     }
+    
+    // Устанавливаем максимальный год (сегодня - 10 лет)
+    const maxYear = today.getFullYear() - 10;
+    if (yearSlider) {
+        yearSlider.max = maxYear;
+        yearSlider.value = Math.min(year, maxYear);
+    }
+    if (monthSlider) monthSlider.value = month;
+    if (daySlider) daySlider.value = day;
+    
+    // Функция для обновления количества дней в зависимости от месяца и года
+    function updateDaysInMonth() {
+        const currentMonth = parseInt(monthSlider.value);
+        const currentYear = parseInt(yearSlider.value);
+        const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+        
+        if (daySlider) {
+            const currentDay = parseInt(daySlider.value);
+            daySlider.max = daysInMonth;
+            if (currentDay > daysInMonth) {
+                daySlider.value = daysInMonth;
+                if (dayValue) dayValue.textContent = daysInMonth;
+            }
+        }
+    }
+    
+    // Функция для обновления скрытого input
+    function updateDateInput() {
+        const d = parseInt(daySlider.value);
+        const m = parseInt(monthSlider.value);
+        const y = parseInt(yearSlider.value);
+        const date = new Date(y, m - 1, d);
+        const dateStr = date.toISOString().split('T')[0];
+        if (dateOfBirthInput) {
+            dateOfBirthInput.value = dateStr;
+        }
+    }
+    
+    // Обновление отображения дня
+    if (daySlider && dayValue) {
+        dayValue.textContent = daySlider.value;
+        daySlider.addEventListener('input', () => {
+            dayValue.textContent = daySlider.value;
+            updateDateInput();
+        });
+    }
+    
+    // Обновление отображения месяца
+    if (monthSlider && monthValue) {
+        monthValue.textContent = monthNames[monthSlider.value - 1];
+        monthSlider.addEventListener('input', () => {
+            monthValue.textContent = monthNames[monthSlider.value - 1];
+            updateDaysInMonth();
+            updateDateInput();
+        });
+    }
+    
+    // Обновление отображения года
+    if (yearSlider && yearValue) {
+        yearValue.textContent = yearSlider.value;
+        yearSlider.addEventListener('input', () => {
+            yearValue.textContent = yearSlider.value;
+            updateDaysInMonth();
+            updateDateInput();
+        });
+    }
+    
+    // Инициализация
+    updateDaysInMonth();
+    updateDateInput();
 }
 
 // Инициализация слайдеров роста и веса
@@ -563,8 +644,8 @@ function showOnboardingScreen() {
     updateProgress();
     showStep(1);
     
-    // Инициализируем input для даты рождения и слайдеры
-    initDateInput();
+    // Инициализируем слайдеры для даты рождения, роста и веса
+    initDateSliders();
     initHeightWeightSliders();
 }
 
@@ -694,7 +775,7 @@ function validateCurrentStep() {
             const dateOfBirth = dateOfBirthInput ? dateOfBirthInput.value : null;
             const gender = document.querySelector('input[name="gender"]:checked');
             
-            if (!dateOfBirth) {
+            if (!dateOfBirth || dateOfBirth === '') {
                 showNotification('Пожалуйста, выберите дату рождения');
                 return false;
             }

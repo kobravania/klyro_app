@@ -345,6 +345,45 @@ h1, h2, h3, h4, h5, h6 {
     text-align: center;
 }
 
+/* Слайдеры для даты рождения */
+.date-sliders {
+    display: flex;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.date-slider-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.date-slider-item .slider {
+    margin: 10px 0;
+}
+
+.date-slider-item .slider-value {
+    font-size: 1.2rem;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.date-slider-item .slider-label {
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+}
+
+@media (max-width: 480px) {
+    .date-sliders {
+        gap: 10px;
+    }
+    
+    .date-slider-item .slider-value {
+        font-size: 1rem;
+    }
+}
+
 /* Wheel Picker (как в Telegram) */
 .wheel-picker-container {
     display: flex;

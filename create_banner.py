@@ -105,3 +105,4 @@ print(f"Размер: {width}x{height} пикселей")
 
 
 
+

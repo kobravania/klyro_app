@@ -182,3 +182,4 @@ print(f"Кадров: {total_frames}")
 
 
 
+
