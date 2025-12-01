@@ -369,14 +369,14 @@ h1, h2, h3, h4, h5, h6 {
     border-right: none;
 }
 
-/* Верхний и нижний градиенты */
+/* Верхний и нижний градиенты (как в Telegram) */
 .wheel-picker::before {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
     top: 0;
-    height: 83px;
+    height: 90px;
     z-index: 2;
     pointer-events: none;
     background: linear-gradient(to bottom, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
@@ -388,7 +388,7 @@ h1, h2, h3, h4, h5, h6 {
     left: 0;
     right: 0;
     bottom: 0;
-    height: 83px;
+    height: 90px;
     z-index: 2;
     pointer-events: none;
     background: linear-gradient(to top, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
@@ -417,22 +417,22 @@ h1, h2, h3, h4, h5, h6 {
     scroll-snap-align: center;
     font-size: 1rem;
     color: rgba(232, 244, 248, 0.4);
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background 0.2s ease;
     cursor: pointer;
     user-select: none;
     position: relative;
     padding: 0 8px;
     text-align: center;
     line-height: 36px;
+    margin: 0 4px;
 }
 
 .wheel-item.selected {
     color: var(--text-primary);
     font-weight: 400;
     font-size: 1rem;
-    background: rgba(93, 173, 226, 0.2);
+    background: rgba(93, 173, 226, 0.25);
     border-radius: 6px;
-    margin: 0 4px;
     z-index: 1;
 }
 
@@ -442,6 +442,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .wheel-item-month.selected {
     font-size: 0.95rem;
+    background: rgba(93, 173, 226, 0.25);
 }
 
 /* Адаптивность */
