@@ -31,3 +31,7 @@ curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=https://web
 
 Или я могу сделать это автоматически, если вы дадите мне URL!
 
+
+
+
+

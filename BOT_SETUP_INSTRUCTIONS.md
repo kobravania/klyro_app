@@ -152,3 +152,7 @@ curl -X POST "https://api.telegram.org/botВАШ_ТОКЕН/sendMessage" \
 
 Где `ВАШ_CHAT_ID` - это ваш ID в Telegram (можно узнать у [@userinfobot](https://t.me/userinfobot))
 
+
+
+
+

@@ -46,3 +46,7 @@ curl -X POST "https://api.telegram.org/bot<ВАШ_ТОКЕН>/setChatMenuButton"
 
 Пользователи увидят кнопку внизу чата с ботом, нажав на которую откроется ваше Web App приложение Klyro!
 
+
+
+
+

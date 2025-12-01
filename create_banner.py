@@ -101,3 +101,7 @@ img.save(output_path, 'PNG')
 print(f"Изображение создано: {output_path}")
 print(f"Размер: {width}x{height} пикселей")
 
+
+
+
+

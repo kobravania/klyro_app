@@ -61,3 +61,7 @@ curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/getWebhookInfo"
 
 Должно показать ваш Railway URL без ошибок.
 
+
+
+
+

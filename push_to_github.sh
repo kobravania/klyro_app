@@ -14,3 +14,7 @@ git push -u origin main
 echo "✅ Готово! Теперь включите GitHub Pages в настройках репозитория."
 echo "📝 URL будет: https://kobravania.github.io/klyro_app/"
 
+
+
+
+

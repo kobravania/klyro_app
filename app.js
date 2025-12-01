@@ -148,12 +148,8 @@ function checkUserAuth() {
                 if (userData && (userData.age || userData.firstName)) {
                     // Сразу показываем профиль, без задержек
                     showProfileScreen();
-                    // Обновляем аватар после загрузки данных
-                    setTimeout(() => {
-                        if (typeof updateAvatarDisplay === 'function') {
-                            updateAvatarDisplay();
-                        }
-                    }, 100);
+                    // Обновляем username
+                    updateUsernameDisplay();
                     return;
                 }
             } catch (e) {
@@ -177,6 +173,8 @@ function checkUserAuth() {
                     username: telegramUser.username || '',
                     photoUrl: telegramUser.photo_url || ''
                 };
+                // Обновляем username
+                updateUsernameDisplay();
                 // Если есть данные профиля, показываем профиль, иначе онбординг
                 if (userData.age || userData.height) {
                     showProfileScreen();
@@ -242,6 +240,8 @@ function showAuthScreen() {
                 username: telegramUser.username || '',
                 photoUrl: telegramUser.photo_url || ''
             };
+            // Обновляем username
+            updateUsernameDisplay();
         } else {
             // Тестовые данные для разработки
             userData = {
@@ -277,8 +277,8 @@ function showProfileScreen() {
         document.getElementById('user-name').textContent = 
             `${userData.firstName} ${userData.lastName || ''}`.trim();
         
-        // Обновляем аватарку
-        updateAvatarDisplay();
+        // Обновляем username в углу
+        updateUsernameDisplay();
         
         // Показываем параметры
         if (userData.age) {
@@ -1373,242 +1373,37 @@ window.exportData = exportData;
 window.importData = importData;
 
 // ============================================
-// ФУНКЦИИ ДЛЯ РАБОТЫ С АВАТАРОМ
+// ФУНКЦИЯ ОТОБРАЖЕНИЯ USERNAME
 // ============================================
 
-let selectedAvatarFile = null;
-let selectedEmoji = null;
-
-// Обновление отображения аватара
-function updateAvatarDisplay() {
-    if (!userData) return;
-    
-    const avatarImg = document.getElementById('user-avatar');
-    const avatarPlaceholder = document.getElementById('avatar-placeholder');
-    const avatarEmoji = document.getElementById('avatar-emoji');
-    
-    // Проверяем наличие элементов
-    if (!avatarImg || !avatarPlaceholder || !avatarEmoji) {
-        console.warn('[AVATAR] Avatar elements not found');
-        return;
-    }
-    
-    // Проверяем наличие фото из Telegram
-    if (userData.photoUrl) {
-        avatarImg.src = userData.photoUrl;
-        avatarImg.style.display = 'block';
-        avatarPlaceholder.style.display = 'none';
-    }
-    // Проверяем загруженное фото
-    else if (userData.customAvatar) {
-        avatarImg.src = userData.customAvatar;
-        avatarImg.style.display = 'block';
-        avatarPlaceholder.style.display = 'none';
-    }
-    // Проверяем выбранный эмодзи
-    else if (userData.avatarEmoji) {
-        avatarImg.style.display = 'none';
-        avatarPlaceholder.style.display = 'flex';
-        avatarEmoji.textContent = userData.avatarEmoji;
-        avatarEmoji.style.fontSize = '48px';
-    }
-    // Показываем placeholder по умолчанию
-    else {
-        avatarImg.style.display = 'none';
-        avatarPlaceholder.style.display = 'flex';
-        avatarEmoji.textContent = '👤';
-        avatarEmoji.style.fontSize = '48px';
-    }
-}
-
-// Открыть модальное окно выбора аватара
-function openAvatarModal() {
-    const modal = document.getElementById('avatar-modal');
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.classList.add('show');
-        // Сбрасываем выбор
-        selectedAvatarFile = null;
-        selectedEmoji = null;
-        const photoSection = document.getElementById('photo-upload-section');
-        const emojiSection = document.getElementById('emoji-picker-section');
-        const saveBtn = document.getElementById('save-photo-btn');
-        const preview = document.getElementById('photo-preview');
-        
-        if (photoSection) photoSection.style.display = 'none';
-        if (emojiSection) emojiSection.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'none';
-        if (preview) preview.innerHTML = '';
-    }
-}
-
-// Закрыть модальное окно
-function closeAvatarModal() {
-    const modal = document.getElementById('avatar-modal');
-    if (modal) {
-        modal.style.display = 'none';
-        modal.classList.remove('show');
-    }
-    selectedAvatarFile = null;
-    selectedEmoji = null;
-}
-
-// Показать секцию загрузки фото
-function showPhotoUpload() {
-    const photoSection = document.getElementById('photo-upload-section');
-    const emojiSection = document.getElementById('emoji-picker-section');
-    if (photoSection) photoSection.style.display = 'block';
-    if (emojiSection) emojiSection.style.display = 'none';
-    selectedEmoji = null;
-}
-
-// Показать секцию выбора эмодзи
-function showEmojiPicker() {
-    const emojiSection = document.getElementById('emoji-picker-section');
-    const photoSection = document.getElementById('photo-upload-section');
-    const saveBtn = document.getElementById('save-photo-btn');
-    const preview = document.getElementById('photo-preview');
-    
-    if (emojiSection) emojiSection.style.display = 'block';
-    if (photoSection) photoSection.style.display = 'none';
-    selectedAvatarFile = null;
-    if (saveBtn) saveBtn.style.display = 'none';
-    if (preview) preview.innerHTML = '';
-    
-    // Заполняем сетку эмодзи, если еще не заполнена
-    const emojiGrid = document.getElementById('emoji-grid');
-    if (emojiGrid.children.length === 0) {
-        const emojis = [
-            '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',
-            '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙',
-            '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
-            '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥',
-            '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮',
-            '🤧', '🥵', '🥶', '😶‍🌫️', '😵', '🤯', '🤠', '🥳', '😎', '🤓',
-            '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺',
-            '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣',
-            '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈',
-            '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾',
-            '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾',
-            '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
-            '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
-            '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
-            '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃',
-            '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋',
-            '💘', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❣️', '💔',
-            '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💯',
-            '🔥', '⭐', '🌟', '✨', '💫', '💥', '💢', '💤', '💨', '🕳️',
-            '🎯', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎮', '🎰', '🎲',
-            '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫', '🎟️',
-            '🎫', '🎟️', '🎫', '🎟️', '🎫', '🎟️', '🎫', '🎟️', '🎫', '🎟️'
-        ];
-        
-        emojis.forEach(emoji => {
-            const emojiBtn = document.createElement('button');
-            emojiBtn.className = 'emoji-btn';
-            emojiBtn.textContent = emoji;
-            emojiBtn.onclick = () => selectEmoji(emoji);
-            emojiGrid.appendChild(emojiBtn);
-        });
-    }
-}
-
-// Обработка выбора файла
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    // Проверяем размер файла (макс 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showNotification('Файл слишком большой. Максимальный размер: 5MB');
-        return;
-    }
-    
-    // Проверяем тип файла
-    if (!file.type.startsWith('image/')) {
-        showNotification('Пожалуйста, выберите изображение');
-        return;
-    }
-    
-    selectedAvatarFile = file;
-    
-    // Показываем превью
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const preview = document.getElementById('photo-preview');
-        preview.innerHTML = `<img src="${e.target.result}" alt="Preview" style="width: 100%; max-width: 200px; border-radius: 50%; object-fit: cover;">`;
-        document.getElementById('save-photo-btn').style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-}
-
-// Сохранение фото аватара
-function savePhotoAvatar() {
-    if (!selectedAvatarFile) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        if (!userData) {
-            userData = {};
-        }
-        
-        // Сохраняем фото как base64
-        userData.customAvatar = e.target.result;
-        userData.avatarEmoji = null; // Убираем эмодзи, если был выбран
-        
-        // Сохраняем в localStorage
-        localStorage.setItem('klyro_user_data', JSON.stringify(userData));
-        
-        // Обновляем отображение
-        updateAvatarDisplay();
-        
-        // Закрываем модальное окно
-        closeAvatarModal();
-        
-        showNotification('Фото сохранено!');
-    };
-    reader.readAsDataURL(selectedAvatarFile);
-}
-
-// Выбор эмодзи
-function selectEmoji(emoji) {
-    selectedEmoji = emoji;
-    
+// Обновление отображения username в углу экрана
+function updateUsernameDisplay() {
     if (!userData) {
-        userData = {};
+        const badge = document.getElementById('username-badge');
+        if (badge) badge.style.display = 'none';
+        return;
     }
     
-    // Сохраняем эмодзи
-    userData.avatarEmoji = emoji;
-    userData.customAvatar = null; // Убираем фото, если было загружено
+    const badge = document.getElementById('username-badge');
+    if (!badge) return;
     
-    // Сохраняем в localStorage
-    localStorage.setItem('klyro_user_data', JSON.stringify(userData));
+    // Получаем username из Telegram или используем firstName
+    let username = userData.username || userData.firstName || 'Пользователь';
     
-    // Обновляем отображение
-    updateAvatarDisplay();
-    
-    // Закрываем модальное окно
-    closeAvatarModal();
-    
-        showNotification('Эмодзи сохранен!');
-}
-
-// Закрытие модального окна при клике вне его
-window.onclick = function(event) {
-    const modal = document.getElementById('avatar-modal');
-    if (event.target === modal) {
-        closeAvatarModal();
+    // Если есть @, убираем его
+    if (username.startsWith('@')) {
+        username = username.substring(1);
     }
+    
+    // Если нет username, используем firstName
+    if (!userData.username && userData.firstName) {
+        username = userData.firstName;
+    }
+    
+    badge.textContent = `@${username}`;
+    badge.style.display = 'block';
 }
 
-// Экспорт функций для использования в HTML
-window.openAvatarModal = openAvatarModal;
-window.closeAvatarModal = closeAvatarModal;
-window.showPhotoUpload = showPhotoUpload;
-window.showEmojiPicker = showEmojiPicker;
-window.handleFileSelect = handleFileSelect;
-window.savePhotoAvatar = savePhotoAvatar;
-window.updateAvatarDisplay = updateAvatarDisplay;
-window.selectEmoji = selectEmoji;
+// Экспорт функции
+window.updateUsernameDisplay = updateUsernameDisplay;
 

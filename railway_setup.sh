@@ -33,3 +33,7 @@ echo "6. Установите webhook:"
 echo "   curl \"https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=ВАШ_RAILWAY_URL/webhook\""
 echo ""
 
+
+
+
+

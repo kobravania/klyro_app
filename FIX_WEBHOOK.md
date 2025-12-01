@@ -49,3 +49,7 @@ curl "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/setWebhook?url=ВАШ_NGRO
 
 Кнопка "ОТКРЫТЬ" появится в списке чатов автоматически, когда бот отправит сообщение с inline keyboard.
 
+
+
+
+

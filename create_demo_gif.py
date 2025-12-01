@@ -178,3 +178,7 @@ print(f"✅ Демо GIF создан: {output_path}")
 print(f"Размер: {width}x{height} пикселей")
 print(f"Кадров: {total_frames}")
 
+
+
+
+
