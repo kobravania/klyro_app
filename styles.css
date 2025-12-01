@@ -369,24 +369,29 @@ h1, h2, h3, h4, h5, h6 {
     border-right: none;
 }
 
-.wheel-picker::before,
+.wheel-picker::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100px;
+    height: 50px;
+    z-index: 1;
+    pointer-events: none;
+    border-top: 1px solid rgba(93, 173, 226, 0.4);
+    border-bottom: 1px solid rgba(93, 173, 226, 0.4);
+    background: rgba(93, 173, 226, 0.05);
+}
+
 .wheel-picker::after {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
+    bottom: 0;
     height: 100px;
     z-index: 2;
     pointer-events: none;
-}
-
-.wheel-picker::before {
-    top: 0;
-    background: linear-gradient(to bottom, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
-}
-
-.wheel-picker::after {
-    bottom: 0;
     background: linear-gradient(to top, var(--background-card) 0%, rgba(36, 52, 71, 0) 100%);
 }
 
@@ -431,11 +436,6 @@ h1, h2, h3, h4, h5, h6 {
 /* Эффект перспективы для элементов выше и ниже центра */
 .wheel-item:not(.selected) {
     transform: scale(0.85);
-}
-
-/* Центральная линия выделения */
-.wheel-picker {
-    position: relative;
 }
 
 .wheel-picker::before {
