@@ -468,20 +468,6 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 1rem;
 }
 
-.wheel-picker::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 100px;
-    height: 50px;
-    z-index: 1;
-    pointer-events: none;
-    border-top: 1px solid rgba(93, 173, 226, 0.4);
-    border-bottom: 1px solid rgba(93, 173, 226, 0.4);
-    background: rgba(93, 173, 226, 0.05);
-}
-
 /* Адаптивность */
 @media (max-width: 480px) {
     .wheel-picker-container {
