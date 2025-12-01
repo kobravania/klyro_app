@@ -503,26 +503,175 @@ function showAuthScreen() {
     });
 }
 
-// Инициализация input для даты рождения
+// Инициализация кастомного date picker
 function initDateInput() {
-    const dateOfBirthInput = document.getElementById('dateOfBirth');
-    if (!dateOfBirthInput) return;
+    const dateInput = document.getElementById('dateOfBirth');
+    const datePicker = document.getElementById('datePicker');
+    const datePickerDays = document.getElementById('datePickerDays');
+    const datePickerMonth = document.getElementById('datePickerMonth');
+    const datePickerYear = document.getElementById('datePickerYear');
+    const dateOfBirthValue = document.getElementById('dateOfBirthValue');
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const resetBtn = document.getElementById('datePickerReset');
+    const confirmBtn = document.getElementById('datePickerConfirm');
     
-    // Устанавливаем максимальную дату (сегодня - 10 лет)
+    if (!dateInput || !datePicker) return;
+    
     const today = new Date();
-    const maxDate = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate());
-    dateOfBirthInput.max = maxDate.toISOString().split('T')[0];
+    const maxYear = today.getFullYear() - 10;
+    const minYear = 1904;
     
-    // Устанавливаем минимальную дату (1904 год)
-    dateOfBirthInput.min = '1904-01-01';
+    let currentDate = new Date();
+    let selectedDate = null;
     
-    // Заполняем дату рождения если есть в userData
+    // Заполняем месяцы
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    
+    monthNames.forEach((name, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = name;
+        datePickerMonth.appendChild(option);
+    });
+    
+    // Заполняем годы
+    for (let year = maxYear; year >= minYear; year--) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        datePickerYear.appendChild(option);
+    }
+    
+    // Инициализация из userData
     if (userData && userData.dateOfBirth) {
-        dateOfBirthInput.value = userData.dateOfBirth;
+        selectedDate = new Date(userData.dateOfBirth);
+        currentDate = new Date(selectedDate);
+        updateDateInput();
     } else if (userData && userData.age) {
-        // Обратная совместимость: вычисляем примерную дату рождения из возраста
         const birthYear = today.getFullYear() - userData.age;
-        dateOfBirthInput.value = `${birthYear}-01-01`;
+        selectedDate = new Date(birthYear, 0, 1);
+        currentDate = new Date(selectedDate);
+        updateDateInput();
+    } else {
+        currentDate = new Date(maxYear, 0, 1);
+    }
+    
+    // Обновление календаря
+    function updateCalendar() {
+        datePickerMonth.value = currentDate.getMonth();
+        datePickerYear.value = currentDate.getFullYear();
+        
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startingDayOfWeek = (firstDay.getDay() + 6) % 7; // Понедельник = 0
+        
+        datePickerDays.innerHTML = '';
+        
+        // Пустые ячейки для дней предыдущего месяца
+        for (let i = 0; i < startingDayOfWeek; i++) {
+            const dayCell = document.createElement('div');
+            dayCell.className = 'date-picker-day date-picker-day-other';
+            datePickerDays.appendChild(dayCell);
+        }
+        
+        // Дни текущего месяца
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayCell = document.createElement('div');
+            dayCell.className = 'date-picker-day';
+            dayCell.textContent = day;
+            
+            const cellDate = new Date(year, month, day);
+            if (selectedDate && 
+                cellDate.getDate() === selectedDate.getDate() &&
+                cellDate.getMonth() === selectedDate.getMonth() &&
+                cellDate.getFullYear() === selectedDate.getFullYear()) {
+                dayCell.classList.add('date-picker-day-selected');
+            }
+            
+            if (cellDate.toDateString() === today.toDateString()) {
+                dayCell.classList.add('date-picker-day-today');
+            }
+            
+            dayCell.addEventListener('click', () => {
+                selectedDate = new Date(year, month, day);
+                updateCalendar();
+                updateDateInput();
+            });
+            
+            datePickerDays.appendChild(dayCell);
+        }
+    }
+    
+    // Обновление отображаемой даты
+    function updateDateInput() {
+        if (selectedDate) {
+            const day = selectedDate.getDate();
+            const month = selectedDate.getMonth() + 1;
+            const year = selectedDate.getFullYear();
+            dateInput.value = `${day.toString().padStart(2, '0')}.${month.toString().padStart(2, '0')}.${year}`;
+            dateOfBirthValue.value = selectedDate.toISOString().split('T')[0];
+        }
+    }
+    
+    // Навигация
+    datePickerMonth.addEventListener('change', () => {
+        currentDate.setMonth(parseInt(datePickerMonth.value));
+        updateCalendar();
+    });
+    
+    datePickerYear.addEventListener('change', () => {
+        currentDate.setFullYear(parseInt(datePickerYear.value));
+        updateCalendar();
+    });
+    
+    prevMonthBtn.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        updateCalendar();
+    });
+    
+    nextMonthBtn.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        updateCalendar();
+    });
+    
+    resetBtn.addEventListener('click', () => {
+        selectedDate = null;
+        dateInput.value = '';
+        dateOfBirthValue.value = '';
+        updateCalendar();
+    });
+    
+    confirmBtn.addEventListener('click', () => {
+        datePicker.style.display = 'none';
+    });
+    
+    // Открытие календаря
+    dateInput.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (datePicker.style.display === 'none') {
+            datePicker.style.display = 'block';
+            updateCalendar();
+        } else {
+            datePicker.style.display = 'none';
+        }
+    });
+    
+    // Закрытие при клике вне календаря
+    document.addEventListener('click', (e) => {
+        if (!datePicker.contains(e.target) && e.target !== dateInput) {
+            datePicker.style.display = 'none';
+        }
+    });
+    
+    // Инициализация
+    updateCalendar();
+    if (selectedDate) {
+        updateDateInput();
     }
 }
 
@@ -693,8 +842,8 @@ function getUserAge() {
 function validateCurrentStep() {
     switch (currentStep) {
         case 1:
-            const dateOfBirthInput = document.getElementById('dateOfBirth');
-            const dateOfBirth = dateOfBirthInput ? dateOfBirthInput.value : null;
+            const dateOfBirthValue = document.getElementById('dateOfBirthValue');
+            const dateOfBirth = dateOfBirthValue ? dateOfBirthValue.value : null;
             const gender = document.querySelector('input[name="gender"]:checked');
             
             if (!dateOfBirth || dateOfBirth === '') {
@@ -766,7 +915,6 @@ function completeOnboarding() {
     }
     
     // Собираем все данные из слайдеров
-    const dateOfBirthInput = document.getElementById('dateOfBirth');
     const genderInput = document.querySelector('input[name="gender"]:checked');
     const heightSlider = document.getElementById('height');
     const weightSlider = document.getElementById('weight');
@@ -778,10 +926,11 @@ function completeOnboarding() {
     }
     
     // Сохраняем дату рождения (не возраст)
-    if (dateOfBirthInput && dateOfBirthInput.value) {
-        userData.dateOfBirth = dateOfBirthInput.value;
+    const dateOfBirthValue = document.getElementById('dateOfBirthValue');
+    if (dateOfBirthValue && dateOfBirthValue.value) {
+        userData.dateOfBirth = dateOfBirthValue.value;
         // Вычисляем и сохраняем возраст для обратной совместимости
-        userData.age = calculateAge(dateOfBirthInput.value);
+        userData.age = calculateAge(dateOfBirthValue.value);
     }
     if (genderInput) userData.gender = genderInput.value;
     if (heightSlider) userData.height = parseInt(heightSlider.value);

@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Klyro - Персональный помощник по питанию</title>
-        <link rel="stylesheet" href="styles.css?v=16">
+        <link rel="stylesheet" href="styles.css?v=17">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
@@ -85,7 +85,32 @@
                     <h2 class="screen-title">Расскажите о себе</h2>
                     <div class="form-group">
                         <label for="dateOfBirth">Дата рождения</label>
-                        <input type="date" id="dateOfBirth" class="input" max="">
+                        <input type="text" id="dateOfBirth" class="input date-input" readonly placeholder="Выберите дату">
+                        <div id="datePicker" class="date-picker" style="display: none;">
+                            <div class="date-picker-header">
+                                <button type="button" class="date-picker-nav" id="prevMonth">&lt;</button>
+                                <div class="date-picker-month-year">
+                                    <select id="datePickerMonth" class="date-picker-select"></select>
+                                    <select id="datePickerYear" class="date-picker-select"></select>
+                                </div>
+                                <button type="button" class="date-picker-nav" id="nextMonth">&gt;</button>
+                            </div>
+                            <div class="date-picker-weekdays">
+                                <div class="date-picker-weekday">Пн</div>
+                                <div class="date-picker-weekday">Вт</div>
+                                <div class="date-picker-weekday">Ср</div>
+                                <div class="date-picker-weekday">Чт</div>
+                                <div class="date-picker-weekday">Пт</div>
+                                <div class="date-picker-weekday">Сб</div>
+                                <div class="date-picker-weekday">Вс</div>
+                            </div>
+                            <div id="datePickerDays" class="date-picker-days"></div>
+                            <div class="date-picker-actions">
+                                <button type="button" class="btn btn-secondary" id="datePickerReset">Сбросить</button>
+                                <button type="button" class="btn btn-primary" id="datePickerConfirm">Готово</button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="dateOfBirthValue" value="">
                     </div>
                     <div class="form-group">
                         <label>Пол</label>
