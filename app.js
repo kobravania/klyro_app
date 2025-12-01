@@ -503,174 +503,24 @@ function showAuthScreen() {
     });
 }
 
-// Инициализация wheel picker для даты рождения
-function initDateWheelPickers() {
-    const dayScroll = document.getElementById('dayScroll');
-    const monthScroll = document.getElementById('monthScroll');
-    const yearScroll = document.getElementById('yearScroll');
+// Инициализация input для даты рождения
+function initDateInput() {
     const dateOfBirthInput = document.getElementById('dateOfBirth');
+    if (!dateOfBirthInput) return;
     
-    if (!dayScroll || !monthScroll || !yearScroll) return;
-    
-    // Месяцы в родительном падеже (как в Telegram)
-    const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 
-                        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-    
-    // Инициализация значений из userData или дефолтные
-    let year = 1990, month = 1, day = 1;
-    if (userData && userData.dateOfBirth) {
-        const date = new Date(userData.dateOfBirth);
-        year = date.getFullYear();
-        month = date.getMonth() + 1;
-        day = date.getDate();
-    } else if (userData && userData.age) {
-        const today = new Date();
-        year = today.getFullYear() - userData.age;
-    }
-    
-    // Устанавливаем максимальный год (сегодня - 10 лет)
+    // Устанавливаем максимальную дату (сегодня - 10 лет)
     const today = new Date();
-    const maxYear = today.getFullYear() - 10;
-    const minYear = 1904;
+    const maxDate = new Date(today.getFullYear() - 10, today.getMonth(), today.getDate());
+    dateOfBirthInput.max = maxDate.toISOString().split('T')[0];
     
-    // Создаем элементы для дней (1-31)
-    dayScroll.innerHTML = '';
-    for (let i = 1; i <= 31; i++) {
-        const item = document.createElement('div');
-        item.className = 'wheel-item';
-        item.textContent = i;
-        item.dataset.value = i;
-        dayScroll.appendChild(item);
+    // Заполняем дату рождения если есть в userData
+    if (userData && userData.dateOfBirth) {
+        dateOfBirthInput.value = userData.dateOfBirth;
+    } else if (userData && userData.age) {
+        // Обратная совместимость: вычисляем примерную дату рождения из возраста
+        const birthYear = today.getFullYear() - userData.age;
+        dateOfBirthInput.value = `${birthYear}-01-01`;
     }
-    
-    // Создаем элементы для месяцев
-    monthScroll.innerHTML = '';
-    monthNames.forEach((name, index) => {
-        const item = document.createElement('div');
-        item.className = 'wheel-item wheel-item-month';
-        item.textContent = name;
-        item.dataset.value = index + 1;
-        monthScroll.appendChild(item);
-    });
-    
-    // Создаем элементы для годов
-    yearScroll.innerHTML = '';
-    for (let i = maxYear; i >= minYear; i--) {
-        const item = document.createElement('div');
-        item.className = 'wheel-item';
-        item.textContent = i;
-        item.dataset.value = i;
-        yearScroll.appendChild(item);
-    }
-    
-    // Функция для обновления даты
-    function updateDate() {
-        const selectedDay = parseInt(dayScroll.querySelector('.wheel-item.selected')?.dataset.value || day);
-        const selectedMonth = parseInt(monthScroll.querySelector('.wheel-item.selected')?.dataset.value || month);
-        const selectedYear = parseInt(yearScroll.querySelector('.wheel-item.selected')?.dataset.value || year);
-        
-        // Проверка корректности дня для выбранного месяца
-        const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-        const validDay = Math.min(selectedDay, daysInMonth);
-        
-        const date = new Date(selectedYear, selectedMonth - 1, validDay);
-        const dateStr = date.toISOString().split('T')[0];
-        if (dateOfBirthInput) {
-            dateOfBirthInput.value = dateStr;
-        }
-        
-        // Обновляем количество дней если нужно
-        if (selectedDay > daysInMonth) {
-            const dayItems = dayScroll.querySelectorAll('.wheel-item');
-            dayItems.forEach(item => {
-                const val = parseInt(item.dataset.value);
-                if (val > daysInMonth) {
-                    item.style.display = 'none';
-                } else {
-                    item.style.display = 'block';
-                }
-            });
-        }
-    }
-    
-        // Инициализация wheel picker для каждого колеса
-    function initWheelPicker(scrollElement, selectedValue, onSelect) {
-        const itemHeight = 36; // Высота одного элемента (как в Telegram)
-        
-        // Устанавливаем начальную позицию
-        const items = scrollElement.querySelectorAll('.wheel-item');
-        const selectedIndex = Array.from(items).findIndex(item => 
-            parseInt(item.dataset.value) === selectedValue
-        );
-        
-        if (selectedIndex >= 0) {
-            // Добавляем отступ сверху и снизу для центрирования (как в Telegram)
-            scrollElement.style.paddingTop = '90px';
-            scrollElement.style.paddingBottom = '90px';
-            scrollElement.scrollTop = selectedIndex * itemHeight;
-            items[selectedIndex].classList.add('selected');
-        } else {
-            // Все равно добавляем padding для скроллинга
-            scrollElement.style.paddingTop = '90px';
-            scrollElement.style.paddingBottom = '90px';
-        }
-        
-        // Обработка прокрутки
-        let scrollTimeout = null;
-        scrollElement.addEventListener('scroll', () => {
-            const scrollTop = scrollElement.scrollTop;
-            const index = Math.round(scrollTop / itemHeight);
-            const item = items[index];
-            
-            if (item) {
-                items.forEach(i => i.classList.remove('selected'));
-                item.classList.add('selected');
-                
-                if (onSelect) {
-                    onSelect(parseInt(item.dataset.value));
-                }
-            }
-            
-            // Автоматическое выравнивание после остановки прокрутки
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                const currentScroll = scrollElement.scrollTop;
-                const currentIndex = Math.round(currentScroll / itemHeight);
-                const targetScroll = currentIndex * itemHeight;
-                
-                if (Math.abs(currentScroll - targetScroll) > 1) {
-                    scrollElement.scrollTo({
-                        top: targetScroll,
-                        behavior: 'smooth'
-                    });
-                }
-            }, 150);
-        });
-        
-        // Обработка клика на элемент
-        items.forEach((item, index) => {
-            item.addEventListener('click', () => {
-                scrollElement.scrollTo({
-                    top: index * itemHeight,
-                    behavior: 'smooth'
-                });
-            });
-        });
-        
-        // Обработка wheel события для прокрутки колесиком мыши
-        scrollElement.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            scrollElement.scrollTop += e.deltaY;
-        }, { passive: false });
-    }
-    
-    // Инициализируем каждое колесо
-    initWheelPicker(dayScroll, day, () => updateDate());
-    initWheelPicker(monthScroll, month, () => updateDate());
-    initWheelPicker(yearScroll, year, () => updateDate());
-    
-    // Обновляем дату при инициализации
-    setTimeout(updateDate, 100);
 }
 
 // Инициализация слайдеров роста и веса
@@ -713,8 +563,8 @@ function showOnboardingScreen() {
     updateProgress();
     showStep(1);
     
-    // Инициализируем wheel pickers и слайдеры
-    initDateWheelPickers();
+    // Инициализируем input для даты рождения и слайдеры
+    initDateInput();
     initHeightWeightSliders();
 }
 

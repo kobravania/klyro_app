@@ -82,25 +82,7 @@
                     <h2 class="screen-title">Расскажите о себе</h2>
                     <div class="form-group">
                         <label for="dateOfBirth">Дата рождения</label>
-                        <div class="wheel-picker-container">
-                            <div class="wheel-picker" id="dayPicker">
-                                <div class="wheel-picker-scroll" id="dayScroll">
-                                    <!-- Дни будут добавлены через JS -->
-                                </div>
-                            </div>
-                            <div class="wheel-picker" id="monthPicker">
-                                <div class="wheel-picker-scroll" id="monthScroll">
-                                    <!-- Месяцы будут добавлены через JS -->
-                                </div>
-                            </div>
-                            <div class="wheel-picker" id="yearPicker">
-                                <div class="wheel-picker-scroll" id="yearScroll">
-                                    <!-- Годы будут добавлены через JS -->
-                                </div>
-                            </div>
-                        </div>
-                        <input type="hidden" id="dateOfBirth" value="">
-                        <small class="form-hint">Приложение автоматически определит ваш возраст</small>
+                        <input type="date" id="dateOfBirth" class="input" max="">
                     </div>
                     <div class="form-group">
                         <label>Пол</label>
