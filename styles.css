@@ -47,6 +47,7 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
     min-height: 100vh;
     padding: 20px;
+    padding-top: 60px; /* Отступ сверху для username badge */
     animation: fadeIn 0.3s ease-in-out;
     position: relative;
     width: 100%;
@@ -77,6 +78,7 @@ h1, h2, h3, h4, h5, h6 {
     max-width: 500px;
     margin: 0 auto;
     padding: 20px;
+    padding-top: 60px; /* Отступ сверху для username badge */
     background: transparent; /* Прозрачный, чтобы был виден фон экрана */
 }
 
@@ -766,6 +768,7 @@ h1, h2, h3, h4, h5, h6 {
     height: 4px;
     background: #3a4a5f;
     border-radius: 2px;
+    margin-top: 0; /* Убираем margin-top, так как padding-top уже есть в screen/container */
     margin-bottom: 30px;
     overflow: hidden;
 }
