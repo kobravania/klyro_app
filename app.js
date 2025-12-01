@@ -655,6 +655,12 @@ function initDateWheelPickers() {
                 });
             });
         });
+        
+        // Обработка wheel события для прокрутки колесиком мыши
+        scrollElement.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            scrollElement.scrollTop += e.deltaY;
+        }, { passive: false });
     }
     
     // Инициализируем каждое колесо
