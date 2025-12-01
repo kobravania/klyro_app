@@ -8,9 +8,159 @@ if (window.Telegram && window.Telegram.WebApp) {
         ready: () => {},
         expand: () => {},
         initDataUnsafe: {},
-        showAlert: (message) => alert(message)
+        showAlert: (message) => alert(message),
+        CloudStorage: null
     };
     console.log('Telegram WebApp API not found, using fallback');
+}
+
+// ============================================
+// ОБЕРТКА ДЛЯ ХРАНЕНИЯ ДАННЫХ (CloudStorage + localStorage fallback)
+// ============================================
+
+// Асинхронное сохранение данных с синхронизацией между устройствами
+async function saveToStorage(key, value) {
+    try {
+        // Пробуем использовать Telegram Cloud Storage (синхронизируется между устройствами)
+        if (tg && tg.CloudStorage) {
+            await tg.CloudStorage.setItem(key, value);
+            console.log(`[STORAGE] Saved to CloudStorage: ${key}`);
+            // Также сохраняем в localStorage как резервную копию
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                console.warn('[STORAGE] localStorage backup failed:', e);
+            }
+            return true;
+        } else {
+            // Fallback на localStorage если CloudStorage недоступен
+            localStorage.setItem(key, value);
+            console.log(`[STORAGE] Saved to localStorage: ${key}`);
+            return true;
+        }
+    } catch (error) {
+        console.error(`[STORAGE] Error saving ${key}:`, error);
+        // Fallback на localStorage при ошибке
+        try {
+            localStorage.setItem(key, value);
+            console.log(`[STORAGE] Fallback to localStorage: ${key}`);
+            return true;
+        } catch (e) {
+            console.error(`[STORAGE] localStorage fallback failed:`, e);
+            return false;
+        }
+    }
+}
+
+// Асинхронная загрузка данных
+async function loadFromStorage(key) {
+    try {
+        // Пробуем загрузить из Telegram Cloud Storage
+        if (tg && tg.CloudStorage) {
+            const value = await tg.CloudStorage.getItem(key);
+            if (value !== null && value !== undefined) {
+                console.log(`[STORAGE] Loaded from CloudStorage: ${key}`);
+                // Обновляем localStorage для быстрого доступа
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    console.warn('[STORAGE] localStorage sync failed:', e);
+                }
+                return value;
+            }
+        }
+        
+        // Fallback на localStorage
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+            console.log(`[STORAGE] Loaded from localStorage: ${key}`);
+            // Если CloudStorage доступен, синхронизируем данные
+            if (tg && tg.CloudStorage) {
+                try {
+                    await tg.CloudStorage.setItem(key, value);
+                    console.log(`[STORAGE] Synced to CloudStorage: ${key}`);
+                } catch (e) {
+                    console.warn('[STORAGE] CloudStorage sync failed:', e);
+                }
+            }
+            return value;
+        }
+        
+        return null;
+    } catch (error) {
+        console.error(`[STORAGE] Error loading ${key}:`, error);
+        // Fallback на localStorage
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            console.error(`[STORAGE] localStorage fallback failed:`, e);
+            return null;
+        }
+    }
+}
+
+// Синхронная версия для обратной совместимости (использует localStorage как кэш)
+function loadFromStorageSync(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (e) {
+        console.error(`[STORAGE] Sync load failed:`, e);
+        return null;
+    }
+}
+
+// Периодическая синхронизация данных из CloudStorage
+function startDataSync() {
+    if (!tg || !tg.CloudStorage) return;
+    
+    // Синхронизация каждые 30 секунд
+    setInterval(async () => {
+        try {
+            console.log('[SYNC] Starting data sync...');
+            
+            // Синхронизируем дневник
+            const diaryStr = await loadFromStorage('klyro_diary');
+            if (diaryStr) {
+                localStorage.setItem('klyro_diary', diaryStr);
+                // Обновляем отображение если нужно
+                if (document.getElementById('diary-screen')?.classList.contains('active')) {
+                    const today = new Date().toISOString().split('T')[0];
+                    renderDiary(today);
+                }
+                if (typeof updateDashboard === 'function') {
+                    updateDashboard();
+                }
+            }
+            
+            // Синхронизируем данные пользователя
+            const userDataStr = await loadFromStorage('klyro_user_data');
+            if (userDataStr) {
+                const cloudUserData = JSON.parse(userDataStr);
+                // Обновляем только если данные новее
+                if (userData && cloudUserData) {
+                    const localTime = userData.lastSync || 0;
+                    const cloudTime = cloudUserData.lastSync || 0;
+                    if (cloudTime > localTime) {
+                        userData = cloudUserData;
+                        localStorage.setItem('klyro_user_data', userDataStr);
+                        if (typeof updateDashboard === 'function') {
+                            updateDashboard();
+                        }
+                    }
+                }
+            }
+            
+            console.log('[SYNC] Data sync completed');
+        } catch (e) {
+            console.error('[SYNC] Sync error:', e);
+        }
+    }, 30000); // 30 секунд
+    
+    // Также синхронизируем при фокусе окна
+    window.addEventListener('focus', async () => {
+        console.log('[SYNC] Window focused, syncing data...');
+        await loadDiaryFromCloud();
+    });
 }
 
 // Состояние приложения
@@ -90,6 +240,14 @@ function initApp() {
             console.log('Telegram WebApp initialized');
             console.log('Telegram version:', tg.version);
             console.log('Telegram platform:', tg.platform);
+            
+            // Запускаем периодическую синхронизацию данных из CloudStorage
+            if (tg.CloudStorage) {
+                console.log('[STORAGE] CloudStorage available, starting sync');
+                startDataSync();
+            } else {
+                console.warn('[STORAGE] CloudStorage not available');
+            }
         } catch (e) {
             console.log('Telegram WebApp init error:', e);
         }
@@ -133,13 +291,25 @@ function startApp() {
 startApp();
 
 // Проверка авторизации и загрузка данных
-function checkUserAuth() {
+async function checkUserAuth() {
     try {
         // Сначала скрываем все экраны, чтобы не было мелькания
         hideAllScreens();
         
-        // Проверяем наличие сохранённых данных
-        const savedData = localStorage.getItem('klyro_user_data');
+        // Проверяем наличие сохранённых данных (сначала из localStorage для быстрой загрузки)
+        let savedData = loadFromStorageSync('klyro_user_data');
+        
+        // Затем загружаем из CloudStorage для синхронизации
+        if (tg && tg.CloudStorage) {
+            try {
+                const cloudData = await loadFromStorage('klyro_user_data');
+                if (cloudData) {
+                    savedData = cloudData;
+                }
+            } catch (e) {
+                console.warn('[AUTH] CloudStorage load failed, using localStorage:', e);
+            }
+        }
         
         if (savedData) {
             try {
@@ -150,11 +320,13 @@ function checkUserAuth() {
                     showProfileScreen();
                     // Обновляем username
                     updateUsernameDisplay();
+                    // Загружаем дневник из CloudStorage
+                    loadDiaryFromCloud();
                     return;
                 }
             } catch (e) {
                 console.error('Error parsing saved data:', e);
-                localStorage.removeItem('klyro_user_data');
+                await saveToStorage('klyro_user_data', '');
             }
         }
 
@@ -490,15 +662,15 @@ function calculateCalories() {
 }
 
 // Сохранение данных пользователя
-function saveUserData() {
+async function saveUserData() {
     if (userData) {
-        localStorage.setItem('klyro_user_data', JSON.stringify(userData));
+        await saveToStorage('klyro_user_data', JSON.stringify(userData));
     }
 }
 
 // Загрузка данных пользователя
-function loadUserData() {
-    const savedData = localStorage.getItem('klyro_user_data');
+async function loadUserData() {
+    const savedData = await loadFromStorage('klyro_user_data');
     if (savedData) {
         userData = JSON.parse(savedData);
         return true;
@@ -887,13 +1059,42 @@ function saveCustomProduct() {
 // ДНЕВНИК ПИТАНИЯ
 // ============================================
 
+// Загрузка дневника из CloudStorage
+async function loadDiaryFromCloud() {
+    try {
+        if (tg && tg.CloudStorage) {
+            const diaryStr = await loadFromStorage('klyro_diary');
+            if (diaryStr) {
+                const diary = JSON.parse(diaryStr);
+                // Обновляем локальный кэш
+                localStorage.setItem('klyro_diary', diaryStr);
+                // Обновляем отображение если на экране дневника
+                if (document.getElementById('diary-screen')?.classList.contains('active')) {
+                    const today = new Date().toISOString().split('T')[0];
+                    renderDiary(today);
+                }
+                // Обновляем dashboard
+                if (typeof updateDashboard === 'function') {
+                    updateDashboard();
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[DIARY] Error loading from cloud:', e);
+    }
+}
+
 function getDiary() {
-    const diaryStr = localStorage.getItem('klyro_diary');
+    const diaryStr = loadFromStorageSync('klyro_diary');
     return diaryStr ? JSON.parse(diaryStr) : {};
 }
 
-function saveDiary(diary) {
-    localStorage.setItem('klyro_diary', JSON.stringify(diary));
+async function saveDiary(diary) {
+    const diaryStr = JSON.stringify(diary);
+    // Сохраняем в CloudStorage для синхронизации
+    await saveToStorage('klyro_diary', diaryStr);
+    // Также сохраняем в localStorage для быстрого доступа
+    localStorage.setItem('klyro_diary', diaryStr);
 }
 
 function getDiaryForDate(date) {
@@ -1178,7 +1379,7 @@ function saveActivity() {
     
     const activities = getActivities();
     activities.push(activity);
-    localStorage.setItem('klyro_activities', JSON.stringify(activities));
+    saveActivities(activities);
     
     if (addToDiary) {
         // Добавляем как отрицательные калории (можно улучшить)
@@ -1258,11 +1459,13 @@ function showSettingsScreen() {
     screen.classList.add('active');
     
     // Загружаем сохранённые единицы измерения
-    const units = localStorage.getItem('klyro_units') || 'metric';
-    document.querySelector(`input[name="units"][value="${units}"]`).checked = true;
+    const units = loadFromStorageSync('klyro_units') || 'metric';
+    const unitInput = document.querySelector(`input[name="units"][value="${units}"]`);
+    if (unitInput) unitInput.checked = true;
 }
 
-function setUnits(units) {
+async function setUnits(units) {
+    await saveToStorage('klyro_units', units);
     localStorage.setItem('klyro_units', units);
     showNotification('Единицы измерения изменены');
 }
@@ -1270,7 +1473,8 @@ function setUnits(units) {
 function exportData() {
     const diary = getDiary();
     const activities = getActivities();
-    const userData = JSON.parse(localStorage.getItem('klyro_user_data') || '{}');
+    const savedUserData = loadFromStorageSync('klyro_user_data');
+    const userData = savedUserData ? JSON.parse(savedUserData) : {};
     
     // Создаём CSV для дневника
     let csv = 'Дата,Продукт,Вес (г),Калории,Белки (г),Жиры (г),Углеводы (г),Время\n';
