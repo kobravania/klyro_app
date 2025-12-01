@@ -1412,7 +1412,9 @@ function updateAvatarDisplay() {
 // Открыть модальное окно выбора аватара
 function openAvatarModal() {
     const modal = document.getElementById('avatar-modal');
-    modal.style.display = 'flex';
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('show');
     // Сбрасываем выбор
     selectedAvatarFile = null;
     selectedEmoji = null;
@@ -1425,7 +1427,9 @@ function openAvatarModal() {
 // Закрыть модальное окно
 function closeAvatarModal() {
     const modal = document.getElementById('avatar-modal');
-    modal.style.display = 'none';
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('show');
     selectedAvatarFile = null;
     selectedEmoji = null;
 }
@@ -1490,21 +1494,13 @@ function handleFileSelect(event) {
     
     // Проверяем размер файла (макс 5MB)
     if (file.size > 5 * 1024 * 1024) {
-        if (typeof showNotification === 'function') {
-            showNotification('Файл слишком большой. Максимальный размер: 5MB');
-        } else {
-            alert('Файл слишком большой. Максимальный размер: 5MB');
-        }
+        showNotification('Файл слишком большой. Максимальный размер: 5MB');
         return;
     }
     
     // Проверяем тип файла
     if (!file.type.startsWith('image/')) {
-        if (typeof showNotification === 'function') {
-            showNotification('Пожалуйста, выберите изображение');
-        } else {
-            alert('Пожалуйста, выберите изображение');
-        }
+        showNotification('Пожалуйста, выберите изображение');
         return;
     }
     
@@ -1543,11 +1539,7 @@ function savePhotoAvatar() {
         // Закрываем модальное окно
         closeAvatarModal();
         
-        if (typeof showNotification === 'function') {
-            showNotification('Фото сохранено!');
-        } else {
-            alert('Фото сохранено!');
-        }
+        showNotification('Фото сохранено!');
     };
     reader.readAsDataURL(selectedAvatarFile);
 }
@@ -1573,11 +1565,7 @@ function selectEmoji(emoji) {
     // Закрываем модальное окно
     closeAvatarModal();
     
-        if (typeof showNotification === 'function') {
-            showNotification('Эмодзи сохранен!');
-        } else {
-            alert('Эмодзи сохранен!');
-        }
+        showNotification('Эмодзи сохранен!');
 }
 
 // Закрытие модального окна при клике вне его
