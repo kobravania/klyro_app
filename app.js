@@ -407,21 +407,32 @@ async function checkUserAuth() {
             if (initData.user) {
                 const telegramUser = initData.user;
                 console.log('Telegram user found:', telegramUser);
-                userData = {
-                    id: telegramUser.id,
-                    firstName: telegramUser.first_name || 'Пользователь',
-                    lastName: telegramUser.last_name || '',
-                    username: telegramUser.username || '',
-                    photoUrl: telegramUser.photo_url || ''
-                };
+                
+                // Если userData еще не загружен из сохраненных данных, создаем базовый объект
+                if (!userData) {
+                    userData = {};
+                }
+                
+                // Обновляем данные Telegram (могут измениться)
+                userData.id = telegramUser.id;
+                userData.firstName = telegramUser.first_name || 'Пользователь';
+                userData.lastName = telegramUser.last_name || '';
+                userData.username = telegramUser.username || '';
+                userData.photoUrl = telegramUser.photo_url || '';
+                
                 // Обновляем username
                 updateUsernameDisplay();
+                
                 // Инициализируем хэши для синхронизации
                 lastUserDataHash = getDataHash(userData);
                 const diary = getDiary();
                 if (diary && Object.keys(diary).length > 0) {
                     lastDiaryHash = getDataHash(diary);
                 }
+                
+                // Сохраняем обновленные данные Telegram
+                await saveUserData();
+                
                 // Если есть данные профиля, показываем профиль, иначе онбординг
                 if (userData.dateOfBirth || userData.age || userData.height) {
                     showProfileScreen();
