@@ -410,6 +410,12 @@ async function checkUserAuth() {
                 };
                 // Обновляем username
                 updateUsernameDisplay();
+                // Инициализируем хэши для синхронизации
+                lastUserDataHash = getDataHash(userData);
+                const diary = getDiary();
+                if (diary && Object.keys(diary).length > 0) {
+                    lastDiaryHash = getDataHash(diary);
+                }
                 // Если есть данные профиля, показываем профиль, иначе онбординг
                 if (userData.age || userData.height) {
                     showProfileScreen();
