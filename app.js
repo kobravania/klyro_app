@@ -934,29 +934,16 @@ async function loadUserData() {
 
 // Редактирование профиля
 function editProfile() {
-    // Заполняем форму текущими данными
-    const dateOfBirthInput = document.getElementById('dateOfBirth');
-    if (dateOfBirthInput) {
-        if (userData.dateOfBirth) {
-            dateOfBirthInput.value = userData.dateOfBirth;
-        } else if (userData.age) {
-            // Обратная совместимость: если есть только age, вычисляем примерную дату рождения
-            const today = new Date();
-            const birthYear = today.getFullYear() - userData.age;
-            dateOfBirthInput.value = `${birthYear}-01-01`;
-        }
-    }
+    // Переходим к онбордингу - слайдеры автоматически заполнятся из userData
+    // через функции initDateSliders и initHeightWeightSliders
+    showOnboardingScreen();
+    
+    // Устанавливаем пол если есть
     if (userData.gender) {
         const genderInput = document.querySelector(`input[name="gender"][value="${userData.gender}"]`);
         if (genderInput) {
             genderInput.checked = true;
         }
-    }
-    if (userData.height) {
-        document.getElementById('height').value = userData.height;
-    }
-    if (userData.weight) {
-        document.getElementById('weight').value = userData.weight;
     }
     if (userData.activity) {
         const activityInput = document.querySelector(`input[name="activity"][value="${userData.activity}"]`);
