@@ -347,7 +347,20 @@ function initApp() {
     console.log('Is Telegram:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
     
     // Скрываем все экраны сразу, чтобы не было мелькания
-    hideAllScreens();
+    try {
+        if (typeof hideAllScreens === 'function') {
+            hideAllScreens();
+        } else {
+            // Если функция еще не определена, скрываем экраны вручную
+            const allScreens = document.querySelectorAll('.screen');
+            allScreens.forEach(screen => {
+                screen.classList.remove('active');
+                screen.style.display = 'none';
+            });
+        }
+    } catch (e) {
+        console.error('Error hiding screens:', e);
+    }
     
     // Telegram WebApp уже инициализирован в initTelegramWebApp()
     // Просто проверяем статус и запускаем синхронизацию
@@ -417,7 +430,19 @@ startApp();
 async function checkUserAuth() {
     try {
         // Сначала скрываем все экраны, чтобы не было мелькания
-        hideAllScreens();
+        try {
+            if (typeof hideAllScreens === 'function') {
+                hideAllScreens();
+            } else {
+                const allScreens = document.querySelectorAll('.screen');
+                allScreens.forEach(screen => {
+                    screen.classList.remove('active');
+                    screen.style.display = 'none';
+                });
+            }
+        } catch (e) {
+            console.error('Error hiding screens:', e);
+        }
         
         // ВАЖНО: Сначала загружаем из CloudStorage для синхронизации между устройствами
         let savedData = null;
