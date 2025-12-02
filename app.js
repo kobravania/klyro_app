@@ -450,20 +450,22 @@ async function checkUserAuth() {
         
         // ВАЖНО: Сначала загружаем из CloudStorage для синхронизации между устройствами
         let savedData = null;
-        if (tg && tg.CloudStorage) {
-            try {
-                savedData = await loadFromStorage('klyro_user_data');
-                console.log('[AUTH] Loaded from CloudStorage:', savedData ? 'found' : 'not found');
-            } catch (e) {
-                console.warn('[AUTH] CloudStorage load failed, trying localStorage:', e);
-                // Fallback на localStorage
-                savedData = loadFromStorageSync('klyro_user_data');
-                console.log('[AUTH] Loaded from localStorage (fallback):', savedData ? 'found' : 'not found');
-            }
-        } else {
-            // Если CloudStorage недоступен, используем localStorage
+        
+        // Пробуем загрузить из CloudStorage (если готов) или из localStorage
+        try {
+            savedData = await loadFromStorage('klyro_user_data');
+            console.log('[AUTH] Loaded from storage:', savedData ? 'found' : 'not found');
+        } catch (e) {
+            console.warn('[AUTH] Storage load failed, trying localStorage:', e);
+            // Fallback на localStorage
             savedData = loadFromStorageSync('klyro_user_data');
-            console.log('[AUTH] CloudStorage not available, loaded from localStorage:', savedData ? 'found' : 'not found');
+            console.log('[AUTH] Loaded from localStorage (fallback):', savedData ? 'found' : 'not found');
+        }
+        
+        // Если ничего не загрузилось, пробуем localStorage напрямую
+        if (!savedData) {
+            savedData = loadFromStorageSync('klyro_user_data');
+            console.log('[AUTH] Final check localStorage:', savedData ? 'found' : 'not found');
         }
         
         if (savedData) {
@@ -511,8 +513,15 @@ async function checkUserAuth() {
                 }
                 
                 // Обновляем данные Telegram (могут измениться), но НЕ перезаписываем данные профиля
+                // Проверяем наличие профиля ДО обновления данных Telegram
                 const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
                 
+                // Обновляем только если профиль еще не заполнен
+                if (!userData) {
+                    userData = {};
+                }
+                
+                // Обновляем данные Telegram
                 userData.id = telegramUser.id;
                 userData.firstName = telegramUser.first_name || 'Пользователь';
                 userData.lastName = telegramUser.last_name || '';
