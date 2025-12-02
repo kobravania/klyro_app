@@ -655,6 +655,7 @@ function initDateInput() {
             
             dayCell.addEventListener('click', () => {
                 selectedDate = new Date(year, month, day);
+                console.log('[DATE] Date selected:', selectedDate);
                 updateCalendar();
                 updateDateInput();
             });
@@ -669,8 +670,24 @@ function initDateInput() {
             const day = selectedDate.getDate();
             const month = selectedDate.getMonth() + 1;
             const year = selectedDate.getFullYear();
-            dateInput.value = `${day.toString().padStart(2, '0')}.${month.toString().padStart(2, '0')}.${year}`;
-            dateOfBirthValue.value = selectedDate.toISOString().split('T')[0];
+            const dateString = `${day.toString().padStart(2, '0')}.${month.toString().padStart(2, '0')}.${year}`;
+            const isoDate = selectedDate.toISOString().split('T')[0];
+            
+            dateInput.value = dateString;
+            if (dateOfBirthValue) {
+                dateOfBirthValue.value = isoDate;
+                console.log('[DATE] Date updated:', {
+                    display: dateString,
+                    iso: isoDate,
+                    hiddenValue: dateOfBirthValue.value
+                });
+            } else {
+                console.error('[DATE] dateOfBirthValue element not found!');
+            }
+        } else {
+            if (dateInput) dateInput.value = '';
+            if (dateOfBirthValue) dateOfBirthValue.value = '';
+            console.log('[DATE] Date cleared');
         }
     }
     
