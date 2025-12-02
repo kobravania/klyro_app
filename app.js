@@ -384,45 +384,73 @@ function initApp() {
     // Всегда вызываем checkUserAuth, который сам решит, что показывать
     // Добавляем небольшую задержку, чтобы убедиться, что все функции определены
     // И таймаут на случай, если checkUserAuth зависнет
+    console.log('[INIT] Setting up checkUserAuth with timeout...');
     const authTimeout = setTimeout(() => {
-        console.warn('[INIT] checkUserAuth timeout, showing onboarding/auth screen');
+        console.warn('[INIT] checkUserAuth timeout after 3 seconds, forcing screen show');
+        // Скрываем loading screen
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('active');
+            loadingScreen.style.display = 'none';
+        }
+        // Показываем нужный экран
         try {
             if (window.Telegram && window.Telegram.WebApp) {
-                showOnboardingScreen();
+                const onboardingScreen = document.getElementById('onboarding-screen');
+                if (onboardingScreen) {
+                    onboardingScreen.classList.add('active');
+                    onboardingScreen.style.display = 'block';
+                    console.log('[INIT] Onboarding screen shown after timeout');
+                }
             } else {
-                showAuthScreen();
+                const authScreen = document.getElementById('auth-screen');
+                if (authScreen) {
+                    authScreen.classList.add('active');
+                    authScreen.style.display = 'block';
+                    console.log('[INIT] Auth screen shown after timeout');
+                }
             }
         } catch (e) {
-            console.error('Error showing screen after timeout:', e);
+            console.error('[INIT] Error showing screen after timeout:', e);
         }
-    }, 5000); // 5 секунд таймаут
+    }, 3000); // 3 секунды таймаут
     
     setTimeout(() => {
+        console.log('[INIT] Calling checkUserAuth...');
         checkUserAuth()
             .then(() => {
                 clearTimeout(authTimeout);
+                console.log('[INIT] checkUserAuth completed successfully');
             })
             .catch(e => {
                 clearTimeout(authTimeout);
-                console.error('Error in checkUserAuth:', e);
-                // Если произошла ошибка, показываем экран авторизации
+                console.error('[INIT] Error in checkUserAuth:', e);
+                // Скрываем loading screen
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.classList.remove('active');
+                    loadingScreen.style.display = 'none';
+                }
+                // Если произошла ошибка, показываем экран
                 try {
                     if (window.Telegram && window.Telegram.WebApp) {
-                        showOnboardingScreen();
+                        const onboardingScreen = document.getElementById('onboarding-screen');
+                        if (onboardingScreen) {
+                            onboardingScreen.classList.add('active');
+                            onboardingScreen.style.display = 'block';
+                        }
                     } else {
-                        showAuthScreen();
+                        const authScreen = document.getElementById('auth-screen');
+                        if (authScreen) {
+                            authScreen.classList.add('active');
+                            authScreen.style.display = 'block';
+                        }
                     }
                 } catch (e2) {
-                    console.error('Error showing auth screen:', e2);
-                    // Последняя попытка - показываем loading screen
-                    const loadingScreen = document.getElementById('loading-screen');
-                    if (loadingScreen) {
-                        loadingScreen.classList.add('active');
-                        loadingScreen.style.display = 'block';
-                    }
+                    console.error('[INIT] Error showing fallback screen:', e2);
                 }
             });
-    }, 100);
+    }, 200);
 }
 
 // Функция для запуска инициализации
@@ -479,17 +507,15 @@ if (document.readyState === 'complete') {
 // Проверка авторизации и загрузка данных
 async function checkUserAuth() {
     try {
-        // Сначала скрываем все экраны, чтобы не было мелькания
+        console.log('[AUTH] Starting checkUserAuth...');
+        // Сначала скрываем все экраны, включая loading screen
         try {
-            if (typeof hideAllScreens === 'function') {
-                hideAllScreens();
-            } else {
-                const allScreens = document.querySelectorAll('.screen');
-                allScreens.forEach(screen => {
-                    screen.classList.remove('active');
-                    screen.style.display = 'none';
-                });
-            }
+            const allScreens = document.querySelectorAll('.screen');
+            allScreens.forEach(screen => {
+                screen.classList.remove('active');
+                screen.style.display = 'none';
+            });
+            console.log('[AUTH] All screens hidden, including loading screen');
         } catch (e) {
             console.error('Error hiding screens:', e);
         }
@@ -623,16 +649,59 @@ async function checkUserAuth() {
         }
         
         // Если нет данных, показываем онбординг (если есть Telegram) или авторизацию
+        console.log('[AUTH] No profile data found, deciding which screen to show...');
         if (window.Telegram && window.Telegram.WebApp) {
-            console.log('[AUTH] No profile data, showing onboarding');
-            showOnboardingScreen();
+            console.log('[AUTH] Telegram available, showing onboarding');
+            try {
+                showOnboardingScreen();
+                console.log('[AUTH] Onboarding screen shown');
+            } catch (e) {
+                console.error('[AUTH] Error showing onboarding:', e);
+                // Fallback
+                const onboardingScreen = document.getElementById('onboarding-screen');
+                if (onboardingScreen) {
+                    onboardingScreen.classList.add('active');
+                    onboardingScreen.style.display = 'block';
+                }
+            }
         } else {
-            console.log('[AUTH] No saved data or Telegram user, showing auth screen');
-            showAuthScreen();
+            console.log('[AUTH] No Telegram, showing auth screen');
+            try {
+                showAuthScreen();
+                console.log('[AUTH] Auth screen shown');
+            } catch (e) {
+                console.error('[AUTH] Error showing auth:', e);
+                // Fallback
+                const authScreen = document.getElementById('auth-screen');
+                if (authScreen) {
+                    authScreen.classList.add('active');
+                    authScreen.style.display = 'block';
+                }
+            }
         }
     } catch (e) {
-        console.error('Error in checkUserAuth:', e);
-        showAuthScreen();
+        console.error('[AUTH] Error in checkUserAuth:', e);
+        // В случае ошибки всегда показываем экран
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                showOnboardingScreen();
+            } else {
+                showAuthScreen();
+            }
+        } catch (e2) {
+            console.error('[AUTH] Error showing fallback screen:', e2);
+            // Последняя попытка - прямая манипуляция DOM
+            const allScreens = document.querySelectorAll('.screen');
+            allScreens.forEach(screen => {
+                screen.classList.remove('active');
+                screen.style.display = 'none';
+            });
+            const onboardingScreen = document.getElementById('onboarding-screen');
+            if (onboardingScreen) {
+                onboardingScreen.classList.add('active');
+                onboardingScreen.style.display = 'block';
+            }
+        }
     }
 }
 
