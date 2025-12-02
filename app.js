@@ -753,12 +753,13 @@ function showOnboardingScreen() {
         onboardingScreen.classList.add('active');
         onboardingScreen.style.display = 'block';
         currentStep = 1;
-    updateProgress();
-    showStep(1);
-    
-    // Инициализируем input для даты рождения и слайдеры для роста и веса
-    initDateInput();
-    initHeightWeightSliders();
+        updateProgress();
+        showStep(1);
+        
+        // Инициализируем input для даты рождения и слайдеры для роста и веса
+        initDateInput();
+        initHeightWeightSliders();
+    }
 }
 
 // Показать экран профиля
@@ -768,6 +769,10 @@ function showProfileScreen() {
     if (profileScreen) {
         profileScreen.classList.add('active');
         profileScreen.style.display = 'block';
+    } else {
+        console.error('Profile screen not found');
+        return;
+    }
     
     if (userData) {
         // Заполняем данные профиля
