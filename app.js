@@ -508,14 +508,25 @@ if (document.readyState === 'complete') {
 async function checkUserAuth() {
     try {
         console.log('[AUTH] Starting checkUserAuth...');
-        // Сначала скрываем все экраны, включая loading screen
+        
+        // ВАЖНО: Сначала скрываем loading screen СРАЗУ, до загрузки данных
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('active');
+            loadingScreen.style.display = 'none';
+            console.log('[AUTH] Loading screen hidden immediately');
+        }
+        
+        // Скрываем все остальные экраны
         try {
             const allScreens = document.querySelectorAll('.screen');
             allScreens.forEach(screen => {
-                screen.classList.remove('active');
-                screen.style.display = 'none';
+                if (screen.id !== 'loading-screen') {
+                    screen.classList.remove('active');
+                    screen.style.display = 'none';
+                }
             });
-            console.log('[AUTH] All screens hidden, including loading screen');
+            console.log('[AUTH] All screens hidden');
         } catch (e) {
             console.error('Error hiding screens:', e);
         }
@@ -523,24 +534,58 @@ async function checkUserAuth() {
         // ВАЖНО: Сначала загружаем из CloudStorage для синхронизации между устройствами
         let savedData = null;
         
-        // Пробуем загрузить из CloudStorage (если готов) или из localStorage
-        // Добавляем таймаут, чтобы не зависнуть на долгой загрузке
-        try {
-            const loadPromise = loadFromStorage('klyro_user_data');
-            const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000)); // 2 секунды таймаут
-            savedData = await Promise.race([loadPromise, timeoutPromise]);
-            console.log('[AUTH] Loaded from storage:', savedData ? 'found' : 'not found');
-        } catch (e) {
-            console.warn('[AUTH] Storage load failed, trying localStorage:', e);
-            // Fallback на localStorage
-            savedData = loadFromStorageSync('klyro_user_data');
-            console.log('[AUTH] Loaded from localStorage (fallback):', savedData ? 'found' : 'not found');
+        // Пробуем загрузить из localStorage СНАЧАЛА (быстро), потом из CloudStorage (медленно)
+        savedData = loadFromStorageSync('klyro_user_data');
+        console.log('[AUTH] Quick check localStorage:', savedData ? 'found' : 'not found');
+        
+        // Если есть данные в localStorage, используем их сразу и показываем экран
+        if (savedData) {
+            try {
+                userData = JSON.parse(savedData);
+                console.log('[AUTH] Loaded userData from localStorage:', userData);
+                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                if (hasProfileData) {
+                    console.log('[AUTH] Profile data found, showing profile screen');
+                    showProfileScreen();
+                    if (typeof updateUsernameDisplay === 'function') {
+                        updateUsernameDisplay();
+                    }
+                    // Загружаем из CloudStorage в фоне для синхронизации
+                    loadFromStorage('klyro_user_data').then(cloudData => {
+                        if (cloudData) {
+                            try {
+                                const cloudUserData = JSON.parse(cloudData);
+                                // Обновляем только если данные из CloudStorage новее
+                                if (cloudUserData && (cloudUserData.dateOfBirth || cloudUserData.age) && cloudUserData.height) {
+                                    userData = cloudUserData;
+                                    localStorage.setItem('klyro_user_data', cloudData);
+                                    console.log('[AUTH] Synced from CloudStorage in background');
+                                }
+                            } catch (e) {
+                                console.warn('[AUTH] Error parsing cloud data:', e);
+                            }
+                        }
+                    }).catch(e => {
+                        console.warn('[AUTH] CloudStorage sync failed:', e);
+                    });
+                    return;
+                }
+            } catch (e) {
+                console.error('[AUTH] Error parsing localStorage data:', e);
+                savedData = null;
+            }
         }
         
-        // Если ничего не загрузилось, пробуем localStorage напрямую
+        // Если нет данных в localStorage, пробуем CloudStorage (с таймаутом)
         if (!savedData) {
-            savedData = loadFromStorageSync('klyro_user_data');
-            console.log('[AUTH] Final check localStorage:', savedData ? 'found' : 'not found');
+            try {
+                const loadPromise = loadFromStorage('klyro_user_data');
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1000)); // 1 секунда таймаут
+                savedData = await Promise.race([loadPromise, timeoutPromise]);
+                console.log('[AUTH] Loaded from CloudStorage:', savedData ? 'found' : 'not found');
+            } catch (e) {
+                console.warn('[AUTH] CloudStorage load failed:', e);
+            }
         }
         
         if (savedData) {
