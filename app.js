@@ -1002,10 +1002,35 @@ async function completeOnboarding() {
     
     // Сохраняем дату рождения (не возраст)
     const dateOfBirthValue = document.getElementById('dateOfBirthValue');
+    const dateInput = document.getElementById('dateOfBirth');
+    console.log('[ONBOARDING] Date inputs:', {
+        dateOfBirthValue: dateOfBirthValue ? dateOfBirthValue.value : 'element not found',
+        dateInput: dateInput ? dateInput.value : 'element not found'
+    });
+    
     if (dateOfBirthValue && dateOfBirthValue.value) {
         userData.dateOfBirth = dateOfBirthValue.value;
         // Вычисляем и сохраняем возраст для обратной совместимости
         userData.age = calculateAge(dateOfBirthValue.value);
+        console.log('[ONBOARDING] Date of birth saved:', userData.dateOfBirth, 'Age:', userData.age);
+    } else if (dateInput && dateInput.value) {
+        // Fallback: пытаемся распарсить из текстового поля (формат DD.MM.YYYY)
+        const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+        if (dateMatch) {
+            const day = parseInt(dateMatch[1]);
+            const month = parseInt(dateMatch[2]) - 1; // месяцы в JS начинаются с 0
+            const year = parseInt(dateMatch[3]);
+            const date = new Date(year, month, day);
+            if (!isNaN(date.getTime())) {
+                userData.dateOfBirth = date.toISOString().split('T')[0];
+                userData.age = calculateAge(userData.dateOfBirth);
+                console.log('[ONBOARDING] Date parsed from input field:', userData.dateOfBirth);
+            }
+        }
+    }
+    
+    if (!userData.dateOfBirth) {
+        console.error('[ONBOARDING] ✗ ERROR: Date of birth is missing!');
     }
     if (genderInput) userData.gender = genderInput.value;
     if (heightSlider) userData.height = parseInt(heightSlider.value);
