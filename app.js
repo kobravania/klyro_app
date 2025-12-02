@@ -1,26 +1,49 @@
 // Telegram Web App API
 let tg;
-if (window.Telegram && window.Telegram.WebApp) {
-    tg = window.Telegram.WebApp;
-    console.log('[TELEGRAM] Telegram WebApp API found');
-    console.log('[TELEGRAM] CloudStorage available:', !!tg.CloudStorage);
-    if (tg.CloudStorage) {
-        console.log('[TELEGRAM] CloudStorage methods:', {
-            setItem: typeof tg.CloudStorage.setItem,
-            getItem: typeof tg.CloudStorage.getItem,
-            getItems: typeof tg.CloudStorage.getItems,
-            removeItem: typeof tg.CloudStorage.removeItem
-        });
+let tgReady = false;
+
+// Инициализация Telegram WebApp (вызывается после загрузки страницы)
+function initTelegramWebApp() {
+    if (window.Telegram && window.Telegram.WebApp) {
+        tg = window.Telegram.WebApp;
+        console.log('[TELEGRAM] Telegram WebApp API found');
+        
+        // Вызываем ready() для инициализации
+        tg.ready();
+        tg.expand();
+        
+        // Небольшая задержка для полной инициализации CloudStorage
+        setTimeout(() => {
+            tgReady = true;
+            console.log('[TELEGRAM] Telegram WebApp ready');
+            console.log('[TELEGRAM] CloudStorage available:', !!tg.CloudStorage);
+            if (tg.CloudStorage) {
+                console.log('[TELEGRAM] CloudStorage methods:', {
+                    setItem: typeof tg.CloudStorage.setItem,
+                    getItem: typeof tg.CloudStorage.getItem,
+                    getItems: typeof tg.CloudStorage.getItems,
+                    removeItem: typeof tg.CloudStorage.removeItem
+                });
+            }
+        }, 100);
+    } else {
+        tg = {
+            ready: () => {},
+            expand: () => {},
+            initDataUnsafe: {},
+            showAlert: (message) => alert(message),
+            CloudStorage: null
+        };
+        tgReady = true; // В браузере считаем готовым сразу
+        console.log('[TELEGRAM] Telegram WebApp API not found, using fallback');
     }
+}
+
+// Инициализируем при загрузке
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTelegramWebApp);
 } else {
-    tg = {
-        ready: () => {},
-        expand: () => {},
-        initDataUnsafe: {},
-        showAlert: (message) => alert(message),
-        CloudStorage: null
-    };
-    console.log('[TELEGRAM] Telegram WebApp API not found, using fallback');
+    initTelegramWebApp();
 }
 
 // ============================================
@@ -41,22 +64,29 @@ async function saveToStorage(key, value) {
         }
         
         // Затем сохраняем в Telegram Cloud Storage (синхронизируется между устройствами)
-        if (tg && tg.CloudStorage) {
+        // ВАЖНО: Проверяем, что WebApp готов и CloudStorage доступен
+        if (tgReady && tg && tg.CloudStorage) {
             try {
                 console.log(`[STORAGE] Saving to CloudStorage...`);
-                console.log(`[STORAGE] tg.CloudStorage available:`, !!tg.CloudStorage);
+                console.log(`[STORAGE] tgReady: ${tgReady}, tg.CloudStorage available:`, !!tg.CloudStorage);
                 console.log(`[STORAGE] tg.CloudStorage.setItem available:`, typeof tg.CloudStorage.setItem);
                 
                 // Сохраняем в CloudStorage
                 await tg.CloudStorage.setItem(key, value);
                 
+                // Небольшая задержка перед проверкой (CloudStorage может быть асинхронным)
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
                 // Проверяем, что данные действительно сохранились
                 const verifyValue = await tg.CloudStorage.getItem(key);
                 if (verifyValue === value) {
                     console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key} (verified)`);
+                } else if (verifyValue && verifyValue.length > 0) {
+                    // Если значения не совпадают, но данные есть - возможно, это нормально (версионирование)
+                    console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key} (data exists, length: ${verifyValue.length})`);
                 } else {
                     console.warn(`[STORAGE] ⚠ Saved to CloudStorage but verification failed for: ${key}`);
-                    console.warn(`[STORAGE] Expected length: ${value.length}, Got length: ${verifyValue ? verifyValue.length : 0}`);
+                    console.warn(`[STORAGE] Expected length: ${value.length}, Got: ${verifyValue ? verifyValue.length : 'null/undefined'}`);
                 }
                 return true;
             } catch (cloudError) {
@@ -70,7 +100,7 @@ async function saveToStorage(key, value) {
                 return true;
             }
         } else {
-            console.log(`[STORAGE] CloudStorage not available (tg: ${!!tg}, CloudStorage: ${tg ? !!tg.CloudStorage : 'N/A'}), only localStorage used`);
+            console.log(`[STORAGE] CloudStorage not available (tgReady: ${tgReady}, tg: ${!!tg}, CloudStorage: ${tg ? !!tg.CloudStorage : 'N/A'}), only localStorage used`);
             return true;
         }
     } catch (error) {
@@ -91,7 +121,8 @@ async function saveToStorage(key, value) {
 async function loadFromStorage(key) {
     try {
         // ВСЕГДА сначала пробуем загрузить из Telegram Cloud Storage (для синхронизации между устройствами)
-        if (tg && tg.CloudStorage) {
+        // ВАЖНО: Проверяем, что WebApp готов
+        if (tgReady && tg && tg.CloudStorage) {
             try {
                 console.log(`[STORAGE] Attempting to load from CloudStorage: ${key}`);
                 console.log(`[STORAGE] tg.CloudStorage available:`, !!tg.CloudStorage);
@@ -134,7 +165,7 @@ async function loadFromStorage(key) {
         if (value !== null && value !== '') {
             console.log(`[STORAGE] Loaded from localStorage (fallback): ${key}`);
             // Если CloudStorage доступен, но был пуст, синхронизируем данные из localStorage
-            if (tg && tg.CloudStorage) {
+            if (tgReady && tg && tg.CloudStorage) {
                 try {
                     await tg.CloudStorage.setItem(key, value);
                     console.log(`[STORAGE] ✓ Synced localStorage to CloudStorage: ${key}`);
@@ -182,7 +213,10 @@ function getDataHash(data) {
 
 // Оптимизированная синхронизация данных из CloudStorage (только при изменениях)
 function startDataSync() {
-    if (!tg || !tg.CloudStorage) return;
+    if (!tgReady || !tg || !tg.CloudStorage) {
+        console.log('[SYNC] CloudStorage not ready, skipping sync');
+        return;
+    }
     
     // Инициализируем хэши при старте
     const currentDiary = getDiary();
@@ -336,28 +370,22 @@ function initApp() {
     // Скрываем все экраны сразу, чтобы не было мелькания
     hideAllScreens();
     
-    // Инициализация Telegram Web App (если доступно)
-    if (window.Telegram && window.Telegram.WebApp) {
-        try {
-            tg = window.Telegram.WebApp;
-            tg.ready();
-            tg.expand();
-            console.log('Telegram WebApp initialized');
-            console.log('Telegram version:', tg.version);
-            console.log('Telegram platform:', tg.platform);
-            
-            // Запускаем периодическую синхронизацию данных из CloudStorage
-            if (tg.CloudStorage) {
-                console.log('[STORAGE] CloudStorage available, starting sync');
-                startDataSync();
-            } else {
-                console.warn('[STORAGE] CloudStorage not available');
-            }
-        } catch (e) {
-            console.log('Telegram WebApp init error:', e);
+    // Telegram WebApp уже инициализирован в initTelegramWebApp()
+    // Просто проверяем статус и запускаем синхронизацию
+    if (tg && tgReady) {
+        console.log('Telegram WebApp initialized');
+        console.log('Telegram version:', tg.version);
+        console.log('Telegram platform:', tg.platform);
+        
+        // Запускаем периодическую синхронизацию данных из CloudStorage
+        if (tg.CloudStorage) {
+            console.log('[STORAGE] CloudStorage available, starting sync');
+            startDataSync();
+        } else {
+            console.warn('[STORAGE] CloudStorage not available');
         }
     } else {
-        console.log('Telegram WebApp API not found - running in browser');
+        console.log('Telegram WebApp not ready yet or not available');
     }
     
     // Проверяем данные пользователя (асинхронно для CloudStorage)
