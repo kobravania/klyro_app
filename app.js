@@ -516,6 +516,20 @@ function startApp() {
     }
 }
 
+// КРИТИЧНО: Скрываем loading screen СРАЗУ при загрузке скрипта
+(function hideLoadingScreenImmediately() {
+    try {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('active');
+            loadingScreen.style.display = 'none';
+            console.log('[SCRIPT] Loading screen hidden immediately on script load');
+        }
+    } catch (e) {
+        console.error('[SCRIPT] Error hiding loading screen:', e);
+    }
+})();
+
 // Запускаем инициализацию только после полной загрузки скрипта
 if (document.readyState === 'complete') {
     startApp();
