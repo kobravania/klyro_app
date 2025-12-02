@@ -369,11 +369,24 @@ function initApp() {
     
     // Проверяем данные пользователя (асинхронно для CloudStorage)
     // Всегда вызываем checkUserAuth, который сам решит, что показывать
-    checkUserAuth().catch(e => {
-        console.error('Error in checkUserAuth:', e);
-        // Если произошла ошибка, показываем экран авторизации
-        showAuthScreen();
-    });
+    // Добавляем небольшую задержку, чтобы убедиться, что все функции определены
+    setTimeout(() => {
+        checkUserAuth().catch(e => {
+            console.error('Error in checkUserAuth:', e);
+            // Если произошла ошибка, показываем экран авторизации
+            try {
+                showAuthScreen();
+            } catch (e2) {
+                console.error('Error showing auth screen:', e2);
+                // Последняя попытка - показываем loading screen
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.classList.add('active');
+                    loadingScreen.style.display = 'block';
+                }
+            }
+        });
+    }, 100);
 }
 
 // Функция для запуска инициализации
