@@ -361,13 +361,16 @@ async function checkUserAuth() {
         
         // Проверяем наличие сохранённых данных (сначала из localStorage для быстрой загрузки)
         let savedData = loadFromStorageSync('klyro_user_data');
+        console.log('[AUTH] Loaded from localStorage:', savedData ? 'found' : 'not found');
         
         // Затем загружаем из CloudStorage для синхронизации
         if (tg && tg.CloudStorage) {
             try {
                 const cloudData = await loadFromStorage('klyro_user_data');
+                console.log('[AUTH] Loaded from CloudStorage:', cloudData ? 'found' : 'not found');
                 if (cloudData) {
                     savedData = cloudData;
+                    console.log('[AUTH] Using CloudStorage data');
                 }
             } catch (e) {
                 console.warn('[AUTH] CloudStorage load failed, using localStorage:', e);
@@ -958,7 +961,23 @@ async function completeOnboarding() {
     userData.calories = calculateCalories();
     
     // Сохраняем данные
+    console.log('[ONBOARDING] Saving user data before showing profile...');
     await saveUserData();
+    console.log('[ONBOARDING] User data saved, showing profile');
+    
+    // Проверяем, что данные сохранились
+    const checkData = loadFromStorageSync('klyro_user_data');
+    if (checkData) {
+        const parsed = JSON.parse(checkData);
+        console.log('[ONBOARDING] Verification - saved data:', {
+            dateOfBirth: parsed.dateOfBirth,
+            height: parsed.height,
+            weight: parsed.weight,
+            gender: parsed.gender
+        });
+    } else {
+        console.error('[ONBOARDING] ERROR: Data was not saved!');
+    }
     
     // Показываем профиль
     showProfileScreen();
