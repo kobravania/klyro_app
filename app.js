@@ -21,32 +21,36 @@ if (window.Telegram && window.Telegram.WebApp) {
 // Асинхронное сохранение данных с синхронизацией между устройствами
 async function saveToStorage(key, value) {
     try {
+        console.log(`[STORAGE] Attempting to save ${key}, value length: ${value ? value.length : 0}`);
         // Пробуем использовать Telegram Cloud Storage (синхронизируется между устройствами)
         if (tg && tg.CloudStorage) {
+            console.log(`[STORAGE] CloudStorage available, saving...`);
             await tg.CloudStorage.setItem(key, value);
-            console.log(`[STORAGE] Saved to CloudStorage: ${key}`);
+            console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key}`);
             // Также сохраняем в localStorage как резервную копию
             try {
                 localStorage.setItem(key, value);
+                console.log(`[STORAGE] ✓ Saved to localStorage backup: ${key}`);
             } catch (e) {
                 console.warn('[STORAGE] localStorage backup failed:', e);
             }
             return true;
         } else {
             // Fallback на localStorage если CloudStorage недоступен
+            console.log(`[STORAGE] CloudStorage not available, using localStorage`);
             localStorage.setItem(key, value);
-            console.log(`[STORAGE] Saved to localStorage: ${key}`);
+            console.log(`[STORAGE] ✓ Saved to localStorage: ${key}`);
             return true;
         }
     } catch (error) {
-        console.error(`[STORAGE] Error saving ${key}:`, error);
+        console.error(`[STORAGE] ✗ Error saving ${key}:`, error);
         // Fallback на localStorage при ошибке
         try {
             localStorage.setItem(key, value);
-            console.log(`[STORAGE] Fallback to localStorage: ${key}`);
+            console.log(`[STORAGE] ✓ Fallback to localStorage: ${key}`);
             return true;
         } catch (e) {
-            console.error(`[STORAGE] localStorage fallback failed:`, e);
+            console.error(`[STORAGE] ✗ localStorage fallback failed:`, e);
             return false;
         }
     }
