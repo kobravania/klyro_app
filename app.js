@@ -383,22 +383,45 @@ function initApp() {
     // Проверяем данные пользователя (асинхронно для CloudStorage)
     // Всегда вызываем checkUserAuth, который сам решит, что показывать
     // Добавляем небольшую задержку, чтобы убедиться, что все функции определены
-    setTimeout(() => {
-        checkUserAuth().catch(e => {
-            console.error('Error in checkUserAuth:', e);
-            // Если произошла ошибка, показываем экран авторизации
-            try {
+    // И таймаут на случай, если checkUserAuth зависнет
+    const authTimeout = setTimeout(() => {
+        console.warn('[INIT] checkUserAuth timeout, showing onboarding/auth screen');
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                showOnboardingScreen();
+            } else {
                 showAuthScreen();
-            } catch (e2) {
-                console.error('Error showing auth screen:', e2);
-                // Последняя попытка - показываем loading screen
-                const loadingScreen = document.getElementById('loading-screen');
-                if (loadingScreen) {
-                    loadingScreen.classList.add('active');
-                    loadingScreen.style.display = 'block';
-                }
             }
-        });
+        } catch (e) {
+            console.error('Error showing screen after timeout:', e);
+        }
+    }, 5000); // 5 секунд таймаут
+    
+    setTimeout(() => {
+        checkUserAuth()
+            .then(() => {
+                clearTimeout(authTimeout);
+            })
+            .catch(e => {
+                clearTimeout(authTimeout);
+                console.error('Error in checkUserAuth:', e);
+                // Если произошла ошибка, показываем экран авторизации
+                try {
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        showOnboardingScreen();
+                    } else {
+                        showAuthScreen();
+                    }
+                } catch (e2) {
+                    console.error('Error showing auth screen:', e2);
+                    // Последняя попытка - показываем loading screen
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.classList.add('active');
+                        loadingScreen.style.display = 'block';
+                    }
+                }
+            });
     }, 100);
 }
 
@@ -475,8 +498,11 @@ async function checkUserAuth() {
         let savedData = null;
         
         // Пробуем загрузить из CloudStorage (если готов) или из localStorage
+        // Добавляем таймаут, чтобы не зависнуть на долгой загрузке
         try {
-            savedData = await loadFromStorage('klyro_user_data');
+            const loadPromise = loadFromStorage('klyro_user_data');
+            const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000)); // 2 секунды таймаут
+            savedData = await Promise.race([loadPromise, timeoutPromise]);
             console.log('[AUTH] Loaded from storage:', savedData ? 'found' : 'not found');
         } catch (e) {
             console.warn('[AUTH] Storage load failed, trying localStorage:', e);
