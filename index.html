@@ -696,11 +696,54 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        // КРИТИЧНО: Скрываем loading screen и показываем экран СРАЗУ
+        console.log('[HTML] Script starting...');
+        (function() {
+            try {
+                // Скрываем loading screen
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.style.visibility = 'hidden';
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.classList.remove('active');
+                    console.log('[HTML] Loading screen hidden');
+                }
+                
+                // Показываем онбординг или авторизацию СРАЗУ
+                setTimeout(() => {
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        const onboardingScreen = document.getElementById('onboarding-screen');
+                        if (onboardingScreen) {
+                            onboardingScreen.classList.add('active');
+                            onboardingScreen.style.display = 'block';
+                            console.log('[HTML] Onboarding screen shown');
+                        }
+                    } else {
+                        const authScreen = document.getElementById('auth-screen');
+                        if (authScreen) {
+                            authScreen.classList.add('active');
+                            authScreen.style.display = 'block';
+                            console.log('[HTML] Auth screen shown');
+                        }
+                    }
+                }, 100);
+            } catch (e) {
+                console.error('[HTML] Error:', e);
+            }
+        })();
+        
         // Принудительная загрузка app.js с timestamp для обхода кэша
         (function() {
             const script = document.createElement('script');
             script.src = 'app.js?v=' + Date.now();
             script.async = false;
+            script.onerror = function() {
+                console.error('[HTML] Failed to load app.js');
+            };
+            script.onload = function() {
+                console.log('[HTML] app.js loaded successfully');
+            };
             document.head.appendChild(script);
         })();
     </script>
