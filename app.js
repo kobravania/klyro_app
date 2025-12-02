@@ -1001,14 +1001,25 @@ function calculateCalories() {
 async function saveUserData() {
     if (userData) {
         const userDataStr = JSON.stringify(userData);
+        console.log('[USERDATA] Saving user data:', userData);
         // Сохраняем в localStorage для быстрого доступа
-        localStorage.setItem('klyro_user_data', userDataStr);
+        try {
+            localStorage.setItem('klyro_user_data', userDataStr);
+            console.log('[USERDATA] Saved to localStorage');
+        } catch (e) {
+            console.error('[USERDATA] localStorage save failed:', e);
+        }
         // Обновляем хэш для отслеживания изменений
         lastUserDataHash = getDataHash(userData);
-        // Сохраняем в CloudStorage для синхронизации (асинхронно)
-        saveToStorage('klyro_user_data', userDataStr).catch(e => {
+        // Сохраняем в CloudStorage для синхронизации
+        try {
+            await saveToStorage('klyro_user_data', userDataStr);
+            console.log('[USERDATA] Saved to CloudStorage');
+        } catch (e) {
             console.warn('[USERDATA] CloudStorage save failed:', e);
-        });
+        }
+    } else {
+        console.warn('[USERDATA] No userData to save');
     }
 }
 
