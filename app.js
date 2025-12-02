@@ -2,7 +2,16 @@
 let tg;
 if (window.Telegram && window.Telegram.WebApp) {
     tg = window.Telegram.WebApp;
-    console.log('Telegram WebApp API found');
+    console.log('[TELEGRAM] Telegram WebApp API found');
+    console.log('[TELEGRAM] CloudStorage available:', !!tg.CloudStorage);
+    if (tg.CloudStorage) {
+        console.log('[TELEGRAM] CloudStorage methods:', {
+            setItem: typeof tg.CloudStorage.setItem,
+            getItem: typeof tg.CloudStorage.getItem,
+            getItems: typeof tg.CloudStorage.getItems,
+            removeItem: typeof tg.CloudStorage.removeItem
+        });
+    }
 } else {
     tg = {
         ready: () => {},
@@ -11,7 +20,7 @@ if (window.Telegram && window.Telegram.WebApp) {
         showAlert: (message) => alert(message),
         CloudStorage: null
     };
-    console.log('Telegram WebApp API not found, using fallback');
+    console.log('[TELEGRAM] Telegram WebApp API not found, using fallback');
 }
 
 // ============================================
@@ -35,16 +44,33 @@ async function saveToStorage(key, value) {
         if (tg && tg.CloudStorage) {
             try {
                 console.log(`[STORAGE] Saving to CloudStorage...`);
+                console.log(`[STORAGE] tg.CloudStorage available:`, !!tg.CloudStorage);
+                console.log(`[STORAGE] tg.CloudStorage.setItem available:`, typeof tg.CloudStorage.setItem);
+                
+                // Сохраняем в CloudStorage
                 await tg.CloudStorage.setItem(key, value);
-                console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key}`);
+                
+                // Проверяем, что данные действительно сохранились
+                const verifyValue = await tg.CloudStorage.getItem(key);
+                if (verifyValue === value) {
+                    console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key} (verified)`);
+                } else {
+                    console.warn(`[STORAGE] ⚠ Saved to CloudStorage but verification failed for: ${key}`);
+                    console.warn(`[STORAGE] Expected length: ${value.length}, Got length: ${verifyValue ? verifyValue.length : 0}`);
+                }
                 return true;
             } catch (cloudError) {
                 console.error(`[STORAGE] ✗ CloudStorage save error:`, cloudError);
+                console.error(`[STORAGE] Error details:`, {
+                    name: cloudError?.name,
+                    message: cloudError?.message,
+                    stack: cloudError?.stack
+                });
                 // Если CloudStorage не работает, хотя бы localStorage сохранен
                 return true;
             }
         } else {
-            console.log(`[STORAGE] CloudStorage not available, only localStorage used`);
+            console.log(`[STORAGE] CloudStorage not available (tg: ${!!tg}, CloudStorage: ${tg ? !!tg.CloudStorage : 'N/A'}), only localStorage used`);
             return true;
         }
     } catch (error) {
@@ -67,7 +93,19 @@ async function loadFromStorage(key) {
         // ВСЕГДА сначала пробуем загрузить из Telegram Cloud Storage (для синхронизации между устройствами)
         if (tg && tg.CloudStorage) {
             try {
+                console.log(`[STORAGE] Attempting to load from CloudStorage: ${key}`);
+                console.log(`[STORAGE] tg.CloudStorage available:`, !!tg.CloudStorage);
+                console.log(`[STORAGE] tg.CloudStorage.getItem available:`, typeof tg.CloudStorage.getItem);
+                
                 const value = await tg.CloudStorage.getItem(key);
+                console.log(`[STORAGE] CloudStorage.getItem result for ${key}:`, {
+                    isNull: value === null,
+                    isUndefined: value === undefined,
+                    isEmpty: value === '',
+                    type: typeof value,
+                    length: value ? value.length : 0
+                });
+                
                 if (value !== null && value !== undefined && value !== '') {
                     console.log(`[STORAGE] ✓ Loaded from CloudStorage: ${key}, length: ${value.length}`);
                     // Обновляем localStorage для быстрого доступа
@@ -83,6 +121,11 @@ async function loadFromStorage(key) {
                 }
             } catch (cloudError) {
                 console.error(`[STORAGE] CloudStorage getItem error for ${key}:`, cloudError);
+                console.error(`[STORAGE] Error details:`, {
+                    name: cloudError?.name,
+                    message: cloudError?.message,
+                    stack: cloudError?.stack
+                });
             }
         }
         
