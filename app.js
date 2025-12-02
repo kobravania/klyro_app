@@ -412,19 +412,46 @@ function startApp() {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOMContentLoaded fired');
-            // Небольшая задержка для Telegram API
-            setTimeout(initApp, 200);
+            // Небольшая задержка для Telegram API и загрузки всех функций
+            setTimeout(() => {
+                try {
+                    initApp();
+                } catch (e) {
+                    console.error('Error in initApp:', e);
+                    // Показываем loading screen как fallback
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.classList.add('active');
+                        loadingScreen.style.display = 'block';
+                    }
+                }
+            }, 500);
         });
     } else {
         console.log('DOM already loaded');
-        // Для Telegram даём больше времени на загрузку API
-        const delay = (window.Telegram && window.Telegram.WebApp) ? 100 : 200;
-        setTimeout(initApp, delay);
+        // Для Telegram даём больше времени на загрузку API и всех функций
+        setTimeout(() => {
+            try {
+                initApp();
+            } catch (e) {
+                console.error('Error in initApp:', e);
+                // Показываем loading screen как fallback
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.classList.add('active');
+                    loadingScreen.style.display = 'block';
+                }
+            }
+        }, 500);
     }
 }
 
-// Запускаем инициализацию
-startApp();
+// Запускаем инициализацию только после полной загрузки скрипта
+if (document.readyState === 'complete') {
+    startApp();
+} else {
+    window.addEventListener('load', startApp);
+}
 
 // Проверка авторизации и загрузка данных
 async function checkUserAuth() {
