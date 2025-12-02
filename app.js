@@ -340,248 +340,41 @@ console.error = function(...args) {
     sendLogToServer('error', args.join(' '));
 };
 
-// Инициализация приложения - упрощённая версия
+// Инициализация приложения
 function initApp() {
     console.log('=== Klyro App Initializing ===');
-    console.log('User Agent:', navigator.userAgent);
-    console.log('Is Telegram:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
-    
-    // КРИТИЧНО: Скрываем loading screen СРАЗУ, до всего остального
-    const loadingScreen = document.getElementById('loading-screen');
-    if (loadingScreen) {
-        loadingScreen.classList.remove('active');
-        loadingScreen.style.display = 'none';
-        console.log('[INIT] Loading screen hidden immediately');
-    }
-    
-    // Скрываем все остальные экраны
-    try {
-        const allScreens = document.querySelectorAll('.screen');
-        allScreens.forEach(screen => {
-            if (screen.id !== 'loading-screen') {
-                screen.classList.remove('active');
-                screen.style.display = 'none';
-            }
-        });
-        console.log('[INIT] All screens hidden');
-    } catch (e) {
-        console.error('Error hiding screens:', e);
-    }
     
     // Telegram WebApp уже инициализирован в initTelegramWebApp()
-    // Просто проверяем статус и запускаем синхронизацию
     if (tg && tgReady) {
         console.log('Telegram WebApp initialized');
-        console.log('Telegram version:', tg.version);
-        console.log('Telegram platform:', tg.platform);
-        
         // Запускаем периодическую синхронизацию данных из CloudStorage
         if (tg.CloudStorage) {
-            console.log('[STORAGE] CloudStorage available, starting sync');
             startDataSync();
-        } else {
-            console.warn('[STORAGE] CloudStorage not available');
         }
-    } else {
-        console.log('Telegram WebApp not ready yet or not available');
     }
     
-    // Проверяем данные пользователя (асинхронно для CloudStorage)
-    // Всегда вызываем checkUserAuth, который сам решит, что показывать
-    // Добавляем небольшую задержку, чтобы убедиться, что все функции определены
-    console.log('[INIT] Setting up checkUserAuth...');
-    
-    // Гарантированный таймаут - через 2 секунды показываем экран в любом случае
-    const guaranteedTimeout = setTimeout(() => {
-        console.warn('[INIT] Guaranteed timeout - showing screen after 2 seconds');
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.classList.remove('active');
-            loadingScreen.style.display = 'none';
-        }
-        
-        // Проверяем, есть ли данные в localStorage
-        const savedData = localStorage.getItem('klyro_user_data');
-        if (savedData) {
-            try {
-                const userData = JSON.parse(savedData);
-                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                if (hasProfileData) {
-                    const profileScreen = document.getElementById('profile-screen');
-                    if (profileScreen) {
-                        profileScreen.classList.add('active');
-                        profileScreen.style.display = 'block';
-                        console.log('[INIT] Profile screen shown after timeout');
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.error('[INIT] Error parsing data:', e);
-            }
-        }
-        
-        // Показываем онбординг или авторизацию
+    // Проверяем данные пользователя - это единственное место, где решается, что показывать
+    checkUserAuth().catch(e => {
+        console.error('[INIT] Error in checkUserAuth:', e);
+        // Fallback - показываем онбординг или авторизацию
         if (window.Telegram && window.Telegram.WebApp) {
-            const onboardingScreen = document.getElementById('onboarding-screen');
-            if (onboardingScreen) {
-                onboardingScreen.classList.add('active');
-                onboardingScreen.style.display = 'block';
-                console.log('[INIT] Onboarding screen shown after timeout');
-            }
+            showOnboardingScreen();
         } else {
-            const authScreen = document.getElementById('auth-screen');
-            if (authScreen) {
-                authScreen.classList.add('active');
-                authScreen.style.display = 'block';
-                console.log('[INIT] Auth screen shown after timeout');
-            }
+            showAuthScreen();
         }
-    }, 2000); // 2 секунды гарантированный таймаут
-    
-    setTimeout(() => {
-        console.log('[INIT] Calling checkUserAuth...');
-        checkUserAuth()
-            .then(() => {
-                clearTimeout(guaranteedTimeout);
-                console.log('[INIT] checkUserAuth completed successfully');
-            })
-            .catch(e => {
-                clearTimeout(guaranteedTimeout);
-                console.error('[INIT] Error in checkUserAuth:', e);
-                // Если произошла ошибка, показываем экран
-                const loadingScreen = document.getElementById('loading-screen');
-                if (loadingScreen) {
-                    loadingScreen.classList.remove('active');
-                    loadingScreen.style.display = 'none';
-                }
-                
-                if (window.Telegram && window.Telegram.WebApp) {
-                    const onboardingScreen = document.getElementById('onboarding-screen');
-                    if (onboardingScreen) {
-                        onboardingScreen.classList.add('active');
-                        onboardingScreen.style.display = 'block';
-                    }
-                } else {
-                    const authScreen = document.getElementById('auth-screen');
-                    if (authScreen) {
-                        authScreen.classList.add('active');
-                        authScreen.style.display = 'block';
-                    }
-                }
-            });
-    }, 100);
+    });
 }
 
 // Функция для запуска инициализации
 function startApp() {
-    console.log('Starting app initialization...');
-    console.log('DOM state:', document.readyState);
-    console.log('Telegram API available:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
-    
     // Ждём готовности DOM
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired');
-            // Небольшая задержка для Telegram API и загрузки всех функций
-            setTimeout(() => {
-                try {
-                    initApp();
-                } catch (e) {
-                    console.error('Error in initApp:', e);
-                    // Показываем loading screen как fallback
-                    const loadingScreen = document.getElementById('loading-screen');
-                    if (loadingScreen) {
-                        loadingScreen.classList.add('active');
-                        loadingScreen.style.display = 'block';
-                    }
-                }
-            }, 500);
-        });
+        document.addEventListener('DOMContentLoaded', initApp);
     } else {
-        console.log('DOM already loaded');
-        // Для Telegram даём больше времени на загрузку API и всех функций
-        setTimeout(() => {
-            try {
-                initApp();
-            } catch (e) {
-                console.error('Error in initApp:', e);
-                // Показываем loading screen как fallback
-                const loadingScreen = document.getElementById('loading-screen');
-                if (loadingScreen) {
-                    loadingScreen.classList.add('active');
-                    loadingScreen.style.display = 'block';
-                }
-            }
-        }, 500);
+        // DOM уже загружен, запускаем сразу
+        initApp();
     }
 }
-
-// КРИТИЧНО: Скрываем loading screen СРАЗУ при загрузке скрипта
-(function hideLoadingScreenImmediately() {
-    try {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.classList.remove('active');
-            loadingScreen.style.display = 'none';
-            console.log('[SCRIPT] Loading screen hidden immediately on script load');
-        }
-    } catch (e) {
-        console.error('[SCRIPT] Error hiding loading screen:', e);
-    }
-})();
-
-// КРИТИЧНО: Показываем экран СРАЗУ, без ожидания
-(function showScreenImmediately() {
-    try {
-        // Скрываем loading screen
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.style.display = 'none';
-            loadingScreen.style.visibility = 'hidden';
-            loadingScreen.style.opacity = '0';
-            loadingScreen.classList.remove('active');
-        }
-        
-        // Проверяем localStorage для быстрого показа профиля
-        const savedData = localStorage.getItem('klyro_user_data');
-        if (savedData) {
-            try {
-                const userData = JSON.parse(savedData);
-                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                if (hasProfileData) {
-                    const profileScreen = document.getElementById('profile-screen');
-                    if (profileScreen) {
-                        profileScreen.classList.add('active');
-                        profileScreen.style.display = 'block';
-                        console.log('[IMMEDIATE] Profile screen shown immediately');
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.error('[IMMEDIATE] Error parsing data:', e);
-            }
-        }
-        
-        // Показываем онбординг или авторизацию
-        if (window.Telegram && window.Telegram.WebApp) {
-            const onboardingScreen = document.getElementById('onboarding-screen');
-            if (onboardingScreen) {
-                onboardingScreen.classList.add('active');
-                onboardingScreen.style.display = 'block';
-                console.log('[IMMEDIATE] Onboarding screen shown immediately');
-            }
-        } else {
-            const authScreen = document.getElementById('auth-screen');
-            if (authScreen) {
-                authScreen.classList.add('active');
-                authScreen.style.display = 'block';
-                console.log('[IMMEDIATE] Auth screen shown immediately');
-            }
-        }
-    } catch (e) {
-        console.error('[IMMEDIATE] Error showing screen:', e);
-    }
-})();
 
 // Запускаем инициализацию только после полной загрузки скрипта
 if (document.readyState === 'complete') {
@@ -593,82 +386,26 @@ if (document.readyState === 'complete') {
 // Проверка авторизации и загрузка данных
 async function checkUserAuth() {
     try {
-        console.log('[AUTH] Starting checkUserAuth...');
-        
-        // ВАЖНО: Сначала скрываем loading screen СРАЗУ, до загрузки данных
+        // Скрываем loading screen
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.remove('active');
             loadingScreen.style.display = 'none';
-            console.log('[AUTH] Loading screen hidden immediately');
         }
         
-        // Скрываем все остальные экраны
-        try {
-            const allScreens = document.querySelectorAll('.screen');
-            allScreens.forEach(screen => {
-                if (screen.id !== 'loading-screen') {
-                    screen.classList.remove('active');
-                    screen.style.display = 'none';
-                }
-            });
-            console.log('[AUTH] All screens hidden');
-        } catch (e) {
-            console.error('Error hiding screens:', e);
-        }
+        // Скрываем все экраны
+        hideAllScreens();
         
-        // ВАЖНО: Сначала загружаем из CloudStorage для синхронизации между устройствами
+        // Загружаем данные из хранилища
         let savedData = null;
         
-        // Пробуем загрузить из localStorage СНАЧАЛА (быстро), потом из CloudStorage (медленно)
+        // Сначала проверяем localStorage (быстро)
         savedData = loadFromStorageSync('klyro_user_data');
-        console.log('[AUTH] Quick check localStorage:', savedData ? 'found' : 'not found');
         
-        // Если есть данные в localStorage, используем их сразу и показываем экран
-        if (savedData) {
+        // Если нет данных в localStorage, пробуем CloudStorage
+        if (!savedData && tgReady && tg && tg.CloudStorage) {
             try {
-                userData = JSON.parse(savedData);
-                console.log('[AUTH] Loaded userData from localStorage:', userData);
-                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                if (hasProfileData) {
-                    console.log('[AUTH] Profile data found, showing profile screen');
-                    showProfileScreen();
-                    if (typeof updateUsernameDisplay === 'function') {
-                        updateUsernameDisplay();
-                    }
-                    // Загружаем из CloudStorage в фоне для синхронизации
-                    loadFromStorage('klyro_user_data').then(cloudData => {
-                        if (cloudData) {
-                            try {
-                                const cloudUserData = JSON.parse(cloudData);
-                                // Обновляем только если данные из CloudStorage новее
-                                if (cloudUserData && (cloudUserData.dateOfBirth || cloudUserData.age) && cloudUserData.height) {
-                                    userData = cloudUserData;
-                                    localStorage.setItem('klyro_user_data', cloudData);
-                                    console.log('[AUTH] Synced from CloudStorage in background');
-                                }
-                            } catch (e) {
-                                console.warn('[AUTH] Error parsing cloud data:', e);
-                            }
-                        }
-                    }).catch(e => {
-                        console.warn('[AUTH] CloudStorage sync failed:', e);
-                    });
-                    return;
-                }
-            } catch (e) {
-                console.error('[AUTH] Error parsing localStorage data:', e);
-                savedData = null;
-            }
-        }
-        
-        // Если нет данных в localStorage, пробуем CloudStorage (с таймаутом)
-        if (!savedData) {
-            try {
-                const loadPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1000)); // 1 секунда таймаут
-                savedData = await Promise.race([loadPromise, timeoutPromise]);
-                console.log('[AUTH] Loaded from CloudStorage:', savedData ? 'found' : 'not found');
+                savedData = await loadFromStorage('klyro_user_data');
             } catch (e) {
                 console.warn('[AUTH] CloudStorage load failed:', e);
             }
@@ -677,11 +414,8 @@ async function checkUserAuth() {
         if (savedData) {
             try {
                 userData = JSON.parse(savedData);
-                console.log('[AUTH] Loaded userData:', userData);
-                // Проверяем, что данные профиля заполнены (дата рождения/возраст И рост)
                 const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
                 if (hasProfileData) {
-                    console.log('[AUTH] Profile data found, showing profile screen');
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
                     if (typeof getDiary === 'function') {
@@ -690,148 +424,62 @@ async function checkUserAuth() {
                             lastDiaryHash = getDataHash(diary);
                         }
                     }
-                    // Сразу показываем профиль, без задержек
                     showProfileScreen();
-                    // Обновляем username
                     if (typeof updateUsernameDisplay === 'function') {
                         updateUsernameDisplay();
                     }
-                    // Загружаем дневник из CloudStorage (если функция определена)
                     if (typeof loadDiaryFromCloud === 'function') {
                         loadDiaryFromCloud();
                     }
                     return;
-                } else {
-                    console.log('[AUTH] Profile data incomplete, will check Telegram auth');
                 }
             } catch (e) {
-                console.error('Error parsing saved data:', e);
-                // Очищаем поврежденные данные
-                try {
-                    localStorage.removeItem('klyro_user_data');
-                } catch (e2) {
-                    console.error('Error clearing corrupted data:', e2);
-                }
+                console.error('[AUTH] Error parsing saved data:', e);
+                localStorage.removeItem('klyro_user_data');
             }
         }
 
-        // Проверяем Telegram авторизацию
+        // Обновляем данные Telegram, если доступны
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
             const initData = window.Telegram.WebApp.initDataUnsafe;
-            console.log('[AUTH] Telegram initData available');
-            
             if (initData.user) {
+                if (!userData) userData = {};
                 const telegramUser = initData.user;
-                console.log('[AUTH] Telegram user found:', telegramUser);
-                
-                // Если userData еще не загружен из сохраненных данных, создаем базовый объект
-                if (!userData) {
-                    userData = {};
-                }
-                
-                // Проверяем наличие профиля ДО обновления данных Telegram
-                const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                
-                // Обновляем данные Telegram
                 userData.id = telegramUser.id;
                 userData.firstName = telegramUser.first_name || 'Пользователь';
                 userData.lastName = telegramUser.last_name || '';
                 userData.username = telegramUser.username || '';
                 userData.photoUrl = telegramUser.photo_url || '';
                 
-                // Обновляем username
-                updateUsernameDisplay();
-                
-                // Инициализируем хэши для синхронизации
-                lastUserDataHash = getDataHash(userData);
-                if (typeof getDiary === 'function') {
-                    const diary = getDiary();
-                    if (diary && Object.keys(diary).length > 0) {
-                        lastDiaryHash = getDataHash(diary);
-                    }
+                if (typeof updateUsernameDisplay === 'function') {
+                    updateUsernameDisplay();
                 }
                 
-                // Сохраняем обновленные данные Telegram (только если профиль уже был заполнен, иначе сохраним после онбординга)
+                const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
                 if (hasExistingProfile) {
+                    lastUserDataHash = getDataHash(userData);
                     await saveUserData();
-                    console.log('[AUTH] Saved updated Telegram data (profile exists)');
-                } else {
-                    console.log('[AUTH] Profile not complete, will save after onboarding');
-                }
-                
-                // Если есть данные профиля, показываем профиль, иначе онбординг
-                if (hasExistingProfile) {
-                    console.log('[AUTH] Profile data found, showing profile screen');
                     showProfileScreen();
-                    // Загружаем дневник из CloudStorage (если функция определена)
                     if (typeof loadDiaryFromCloud === 'function') {
                         loadDiaryFromCloud();
                     }
-                } else {
-                    console.log('[AUTH] Profile data incomplete, showing onboarding');
-                    showOnboardingScreen();
+                    return;
                 }
-                return;
-            } else {
-                console.log('[AUTH] Telegram user not found in initData');
             }
-        } else {
-            console.log('[AUTH] Telegram WebApp or initDataUnsafe not available');
         }
         
-        // Если нет данных, показываем онбординг (если есть Telegram) или авторизацию
-        console.log('[AUTH] No profile data found, deciding which screen to show...');
+        // Если нет данных профиля, показываем онбординг или авторизацию
         if (window.Telegram && window.Telegram.WebApp) {
-            console.log('[AUTH] Telegram available, showing onboarding');
-            try {
-                showOnboardingScreen();
-                console.log('[AUTH] Onboarding screen shown');
-            } catch (e) {
-                console.error('[AUTH] Error showing onboarding:', e);
-                // Fallback
-                const onboardingScreen = document.getElementById('onboarding-screen');
-                if (onboardingScreen) {
-                    onboardingScreen.classList.add('active');
-                    onboardingScreen.style.display = 'block';
-                }
-            }
+            showOnboardingScreen();
         } else {
-            console.log('[AUTH] No Telegram, showing auth screen');
-            try {
-                showAuthScreen();
-                console.log('[AUTH] Auth screen shown');
-            } catch (e) {
-                console.error('[AUTH] Error showing auth:', e);
-                // Fallback
-                const authScreen = document.getElementById('auth-screen');
-                if (authScreen) {
-                    authScreen.classList.add('active');
-                    authScreen.style.display = 'block';
-                }
-            }
+            showAuthScreen();
         }
     } catch (e) {
         console.error('[AUTH] Error in checkUserAuth:', e);
-        // В случае ошибки всегда показываем экран
-        try {
-            if (window.Telegram && window.Telegram.WebApp) {
-                showOnboardingScreen();
-            } else {
-                showAuthScreen();
-            }
-        } catch (e2) {
-            console.error('[AUTH] Error showing fallback screen:', e2);
-            // Последняя попытка - прямая манипуляция DOM
-            const allScreens = document.querySelectorAll('.screen');
-            allScreens.forEach(screen => {
-                screen.classList.remove('active');
-                screen.style.display = 'none';
-            });
-            const onboardingScreen = document.getElementById('onboarding-screen');
-            if (onboardingScreen) {
-                onboardingScreen.classList.add('active');
-                onboardingScreen.style.display = 'block';
-            }
+        if (window.Telegram && window.Telegram.WebApp) {
+            showOnboardingScreen();
+        } else {
+            showAuthScreen();
         }
     }
 }
