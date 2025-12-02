@@ -1185,9 +1185,12 @@ function hideAllScreens() {
         screens.forEach(screen => {
             screen.classList.remove('active');
             screen.style.display = 'none';
+            screen.style.visibility = 'hidden';
+            screen.style.opacity = '0';
         });
+        console.log('[SCREEN] All screens hidden');
     } catch (e) {
-        console.error('Error hiding screens:', e);
+        console.error('[SCREEN] Error hiding screens:', e);
     }
 }
 
