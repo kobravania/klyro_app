@@ -346,18 +346,24 @@ function initApp() {
     console.log('User Agent:', navigator.userAgent);
     console.log('Is Telegram:', window.Telegram && window.Telegram.WebApp ? 'Yes' : 'No');
     
-    // Скрываем все экраны сразу, чтобы не было мелькания
+    // КРИТИЧНО: Скрываем loading screen СРАЗУ, до всего остального
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+        loadingScreen.classList.remove('active');
+        loadingScreen.style.display = 'none';
+        console.log('[INIT] Loading screen hidden immediately');
+    }
+    
+    // Скрываем все остальные экраны
     try {
-        if (typeof hideAllScreens === 'function') {
-            hideAllScreens();
-        } else {
-            // Если функция еще не определена, скрываем экраны вручную
-            const allScreens = document.querySelectorAll('.screen');
-            allScreens.forEach(screen => {
+        const allScreens = document.querySelectorAll('.screen');
+        allScreens.forEach(screen => {
+            if (screen.id !== 'loading-screen') {
                 screen.classList.remove('active');
                 screen.style.display = 'none';
-            });
-        }
+            }
+        });
+        console.log('[INIT] All screens hidden');
     } catch (e) {
         console.error('Error hiding screens:', e);
     }
@@ -383,74 +389,87 @@ function initApp() {
     // Проверяем данные пользователя (асинхронно для CloudStorage)
     // Всегда вызываем checkUserAuth, который сам решит, что показывать
     // Добавляем небольшую задержку, чтобы убедиться, что все функции определены
-    // И таймаут на случай, если checkUserAuth зависнет
-    console.log('[INIT] Setting up checkUserAuth with timeout...');
-    const authTimeout = setTimeout(() => {
-        console.warn('[INIT] checkUserAuth timeout after 3 seconds, forcing screen show');
-        // Скрываем loading screen
+    console.log('[INIT] Setting up checkUserAuth...');
+    
+    // Гарантированный таймаут - через 2 секунды показываем экран в любом случае
+    const guaranteedTimeout = setTimeout(() => {
+        console.warn('[INIT] Guaranteed timeout - showing screen after 2 seconds');
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.classList.remove('active');
             loadingScreen.style.display = 'none';
         }
-        // Показываем нужный экран
-        try {
-            if (window.Telegram && window.Telegram.WebApp) {
-                const onboardingScreen = document.getElementById('onboarding-screen');
-                if (onboardingScreen) {
-                    onboardingScreen.classList.add('active');
-                    onboardingScreen.style.display = 'block';
-                    console.log('[INIT] Onboarding screen shown after timeout');
+        
+        // Проверяем, есть ли данные в localStorage
+        const savedData = localStorage.getItem('klyro_user_data');
+        if (savedData) {
+            try {
+                const userData = JSON.parse(savedData);
+                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                if (hasProfileData) {
+                    const profileScreen = document.getElementById('profile-screen');
+                    if (profileScreen) {
+                        profileScreen.classList.add('active');
+                        profileScreen.style.display = 'block';
+                        console.log('[INIT] Profile screen shown after timeout');
+                        return;
+                    }
                 }
-            } else {
-                const authScreen = document.getElementById('auth-screen');
-                if (authScreen) {
-                    authScreen.classList.add('active');
-                    authScreen.style.display = 'block';
-                    console.log('[INIT] Auth screen shown after timeout');
-                }
+            } catch (e) {
+                console.error('[INIT] Error parsing data:', e);
             }
-        } catch (e) {
-            console.error('[INIT] Error showing screen after timeout:', e);
         }
-    }, 3000); // 3 секунды таймаут
+        
+        // Показываем онбординг или авторизацию
+        if (window.Telegram && window.Telegram.WebApp) {
+            const onboardingScreen = document.getElementById('onboarding-screen');
+            if (onboardingScreen) {
+                onboardingScreen.classList.add('active');
+                onboardingScreen.style.display = 'block';
+                console.log('[INIT] Onboarding screen shown after timeout');
+            }
+        } else {
+            const authScreen = document.getElementById('auth-screen');
+            if (authScreen) {
+                authScreen.classList.add('active');
+                authScreen.style.display = 'block';
+                console.log('[INIT] Auth screen shown after timeout');
+            }
+        }
+    }, 2000); // 2 секунды гарантированный таймаут
     
     setTimeout(() => {
         console.log('[INIT] Calling checkUserAuth...');
         checkUserAuth()
             .then(() => {
-                clearTimeout(authTimeout);
+                clearTimeout(guaranteedTimeout);
                 console.log('[INIT] checkUserAuth completed successfully');
             })
             .catch(e => {
-                clearTimeout(authTimeout);
+                clearTimeout(guaranteedTimeout);
                 console.error('[INIT] Error in checkUserAuth:', e);
-                // Скрываем loading screen
+                // Если произошла ошибка, показываем экран
                 const loadingScreen = document.getElementById('loading-screen');
                 if (loadingScreen) {
                     loadingScreen.classList.remove('active');
                     loadingScreen.style.display = 'none';
                 }
-                // Если произошла ошибка, показываем экран
-                try {
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        const onboardingScreen = document.getElementById('onboarding-screen');
-                        if (onboardingScreen) {
-                            onboardingScreen.classList.add('active');
-                            onboardingScreen.style.display = 'block';
-                        }
-                    } else {
-                        const authScreen = document.getElementById('auth-screen');
-                        if (authScreen) {
-                            authScreen.classList.add('active');
-                            authScreen.style.display = 'block';
-                        }
+                
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const onboardingScreen = document.getElementById('onboarding-screen');
+                    if (onboardingScreen) {
+                        onboardingScreen.classList.add('active');
+                        onboardingScreen.style.display = 'block';
                     }
-                } catch (e2) {
-                    console.error('[INIT] Error showing fallback screen:', e2);
+                } else {
+                    const authScreen = document.getElementById('auth-screen');
+                    if (authScreen) {
+                        authScreen.classList.add('active');
+                        authScreen.style.display = 'block';
+                    }
                 }
             });
-    }, 200);
+    }, 100);
 }
 
 // Функция для запуска инициализации
