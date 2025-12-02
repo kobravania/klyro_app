@@ -749,8 +749,10 @@ function initHeightWeightSliders() {
 function showOnboardingScreen() {
     hideAllScreens();
     const onboardingScreen = document.getElementById('onboarding-screen');
-    onboardingScreen.classList.add('active');
-    currentStep = 1;
+    if (onboardingScreen) {
+        onboardingScreen.classList.add('active');
+        onboardingScreen.style.display = 'block';
+        currentStep = 1;
     updateProgress();
     showStep(1);
     
@@ -763,7 +765,9 @@ function showOnboardingScreen() {
 function showProfileScreen() {
     hideAllScreens();
     const profileScreen = document.getElementById('profile-screen');
-    profileScreen.classList.add('active');
+    if (profileScreen) {
+        profileScreen.classList.add('active');
+        profileScreen.style.display = 'block';
     
     if (userData) {
         // Заполняем данные профиля
@@ -1160,17 +1164,10 @@ function recalculateCalories() {
 function hideAllScreens() {
     try {
         const screens = document.querySelectorAll('.screen');
-        console.log('Hiding', screens.length, 'screens');
         screens.forEach(screen => {
             screen.classList.remove('active');
             screen.style.display = 'none';
         });
-        // Убеждаемся, что loading screen скрыт
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.classList.remove('active');
-            loadingScreen.style.display = 'none';
-        }
     } catch (e) {
         console.error('Error hiding screens:', e);
     }
