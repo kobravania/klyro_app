@@ -474,16 +474,20 @@ async function checkUserAuth() {
                     console.log('[AUTH] Profile data found, showing profile screen');
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
-                    const diary = getDiary();
-                    if (diary && Object.keys(diary).length > 0) {
-                        lastDiaryHash = getDataHash(diary);
+                    if (typeof getDiary === 'function') {
+                        const diary = getDiary();
+                        if (diary && Object.keys(diary).length > 0) {
+                            lastDiaryHash = getDataHash(diary);
+                        }
                     }
                     // Сразу показываем профиль, без задержек
                     showProfileScreen();
                     // Обновляем username
                     updateUsernameDisplay();
-                    // Загружаем дневник из CloudStorage
-                    loadDiaryFromCloud();
+                    // Загружаем дневник из CloudStorage (если функция определена)
+                    if (typeof loadDiaryFromCloud === 'function') {
+                        loadDiaryFromCloud();
+                    }
                     return;
                 } else {
                     console.log('[AUTH] Profile data incomplete, will check Telegram auth');
@@ -528,9 +532,11 @@ async function checkUserAuth() {
                 
                 // Инициализируем хэши для синхронизации
                 lastUserDataHash = getDataHash(userData);
-                const diary = getDiary();
-                if (diary && Object.keys(diary).length > 0) {
-                    lastDiaryHash = getDataHash(diary);
+                if (typeof getDiary === 'function') {
+                    const diary = getDiary();
+                    if (diary && Object.keys(diary).length > 0) {
+                        lastDiaryHash = getDataHash(diary);
+                    }
                 }
                 
                 // Сохраняем обновленные данные Telegram (только если профиль уже был заполнен, иначе сохраним после онбординга)
@@ -545,8 +551,10 @@ async function checkUserAuth() {
                 if (hasExistingProfile) {
                     console.log('[AUTH] Profile data found, showing profile screen');
                     showProfileScreen();
-                    // Загружаем дневник из CloudStorage
-                    loadDiaryFromCloud();
+                    // Загружаем дневник из CloudStorage (если функция определена)
+                    if (typeof loadDiaryFromCloud === 'function') {
+                        loadDiaryFromCloud();
+                    }
                 } else {
                     console.log('[AUTH] Profile data incomplete, showing onboarding');
                     showOnboardingScreen();
