@@ -44,15 +44,13 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Screen Management */
 .screen {
-    display: none !important;
+    display: none;
     min-height: 100vh;
     padding: 20px;
     padding-top: 60px; /* Отступ сверху для username badge */
     animation: fadeIn 0.3s ease-in-out;
     position: relative;
     width: 100%;
-    visibility: hidden; /* Дополнительно скрываем для предотвращения мелькания */
-    opacity: 0; /* Скрываем через opacity для плавности */
     background: var(--background-color); /* Явный темно-синий фон */
 }
 
@@ -64,8 +62,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .screen.active {
     display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 
 @keyframes fadeIn {
@@ -88,11 +84,9 @@ h1, h2, h3, h4, h5, h6 {
     background: transparent; /* Прозрачный, чтобы был виден фон экрана */
 }
 
-/* Loading Screen - КРИТИЧНО: скрыт по умолчанию */
+/* Loading Screen */
 #loading-screen {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
+    display: none;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);

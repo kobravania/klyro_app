@@ -696,19 +696,24 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        // КРИТИЧНО: Скрываем loading screen и показываем экран СРАЗУ
+        // КРИТИЧНО: Показываем экран СРАЗУ
         console.log('[HTML] Script starting...');
         (function() {
             try {
                 // Скрываем loading screen
                 const loadingScreen = document.getElementById('loading-screen');
                 if (loadingScreen) {
-                    loadingScreen.style.display = 'none';
-                    loadingScreen.style.visibility = 'hidden';
-                    loadingScreen.style.opacity = '0';
                     loadingScreen.classList.remove('active');
+                    loadingScreen.style.display = 'none';
                     console.log('[HTML] Loading screen hidden');
                 }
+                
+                // Скрываем все экраны
+                const allScreens = document.querySelectorAll('.screen');
+                allScreens.forEach(screen => {
+                    screen.classList.remove('active');
+                    screen.style.display = 'none';
+                });
                 
                 // Показываем онбординг или авторизацию СРАЗУ
                 setTimeout(() => {
@@ -718,6 +723,8 @@
                             onboardingScreen.classList.add('active');
                             onboardingScreen.style.display = 'block';
                             console.log('[HTML] Onboarding screen shown');
+                        } else {
+                            console.error('[HTML] Onboarding screen not found!');
                         }
                     } else {
                         const authScreen = document.getElementById('auth-screen');
@@ -725,9 +732,11 @@
                             authScreen.classList.add('active');
                             authScreen.style.display = 'block';
                             console.log('[HTML] Auth screen shown');
+                        } else {
+                            console.error('[HTML] Auth screen not found!');
                         }
                     }
-                }, 100);
+                }, 50);
             } catch (e) {
                 console.error('[HTML] Error:', e);
             }
