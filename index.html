@@ -706,15 +706,31 @@
     </script>
 
     <script>
-        // Скрываем все экраны сразу при загрузке, чтобы не было мелькания
+        // КРИТИЧНО: Скрываем loading screen СРАЗУ при загрузке HTML
         (function() {
-            const allScreens = document.querySelectorAll('.screen');
-            allScreens.forEach(screen => {
-                screen.style.display = 'none';
-                screen.style.visibility = 'hidden';
-                screen.style.opacity = '0';
-                screen.classList.remove('active');
-            });
+            try {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.style.visibility = 'hidden';
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.classList.remove('active');
+                    console.log('[HTML] Loading screen hidden immediately in HTML');
+                }
+                
+                // Скрываем все остальные экраны
+                const allScreens = document.querySelectorAll('.screen');
+                allScreens.forEach(screen => {
+                    if (screen.id !== 'loading-screen') {
+                        screen.style.display = 'none';
+                        screen.style.visibility = 'hidden';
+                        screen.style.opacity = '0';
+                        screen.classList.remove('active');
+                    }
+                });
+            } catch (e) {
+                console.error('[HTML] Error hiding screens:', e);
+            }
         })();
     </script>
 </body>
