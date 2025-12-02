@@ -124,59 +124,38 @@ async function loadFromStorage(key) {
         // ВАЖНО: Проверяем, что WebApp готов
         if (tgReady && tg && tg.CloudStorage) {
             try {
-                console.log(`[STORAGE] Attempting to load from CloudStorage: ${key}`);
-                console.log(`[STORAGE] tg.CloudStorage available:`, !!tg.CloudStorage);
-                console.log(`[STORAGE] tg.CloudStorage.getItem available:`, typeof tg.CloudStorage.getItem);
-                
                 const value = await tg.CloudStorage.getItem(key);
-                console.log(`[STORAGE] CloudStorage.getItem result for ${key}:`, {
-                    isNull: value === null,
-                    isUndefined: value === undefined,
-                    isEmpty: value === '',
-                    type: typeof value,
-                    length: value ? value.length : 0
-                });
-                
                 if (value !== null && value !== undefined && value !== '') {
                     console.log(`[STORAGE] ✓ Loaded from CloudStorage: ${key}, length: ${value.length}`);
                     // Обновляем localStorage для быстрого доступа
                     try {
                         localStorage.setItem(key, value);
-                        console.log(`[STORAGE] ✓ Updated localStorage from CloudStorage: ${key}`);
                     } catch (e) {
                         console.warn('[STORAGE] localStorage sync failed:', e);
                     }
                     return value;
-                } else {
-                    console.log(`[STORAGE] CloudStorage value is null/undefined/empty for: ${key}`);
                 }
             } catch (cloudError) {
                 console.error(`[STORAGE] CloudStorage getItem error for ${key}:`, cloudError);
-                console.error(`[STORAGE] Error details:`, {
-                    name: cloudError?.name,
-                    message: cloudError?.message,
-                    stack: cloudError?.stack
-                });
             }
         }
         
         // Fallback на localStorage (только если CloudStorage пуст или недоступен)
         const value = localStorage.getItem(key);
         if (value !== null && value !== '') {
-            console.log(`[STORAGE] Loaded from localStorage (fallback): ${key}`);
-            // Если CloudStorage доступен, но был пуст, синхронизируем данные из localStorage
+            console.log(`[STORAGE] Loaded from localStorage: ${key}`);
+            // Если CloudStorage доступен, но был пуст, синхронизируем данные из localStorage (асинхронно, не блокируем)
             if (tgReady && tg && tg.CloudStorage) {
-                try {
-                    await tg.CloudStorage.setItem(key, value);
+                // Делаем синхронизацию асинхронно, не ждем
+                tg.CloudStorage.setItem(key, value).then(() => {
                     console.log(`[STORAGE] ✓ Synced localStorage to CloudStorage: ${key}`);
-                } catch (e) {
+                }).catch(e => {
                     console.warn('[STORAGE] CloudStorage sync failed:', e);
-                }
+                });
             }
             return value;
         }
         
-        console.log(`[STORAGE] No data found for: ${key}`);
         return null;
     } catch (error) {
         console.error(`[STORAGE] Error loading ${key}:`, error);
