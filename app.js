@@ -530,6 +530,59 @@ function startApp() {
     }
 })();
 
+// КРИТИЧНО: Показываем экран СРАЗУ, без ожидания
+(function showScreenImmediately() {
+    try {
+        // Скрываем loading screen
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+            loadingScreen.style.visibility = 'hidden';
+            loadingScreen.style.opacity = '0';
+            loadingScreen.classList.remove('active');
+        }
+        
+        // Проверяем localStorage для быстрого показа профиля
+        const savedData = localStorage.getItem('klyro_user_data');
+        if (savedData) {
+            try {
+                const userData = JSON.parse(savedData);
+                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                if (hasProfileData) {
+                    const profileScreen = document.getElementById('profile-screen');
+                    if (profileScreen) {
+                        profileScreen.classList.add('active');
+                        profileScreen.style.display = 'block';
+                        console.log('[IMMEDIATE] Profile screen shown immediately');
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error('[IMMEDIATE] Error parsing data:', e);
+            }
+        }
+        
+        // Показываем онбординг или авторизацию
+        if (window.Telegram && window.Telegram.WebApp) {
+            const onboardingScreen = document.getElementById('onboarding-screen');
+            if (onboardingScreen) {
+                onboardingScreen.classList.add('active');
+                onboardingScreen.style.display = 'block';
+                console.log('[IMMEDIATE] Onboarding screen shown immediately');
+            }
+        } else {
+            const authScreen = document.getElementById('auth-screen');
+            if (authScreen) {
+                authScreen.classList.add('active');
+                authScreen.style.display = 'block';
+                console.log('[IMMEDIATE] Auth screen shown immediately');
+            }
+        }
+    } catch (e) {
+        console.error('[IMMEDIATE] Error showing screen:', e);
+    }
+})();
+
 // Запускаем инициализацию только после полной загрузки скрипта
 if (document.readyState === 'complete') {
     startApp();
