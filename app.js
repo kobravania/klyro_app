@@ -386,6 +386,8 @@ if (document.readyState === 'complete') {
 // Проверка авторизации и загрузка данных
 async function checkUserAuth() {
     try {
+        console.log('[AUTH] Starting checkUserAuth...');
+        
         // Скрываем loading screen
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
@@ -393,19 +395,21 @@ async function checkUserAuth() {
             loadingScreen.style.display = 'none';
         }
         
-        // Скрываем все экраны
-        hideAllScreens();
-        
         // Загружаем данные из хранилища
         let savedData = null;
         
         // Сначала проверяем localStorage (быстро)
         savedData = loadFromStorageSync('klyro_user_data');
+        console.log('[AUTH] localStorage check:', savedData ? 'found' : 'not found');
         
-        // Если нет данных в localStorage, пробуем CloudStorage
+        // Если нет данных в localStorage, пробуем CloudStorage (с таймаутом)
         if (!savedData && tgReady && tg && tg.CloudStorage) {
             try {
-                savedData = await loadFromStorage('klyro_user_data');
+                console.log('[AUTH] Trying CloudStorage...');
+                const cloudPromise = loadFromStorage('klyro_user_data');
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
+                savedData = await Promise.race([cloudPromise, timeoutPromise]);
+                console.log('[AUTH] CloudStorage result:', savedData ? 'found' : 'not found');
             } catch (e) {
                 console.warn('[AUTH] CloudStorage load failed:', e);
             }
@@ -415,6 +419,7 @@ async function checkUserAuth() {
             try {
                 userData = JSON.parse(savedData);
                 const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                console.log('[AUTH] Profile data check:', hasProfileData ? 'complete' : 'incomplete');
                 if (hasProfileData) {
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
@@ -424,6 +429,7 @@ async function checkUserAuth() {
                             lastDiaryHash = getDataHash(diary);
                         }
                     }
+                    console.log('[AUTH] Showing profile screen');
                     showProfileScreen();
                     if (typeof updateUsernameDisplay === 'function') {
                         updateUsernameDisplay();
@@ -459,6 +465,7 @@ async function checkUserAuth() {
                 if (hasExistingProfile) {
                     lastUserDataHash = getDataHash(userData);
                     await saveUserData();
+                    console.log('[AUTH] Showing profile screen (from Telegram)');
                     showProfileScreen();
                     if (typeof loadDiaryFromCloud === 'function') {
                         loadDiaryFromCloud();
@@ -469,6 +476,7 @@ async function checkUserAuth() {
         }
         
         // Если нет данных профиля, показываем онбординг или авторизацию
+        console.log('[AUTH] No profile data, showing onboarding/auth');
         if (window.Telegram && window.Telegram.WebApp) {
             showOnboardingScreen();
         } else {
@@ -476,6 +484,8 @@ async function checkUserAuth() {
         }
     } catch (e) {
         console.error('[AUTH] Error in checkUserAuth:', e);
+        console.error('[AUTH] Stack:', e.stack);
+        // ВАЖНО: Всегда показываем экран, даже при ошибке
         if (window.Telegram && window.Telegram.WebApp) {
             showOnboardingScreen();
         } else {
@@ -486,13 +496,17 @@ async function checkUserAuth() {
 
 // Показать экран авторизации
 function showAuthScreen() {
+    console.log('[SCREEN] showAuthScreen called');
     hideAllScreens();
     const authScreen = document.getElementById('auth-screen');
     if (authScreen) {
         authScreen.classList.add('active');
         authScreen.style.display = 'block';
+        authScreen.style.visibility = 'visible';
+        authScreen.style.opacity = '1';
+        console.log('[SCREEN] Auth screen shown');
     } else {
-        console.error('Auth screen not found');
+        console.error('[SCREEN] Auth screen element not found!');
         return;
     }
     
@@ -736,11 +750,14 @@ function initHeightWeightSliders() {
 
 // Показать экран онбординга
 function showOnboardingScreen() {
+    console.log('[SCREEN] showOnboardingScreen called');
     hideAllScreens();
     const onboardingScreen = document.getElementById('onboarding-screen');
     if (onboardingScreen) {
         onboardingScreen.classList.add('active');
         onboardingScreen.style.display = 'block';
+        onboardingScreen.style.visibility = 'visible';
+        onboardingScreen.style.opacity = '1';
         currentStep = 1;
         updateProgress();
         showStep(1);
@@ -748,18 +765,25 @@ function showOnboardingScreen() {
         // Инициализируем input для даты рождения и слайдеры для роста и веса
         initDateInput();
         initHeightWeightSliders();
+        console.log('[SCREEN] Onboarding screen shown');
+    } else {
+        console.error('[SCREEN] Onboarding screen element not found!');
     }
 }
 
 // Показать экран профиля
 function showProfileScreen() {
+    console.log('[SCREEN] showProfileScreen called');
     hideAllScreens();
     const profileScreen = document.getElementById('profile-screen');
     if (profileScreen) {
         profileScreen.classList.add('active');
         profileScreen.style.display = 'block';
+        profileScreen.style.visibility = 'visible';
+        profileScreen.style.opacity = '1';
+        console.log('[SCREEN] Profile screen shown');
     } else {
-        console.error('Profile screen not found');
+        console.error('[SCREEN] Profile screen element not found!');
         return;
     }
     
