@@ -368,33 +368,12 @@ function initApp() {
     }
     
     // Проверяем данные пользователя (асинхронно для CloudStorage)
-    // Сначала проверяем localStorage для быстрой загрузки
-    try {
-        const quickCheck = loadFromStorageSync('klyro_user_data');
-        if (quickCheck) {
-            try {
-                const quickUserData = JSON.parse(quickCheck);
-                if (quickUserData && (quickUserData.dateOfBirth || quickUserData.age || quickUserData.firstName)) {
-                    userData = quickUserData;
-                    showProfileScreen();
-                    updateUsernameDisplay();
-                }
-            } catch (e) {
-                console.error('Error parsing quick check:', e);
-            }
-        }
-        
-        // Затем загружаем из CloudStorage для синхронизации
-        checkUserAuth().catch(e => {
-            console.error('Error in checkUserAuth:', e);
-            if (!userData) {
-                showAuthScreen();
-            }
-        });
-    } catch (e) {
-        console.error('Error in init:', e);
+    // Всегда вызываем checkUserAuth, который сам решит, что показывать
+    checkUserAuth().catch(e => {
+        console.error('Error in checkUserAuth:', e);
+        // Если произошла ошибка, показываем экран авторизации
         showAuthScreen();
-    }
+    });
 }
 
 // Функция для запуска инициализации
@@ -469,36 +448,35 @@ async function checkUserAuth() {
                     loadDiaryFromCloud();
                     return;
                 } else {
-                    console.log('[AUTH] Profile data incomplete, will show onboarding');
+                    console.log('[AUTH] Profile data incomplete, will check Telegram auth');
                 }
             } catch (e) {
                 console.error('Error parsing saved data:', e);
-                await saveToStorage('klyro_user_data', '');
+                // Очищаем поврежденные данные
+                try {
+                    localStorage.removeItem('klyro_user_data');
+                } catch (e2) {
+                    console.error('Error clearing corrupted data:', e2);
+                }
             }
         }
 
         // Проверяем Telegram авторизацию
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
             const initData = window.Telegram.WebApp.initDataUnsafe;
-            console.log('Telegram initData:', initData);
+            console.log('[AUTH] Telegram initData available');
             
             if (initData.user) {
                 const telegramUser = initData.user;
-                console.log('Telegram user found:', telegramUser);
+                console.log('[AUTH] Telegram user found:', telegramUser);
                 
                 // Если userData еще не загружен из сохраненных данных, создаем базовый объект
                 if (!userData) {
                     userData = {};
                 }
                 
-                // Обновляем данные Telegram (могут измениться), но НЕ перезаписываем данные профиля
                 // Проверяем наличие профиля ДО обновления данных Telegram
                 const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                
-                // Обновляем только если профиль еще не заполнен
-                if (!userData) {
-                    userData = {};
-                }
                 
                 // Обновляем данные Telegram
                 userData.id = telegramUser.id;
@@ -537,15 +515,20 @@ async function checkUserAuth() {
                 }
                 return;
             } else {
-                console.log('Telegram user not found in initData');
+                console.log('[AUTH] Telegram user not found in initData');
             }
         } else {
-            console.log('Telegram WebApp or initDataUnsafe not available');
+            console.log('[AUTH] Telegram WebApp or initDataUnsafe not available');
         }
         
-        // Если нет данных Telegram, показываем экран авторизации
-        console.log('No saved data or Telegram user, showing auth screen');
-        showAuthScreen();
+        // Если нет данных, показываем онбординг (если есть Telegram) или авторизацию
+        if (window.Telegram && window.Telegram.WebApp) {
+            console.log('[AUTH] No profile data, showing onboarding');
+            showOnboardingScreen();
+        } else {
+            console.log('[AUTH] No saved data or Telegram user, showing auth screen');
+            showAuthScreen();
+        }
     } catch (e) {
         console.error('Error in checkUserAuth:', e);
         showAuthScreen();
