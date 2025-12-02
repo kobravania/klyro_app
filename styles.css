@@ -88,9 +88,11 @@ h1, h2, h3, h4, h5, h6 {
     background: transparent; /* Прозрачный, чтобы был виден фон экрана */
 }
 
-/* Loading Screen */
+/* Loading Screen - КРИТИЧНО: скрыт по умолчанию */
 #loading-screen {
-    display: none;
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
