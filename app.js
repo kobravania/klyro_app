@@ -483,7 +483,9 @@ async function checkUserAuth() {
                     // Сразу показываем профиль, без задержек
                     showProfileScreen();
                     // Обновляем username
-                    updateUsernameDisplay();
+                    if (typeof updateUsernameDisplay === 'function') {
+                        updateUsernameDisplay();
+                    }
                     // Загружаем дневник из CloudStorage (если функция определена)
                     if (typeof loadDiaryFromCloud === 'function') {
                         loadDiaryFromCloud();
