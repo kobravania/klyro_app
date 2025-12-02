@@ -22,24 +22,29 @@ if (window.Telegram && window.Telegram.WebApp) {
 async function saveToStorage(key, value) {
     try {
         console.log(`[STORAGE] Attempting to save ${key}, value length: ${value ? value.length : 0}`);
-        // Пробуем использовать Telegram Cloud Storage (синхронизируется между устройствами)
-        if (tg && tg.CloudStorage) {
-            console.log(`[STORAGE] CloudStorage available, saving...`);
-            await tg.CloudStorage.setItem(key, value);
-            console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key}`);
-            // Также сохраняем в localStorage как резервную копию
-            try {
-                localStorage.setItem(key, value);
-                console.log(`[STORAGE] ✓ Saved to localStorage backup: ${key}`);
-            } catch (e) {
-                console.warn('[STORAGE] localStorage backup failed:', e);
-            }
-            return true;
-        } else {
-            // Fallback на localStorage если CloudStorage недоступен
-            console.log(`[STORAGE] CloudStorage not available, using localStorage`);
+        
+        // ВАЖНО: Сначала сохраняем в localStorage для быстрого доступа
+        try {
             localStorage.setItem(key, value);
             console.log(`[STORAGE] ✓ Saved to localStorage: ${key}`);
+        } catch (e) {
+            console.warn('[STORAGE] localStorage save failed:', e);
+        }
+        
+        // Затем сохраняем в Telegram Cloud Storage (синхронизируется между устройствами)
+        if (tg && tg.CloudStorage) {
+            try {
+                console.log(`[STORAGE] Saving to CloudStorage...`);
+                await tg.CloudStorage.setItem(key, value);
+                console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key}`);
+                return true;
+            } catch (cloudError) {
+                console.error(`[STORAGE] ✗ CloudStorage save error:`, cloudError);
+                // Если CloudStorage не работает, хотя бы localStorage сохранен
+                return true;
+            }
+        } else {
+            console.log(`[STORAGE] CloudStorage not available, only localStorage used`);
             return true;
         }
     } catch (error) {
@@ -56,33 +61,40 @@ async function saveToStorage(key, value) {
     }
 }
 
-// Асинхронная загрузка данных
+// Асинхронная загрузка данных (приоритет CloudStorage для синхронизации)
 async function loadFromStorage(key) {
     try {
-        // Пробуем загрузить из Telegram Cloud Storage
+        // ВСЕГДА сначала пробуем загрузить из Telegram Cloud Storage (для синхронизации между устройствами)
         if (tg && tg.CloudStorage) {
-            const value = await tg.CloudStorage.getItem(key);
-            if (value !== null && value !== undefined) {
-                console.log(`[STORAGE] Loaded from CloudStorage: ${key}`);
-                // Обновляем localStorage для быстрого доступа
-                try {
-                    localStorage.setItem(key, value);
-                } catch (e) {
-                    console.warn('[STORAGE] localStorage sync failed:', e);
+            try {
+                const value = await tg.CloudStorage.getItem(key);
+                if (value !== null && value !== undefined && value !== '') {
+                    console.log(`[STORAGE] ✓ Loaded from CloudStorage: ${key}, length: ${value.length}`);
+                    // Обновляем localStorage для быстрого доступа
+                    try {
+                        localStorage.setItem(key, value);
+                        console.log(`[STORAGE] ✓ Updated localStorage from CloudStorage: ${key}`);
+                    } catch (e) {
+                        console.warn('[STORAGE] localStorage sync failed:', e);
+                    }
+                    return value;
+                } else {
+                    console.log(`[STORAGE] CloudStorage value is null/undefined/empty for: ${key}`);
                 }
-                return value;
+            } catch (cloudError) {
+                console.error(`[STORAGE] CloudStorage getItem error for ${key}:`, cloudError);
             }
         }
         
-        // Fallback на localStorage
+        // Fallback на localStorage (только если CloudStorage пуст или недоступен)
         const value = localStorage.getItem(key);
-        if (value !== null) {
-            console.log(`[STORAGE] Loaded from localStorage: ${key}`);
-            // Если CloudStorage доступен, синхронизируем данные
+        if (value !== null && value !== '') {
+            console.log(`[STORAGE] Loaded from localStorage (fallback): ${key}`);
+            // Если CloudStorage доступен, но был пуст, синхронизируем данные из localStorage
             if (tg && tg.CloudStorage) {
                 try {
                     await tg.CloudStorage.setItem(key, value);
-                    console.log(`[STORAGE] Synced to CloudStorage: ${key}`);
+                    console.log(`[STORAGE] ✓ Synced localStorage to CloudStorage: ${key}`);
                 } catch (e) {
                     console.warn('[STORAGE] CloudStorage sync failed:', e);
                 }
@@ -90,12 +102,14 @@ async function loadFromStorage(key) {
             return value;
         }
         
+        console.log(`[STORAGE] No data found for: ${key}`);
         return null;
     } catch (error) {
         console.error(`[STORAGE] Error loading ${key}:`, error);
         // Fallback на localStorage
         try {
-            return localStorage.getItem(key);
+            const value = localStorage.getItem(key);
+            return value;
         } catch (e) {
             console.error(`[STORAGE] localStorage fallback failed:`, e);
             return null;
@@ -363,22 +377,22 @@ async function checkUserAuth() {
         // Сначала скрываем все экраны, чтобы не было мелькания
         hideAllScreens();
         
-        // Проверяем наличие сохранённых данных (сначала из localStorage для быстрой загрузки)
-        let savedData = loadFromStorageSync('klyro_user_data');
-        console.log('[AUTH] Loaded from localStorage:', savedData ? 'found' : 'not found');
-        
-        // Затем загружаем из CloudStorage для синхронизации
+        // ВАЖНО: Сначала загружаем из CloudStorage для синхронизации между устройствами
+        let savedData = null;
         if (tg && tg.CloudStorage) {
             try {
-                const cloudData = await loadFromStorage('klyro_user_data');
-                console.log('[AUTH] Loaded from CloudStorage:', cloudData ? 'found' : 'not found');
-                if (cloudData) {
-                    savedData = cloudData;
-                    console.log('[AUTH] Using CloudStorage data');
-                }
+                savedData = await loadFromStorage('klyro_user_data');
+                console.log('[AUTH] Loaded from CloudStorage:', savedData ? 'found' : 'not found');
             } catch (e) {
-                console.warn('[AUTH] CloudStorage load failed, using localStorage:', e);
+                console.warn('[AUTH] CloudStorage load failed, trying localStorage:', e);
+                // Fallback на localStorage
+                savedData = loadFromStorageSync('klyro_user_data');
+                console.log('[AUTH] Loaded from localStorage (fallback):', savedData ? 'found' : 'not found');
             }
+        } else {
+            // Если CloudStorage недоступен, используем localStorage
+            savedData = loadFromStorageSync('klyro_user_data');
+            console.log('[AUTH] CloudStorage not available, loaded from localStorage:', savedData ? 'found' : 'not found');
         }
         
         if (savedData) {
@@ -425,7 +439,9 @@ async function checkUserAuth() {
                     userData = {};
                 }
                 
-                // Обновляем данные Telegram (могут измениться)
+                // Обновляем данные Telegram (могут измениться), но НЕ перезаписываем данные профиля
+                const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                
                 userData.id = telegramUser.id;
                 userData.firstName = telegramUser.first_name || 'Пользователь';
                 userData.lastName = telegramUser.last_name || '';
@@ -442,13 +458,22 @@ async function checkUserAuth() {
                     lastDiaryHash = getDataHash(diary);
                 }
                 
-                // Сохраняем обновленные данные Telegram
-                await saveUserData();
+                // Сохраняем обновленные данные Telegram (только если профиль уже был заполнен, иначе сохраним после онбординга)
+                if (hasExistingProfile) {
+                    await saveUserData();
+                    console.log('[AUTH] Saved updated Telegram data (profile exists)');
+                } else {
+                    console.log('[AUTH] Profile not complete, will save after onboarding');
+                }
                 
                 // Если есть данные профиля, показываем профиль, иначе онбординг
-                if (userData.dateOfBirth || userData.age || userData.height) {
+                if (hasExistingProfile) {
+                    console.log('[AUTH] Profile data found, showing profile screen');
                     showProfileScreen();
+                    // Загружаем дневник из CloudStorage
+                    loadDiaryFromCloud();
                 } else {
+                    console.log('[AUTH] Profile data incomplete, showing onboarding');
                     showOnboardingScreen();
                 }
                 return;
@@ -966,21 +991,52 @@ async function completeOnboarding() {
     
     // Сохраняем данные
     console.log('[ONBOARDING] Saving user data before showing profile...');
-    await saveUserData();
-    console.log('[ONBOARDING] User data saved, showing profile');
+    console.log('[ONBOARDING] User data to save:', {
+        dateOfBirth: userData.dateOfBirth,
+        age: userData.age,
+        height: userData.height,
+        weight: userData.weight,
+        gender: userData.gender,
+        activity: userData.activity,
+        goal: userData.goal,
+        calories: userData.calories
+    });
     
-    // Проверяем, что данные сохранились
-    const checkData = loadFromStorageSync('klyro_user_data');
-    if (checkData) {
-        const parsed = JSON.parse(checkData);
-        console.log('[ONBOARDING] Verification - saved data:', {
+    await saveUserData();
+    console.log('[ONBOARDING] User data saved, verifying...');
+    
+    // Проверяем, что данные сохранились (проверяем и localStorage и CloudStorage)
+    const checkLocalData = loadFromStorageSync('klyro_user_data');
+    if (checkLocalData) {
+        const parsed = JSON.parse(checkLocalData);
+        console.log('[ONBOARDING] ✓ Verification - localStorage data:', {
             dateOfBirth: parsed.dateOfBirth,
             height: parsed.height,
             weight: parsed.weight,
             gender: parsed.gender
         });
     } else {
-        console.error('[ONBOARDING] ERROR: Data was not saved!');
+        console.error('[ONBOARDING] ✗ ERROR: Data was not saved to localStorage!');
+    }
+    
+    // Проверяем CloudStorage
+    if (tg && tg.CloudStorage) {
+        try {
+            const checkCloudData = await loadFromStorage('klyro_user_data');
+            if (checkCloudData) {
+                const parsed = JSON.parse(checkCloudData);
+                console.log('[ONBOARDING] ✓ Verification - CloudStorage data:', {
+                    dateOfBirth: parsed.dateOfBirth,
+                    height: parsed.height,
+                    weight: parsed.weight,
+                    gender: parsed.gender
+                });
+            } else {
+                console.warn('[ONBOARDING] ⚠ WARNING: Data was not saved to CloudStorage!');
+            }
+        } catch (e) {
+            console.error('[ONBOARDING] ✗ ERROR checking CloudStorage:', e);
+        }
     }
     
     // Показываем профиль
