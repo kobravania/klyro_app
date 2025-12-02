@@ -377,8 +377,11 @@ async function checkUserAuth() {
         if (savedData) {
             try {
                 userData = JSON.parse(savedData);
-                // Проверяем, что данные валидны (есть хотя бы дата рождения/возраст или имя)
-                if (userData && (userData.dateOfBirth || userData.age || userData.firstName)) {
+                console.log('[AUTH] Loaded userData:', userData);
+                // Проверяем, что данные профиля заполнены (дата рождения/возраст И рост)
+                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                if (hasProfileData) {
+                    console.log('[AUTH] Profile data found, showing profile screen');
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
                     const diary = getDiary();
@@ -392,6 +395,8 @@ async function checkUserAuth() {
                     // Загружаем дневник из CloudStorage
                     loadDiaryFromCloud();
                     return;
+                } else {
+                    console.log('[AUTH] Profile data incomplete, will show onboarding');
                 }
             } catch (e) {
                 console.error('Error parsing saved data:', e);
