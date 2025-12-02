@@ -418,8 +418,22 @@ async function checkUserAuth() {
         if (savedData) {
             try {
                 userData = JSON.parse(savedData);
+                console.log('[AUTH] Parsed userData:', {
+                    dateOfBirth: userData.dateOfBirth,
+                    age: userData.age,
+                    height: userData.height,
+                    weight: userData.weight,
+                    gender: userData.gender
+                });
                 const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
                 console.log('[AUTH] Profile data check:', hasProfileData ? 'complete' : 'incomplete');
+                if (!hasProfileData) {
+                    console.warn('[AUTH] Missing profile data:', {
+                        hasDateOfBirth: !!userData.dateOfBirth,
+                        hasAge: !!userData.age,
+                        hasHeight: !!userData.height
+                    });
+                }
                 if (hasProfileData) {
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
@@ -1096,27 +1110,49 @@ function calculateCalories() {
 
 // Сохранение данных пользователя
 async function saveUserData() {
-    if (userData) {
-        const userDataStr = JSON.stringify(userData);
-        console.log('[USERDATA] Saving user data:', userData);
-        // Сохраняем в localStorage для быстрого доступа
-        try {
-            localStorage.setItem('klyro_user_data', userDataStr);
-            console.log('[USERDATA] Saved to localStorage');
-        } catch (e) {
-            console.error('[USERDATA] localStorage save failed:', e);
-        }
-        // Обновляем хэш для отслеживания изменений
-        lastUserDataHash = getDataHash(userData);
-        // Сохраняем в CloudStorage для синхронизации
-        try {
-            await saveToStorage('klyro_user_data', userDataStr);
-            console.log('[USERDATA] Saved to CloudStorage');
-        } catch (e) {
-            console.warn('[USERDATA] CloudStorage save failed:', e);
-        }
-    } else {
+    if (!userData) {
         console.warn('[USERDATA] No userData to save');
+        return;
+    }
+    
+    const userDataStr = JSON.stringify(userData);
+    console.log('[USERDATA] Saving user data:', {
+        dateOfBirth: userData.dateOfBirth,
+        age: userData.age,
+        height: userData.height,
+        weight: userData.weight,
+        gender: userData.gender,
+        activity: userData.activity,
+        goal: userData.goal,
+        dataLength: userDataStr.length
+    });
+    
+    // ВАЖНО: Сохраняем в localStorage СНАЧАЛА (быстро и надежно)
+    try {
+        localStorage.setItem('klyro_user_data', userDataStr);
+        console.log('[USERDATA] ✓ Saved to localStorage');
+        
+        // Проверяем, что сохранилось
+        const verify = localStorage.getItem('klyro_user_data');
+        if (verify === userDataStr) {
+            console.log('[USERDATA] ✓ localStorage verification PASSED');
+        } else {
+            console.error('[USERDATA] ✗ localStorage verification FAILED!');
+            console.error('[USERDATA] Expected length:', userDataStr.length, 'Got:', verify ? verify.length : 'null');
+        }
+    } catch (e) {
+        console.error('[USERDATA] ✗ localStorage save error:', e);
+    }
+    
+    // Обновляем хэш для отслеживания изменений
+    lastUserDataHash = getDataHash(userData);
+    
+    // Сохраняем в CloudStorage для синхронизации (не блокируем, если не работает)
+    try {
+        await saveToStorage('klyro_user_data', userDataStr);
+        console.log('[USERDATA] ✓ Saved to CloudStorage');
+    } catch (e) {
+        console.warn('[USERDATA] ⚠ CloudStorage save failed (but localStorage is OK):', e);
     }
 }
 
