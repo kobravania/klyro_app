@@ -486,35 +486,23 @@ async function checkUserAuth() {
 
 // Показать экран авторизации
 function showAuthScreen() {
-    console.log('showAuthScreen() called');
-    try {
-        // Скрываем все экраны явно
-        const allScreens = document.querySelectorAll('.screen');
-        console.log('Hiding', allScreens.length, 'screens');
-        allScreens.forEach(screen => {
-            screen.classList.remove('active');
-            screen.style.display = 'none';
-        });
-        
-        // Показываем auth screen
-        const authScreen = document.getElementById('auth-screen');
-        if (authScreen) {
-            authScreen.classList.add('active');
-            authScreen.style.display = 'block';
-            console.log('✅ Auth screen activated and visible');
-        } else {
-            console.error('❌ Auth screen element not found!');
-            forceShowAuth();
-            return;
-        }
-    } catch (e) {
-        console.error('Error in showAuthScreen:', e);
-        forceShowAuth();
+    hideAllScreens();
+    const authScreen = document.getElementById('auth-screen');
+    if (authScreen) {
+        authScreen.classList.add('active');
+        authScreen.style.display = 'block';
+    } else {
+        console.error('Auth screen not found');
         return;
     }
     
     const authButton = document.getElementById('auth-button');
-    authButton.addEventListener('click', () => {
+    if (authButton) {
+        // Удаляем старые обработчики, если есть
+        const newAuthButton = authButton.cloneNode(true);
+        authButton.parentNode.replaceChild(newAuthButton, authButton);
+        
+        newAuthButton.addEventListener('click', () => {
         // В реальном приложении здесь должна быть проверка через Telegram
         // Для демо используем данные из initDataUnsafe или создаём тестовые
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -539,7 +527,8 @@ function showAuthScreen() {
             };
         }
         showOnboardingScreen();
-    });
+        });
+    }
 }
 
 // Инициализация кастомного date picker
