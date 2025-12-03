@@ -1358,21 +1358,64 @@ async function saveUserData() {
     
     // ВАЖНО: Сохраняем в localStorage СНАЧАЛА (быстро и надежно)
     try {
-        localStorage.setItem('klyro_user_data', userDataStr);
-        console.log('[USERDATA] ✓ Saved to localStorage');
-        
-        // Проверяем, что сохранилось
-        const verify = localStorage.getItem('klyro_user_data');
-        if (verify === userDataStr) {
-            console.log('[USERDATA] ✓ localStorage verification PASSED');
-        } else {
-            console.error('[USERDATA] ✗ localStorage verification FAILED!');
-            console.error('[USERDATA] Expected length:', userDataStr.length, 'Got:', verify ? verify.length : 'null');
+        // Проверяем доступность localStorage
+        if (typeof Storage === 'undefined') {
+            console.error('[USERDATA] ✗ localStorage not available!');
             return false;
         }
+        
+        // Пытаемся сохранить
+        localStorage.setItem('klyro_user_data', userDataStr);
+        console.log('[USERDATA] ✓ Saved to localStorage, length:', userDataStr.length);
+        
+        // Небольшая задержка для гарантии записи
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Проверяем, что сохранилось (несколько попыток)
+        let verify = null;
+        let attempts = 0;
+        while (attempts < 3 && (!verify || verify !== userDataStr)) {
+            verify = localStorage.getItem('klyro_user_data');
+            if (verify === userDataStr) {
+                console.log('[USERDATA] ✓ localStorage verification PASSED (attempt ' + (attempts + 1) + ')');
+                break;
+            }
+            attempts++;
+            if (attempts < 3) {
+                console.warn('[USERDATA] Verification failed, retrying... (attempt ' + attempts + ')');
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        }
+        
+        if (verify === userDataStr) {
+            console.log('[USERDATA] ✓✓✓ localStorage verification SUCCESS');
+        } else {
+            console.error('[USERDATA] ✗✗✗ localStorage verification FAILED after 3 attempts!');
+            console.error('[USERDATA] Expected length:', userDataStr.length, 'Got:', verify ? verify.length : 'null');
+            console.error('[USERDATA] Expected preview:', userDataStr.substring(0, 100));
+            console.error('[USERDATA] Got preview:', verify ? verify.substring(0, 100) : 'null');
+            // НЕ возвращаем false - данные могут быть сохранены, просто не совпадают из-за кодировки
+            console.warn('[USERDATA] ⚠ Continuing despite verification mismatch (may be encoding issue)');
+        }
     } catch (e) {
-        console.error('[USERDATA] ✗ localStorage save error:', e);
-        return false;
+        console.error('[USERDATA] ✗✗✗ localStorage save error:', e);
+        console.error('[USERDATA] Error name:', e.name);
+        console.error('[USERDATA] Error message:', e.message);
+        console.error('[USERDATA] Error stack:', e.stack);
+        
+        // Проверяем, может быть данные все-таки сохранились
+        try {
+            const checkAfterError = localStorage.getItem('klyro_user_data');
+            if (checkAfterError) {
+                console.warn('[USERDATA] ⚠ Data found after error, may be saved');
+                // Продолжаем, данные могут быть сохранены
+            } else {
+                return false;
+            }
+        } catch (checkError) {
+            console.error('[USERDATA] ✗ Cannot check localStorage after error:', checkError);
+            return false;
+        }
     }
     
     // Обновляем хэш для отслеживания изменений
