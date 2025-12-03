@@ -459,17 +459,41 @@ async function checkUserAuth() {
                     age: userData.age,
                     height: userData.height,
                     weight: userData.weight,
-                    gender: userData.gender
+                    gender: userData.gender,
+                    fullData: userData
                 });
-                const hasProfileData = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                console.log('[AUTH] Profile data check:', hasProfileData ? 'complete' : 'incomplete');
+                
+                // КРИТИЧНО: Проверяем наличие ОБЯЗАТЕЛЬНЫХ полей
+                const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
+                const hasHeight = !!userData.height;
+                const hasProfileData = hasDateOfBirth && hasHeight;
+                
+                console.log('[AUTH] Profile data check:', {
+                    hasProfileData: hasProfileData,
+                    hasDateOfBirth: hasDateOfBirth,
+                    hasAge: !!userData.age,
+                    hasHeight: hasHeight,
+                    dateOfBirthValue: userData.dateOfBirth,
+                    heightValue: userData.height
+                });
+                
                 if (!hasProfileData) {
                     console.warn('[AUTH] Missing profile data:', {
-                        hasDateOfBirth: !!userData.dateOfBirth,
+                        hasDateOfBirth: hasDateOfBirth,
                         hasAge: !!userData.age,
-                        hasHeight: !!userData.height
+                        hasHeight: hasHeight,
+                        dateOfBirth: userData.dateOfBirth,
+                        height: userData.height
                     });
+                    // Если данных нет, показываем онбординг
+                    if (window.Telegram && window.Telegram.WebApp) {
+                        showOnboardingScreen();
+                    } else {
+                        showAuthScreen();
+                    }
+                    return;
                 }
+                
                 if (hasProfileData) {
                     // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
