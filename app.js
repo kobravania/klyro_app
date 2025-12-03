@@ -534,26 +534,38 @@ async function checkUserAuth() {
         }
 
         // Обновляем данные Telegram, если доступны
+        // ВАЖНО: Не перезаписываем существующие данные профиля!
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
             const initData = window.Telegram.WebApp.initDataUnsafe;
             if (initData.user) {
                 if (!userData) userData = {};
                 const telegramUser = initData.user;
+                
+                // Обновляем только Telegram-специфичные поля, НЕ трогаем данные профиля
                 userData.id = telegramUser.id;
-                userData.firstName = telegramUser.first_name || 'Пользователь';
-                userData.lastName = telegramUser.last_name || '';
-                userData.username = telegramUser.username || '';
-                userData.photoUrl = telegramUser.photo_url || '';
+                userData.firstName = telegramUser.first_name || userData.firstName || 'Пользователь';
+                userData.lastName = telegramUser.last_name || userData.lastName || '';
+                userData.username = telegramUser.username || userData.username || '';
+                userData.photoUrl = telegramUser.photo_url || userData.photoUrl || '';
+                
+                console.log('[AUTH] Telegram data merged:', {
+                    id: userData.id,
+                    firstName: userData.firstName,
+                    username: userData.username,
+                    hasProfileData: !!(userData.dateOfBirth || userData.age) && !!userData.height
+                });
                 
                 if (typeof updateUsernameDisplay === 'function') {
                     updateUsernameDisplay();
                 }
                 
+                // Проверяем, есть ли данные профиля (НЕ перезаписываем их!)
                 const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                console.log('[AUTH] After Telegram merge - hasExistingProfile:', hasExistingProfile);
                 if (hasExistingProfile) {
                     lastUserDataHash = getDataHash(userData);
-                    await saveUserData();
-                    console.log('[AUTH] Showing profile screen (from Telegram)');
+                    await saveUserData(); // Сохраняем объединенные данные
+                    console.log('[AUTH] Showing profile screen (from Telegram + saved data)');
                     showProfileScreen();
                     if (typeof loadDiaryFromCloud === 'function') {
                         loadDiaryFromCloud();
