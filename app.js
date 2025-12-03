@@ -433,7 +433,21 @@ async function checkUserAuth() {
         // Сначала проверяем localStorage (быстро)
         try {
             savedData = loadFromStorageSync('klyro_user_data');
-            console.log('[AUTH] localStorage check:', savedData ? 'found' : 'not found');
+            console.log('[AUTH] localStorage check:', savedData ? `found (${savedData.length} chars)` : 'not found');
+            if (savedData) {
+                try {
+                    const testParse = JSON.parse(savedData);
+                    console.log('[AUTH] localStorage test parse:', {
+                        hasDateOfBirth: !!testParse.dateOfBirth,
+                        hasAge: !!testParse.age,
+                        hasHeight: !!testParse.height,
+                        dateOfBirth: testParse.dateOfBirth,
+                        height: testParse.height
+                    });
+                } catch (e) {
+                    console.error('[AUTH] localStorage parse error:', e);
+                }
+            }
         } catch (e) {
             console.error('[AUTH] localStorage read error:', e);
         }
