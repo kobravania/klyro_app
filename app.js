@@ -1132,43 +1132,77 @@ async function completeOnboarding() {
     });
     
     // КРИТИЧНО: Сохраняем данные и ждем подтверждения
+    console.log('[ONBOARDING] About to save userData:', JSON.stringify(userData, null, 2));
     const saveResult = await saveUserData();
     console.log('[ONBOARDING] saveUserData result:', saveResult);
     
+    if (!saveResult) {
+        console.error('[ONBOARDING] ✗ CRITICAL: saveUserData returned false!');
+        showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+        return;
+    }
+    
     // Небольшая задержка для гарантии сохранения
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     console.log('[ONBOARDING] User data saved, verifying...');
     
     // Проверяем, что данные сохранились (проверяем и localStorage и CloudStorage)
-    const checkLocalData = loadFromStorageSync('klyro_user_data');
+    let checkLocalData = null;
+    try {
+        checkLocalData = loadFromStorageSync('klyro_user_data');
+        console.log('[ONBOARDING] localStorage check after save:', checkLocalData ? 'found' : 'NOT FOUND');
+    } catch (e) {
+        console.error('[ONBOARDING] ✗ ERROR reading localStorage:', e);
+    }
+    
     if (checkLocalData) {
         try {
             const parsed = JSON.parse(checkLocalData);
             const hasRequiredData = parsed.dateOfBirth && parsed.height;
             console.log('[ONBOARDING] ✓ Verification - localStorage data:', {
                 dateOfBirth: parsed.dateOfBirth,
+                age: parsed.age,
                 height: parsed.height,
                 weight: parsed.weight,
                 gender: parsed.gender,
-                hasRequiredData: hasRequiredData
+                hasRequiredData: hasRequiredData,
+                fullData: parsed
             });
             
             if (!hasRequiredData) {
                 console.error('[ONBOARDING] ✗ ERROR: Required data missing in saved data!');
                 console.error('[ONBOARDING] Missing:', {
                     dateOfBirth: !parsed.dateOfBirth,
-                    height: !parsed.height
+                    height: !parsed.height,
+                    parsedData: parsed
                 });
+                showNotification('Ошибка: данные не сохранились полностью. Пожалуйста, попробуйте еще раз.');
+                return;
             }
         } catch (e) {
             console.error('[ONBOARDING] ✗ ERROR parsing saved data:', e);
+            showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+            return;
         }
     } else {
-        console.error('[ONBOARDING] ✗ ERROR: Data was not saved to localStorage!');
+        console.error('[ONBOARDING] ✗ CRITICAL ERROR: Data was not saved to localStorage!');
         // Пытаемся сохранить еще раз
         console.log('[ONBOARDING] Retrying save...');
-        await saveUserData();
+        const retryResult = await saveUserData();
+        if (!retryResult) {
+            console.error('[ONBOARDING] ✗ Retry also failed!');
+            showNotification('Критическая ошибка сохранения. Пожалуйста, попробуйте еще раз.');
+            return;
+        }
+        // Проверяем еще раз после повтора
+        await new Promise(resolve => setTimeout(resolve, 300));
+        checkLocalData = loadFromStorageSync('klyro_user_data');
+        if (!checkLocalData) {
+            console.error('[ONBOARDING] ✗ Still no data after retry!');
+            showNotification('Не удалось сохранить данные. Пожалуйста, попробуйте еще раз.');
+            return;
+        }
     }
     
     // Проверяем CloudStorage
@@ -1192,27 +1226,50 @@ async function completeOnboarding() {
     }
     
     // КРИТИЧНО: Проверяем еще раз перед показом профиля
+    await new Promise(resolve => setTimeout(resolve, 100));
     const finalCheck = loadFromStorageSync('klyro_user_data');
+    console.log('[ONBOARDING] Final check - localStorage:', finalCheck ? 'found' : 'NOT FOUND');
+    
     if (finalCheck) {
         try {
             const finalParsed = JSON.parse(finalCheck);
             const hasFinalData = finalParsed.dateOfBirth && finalParsed.height;
+            console.log('[ONBOARDING] Final check - parsed data:', {
+                dateOfBirth: finalParsed.dateOfBirth,
+                height: finalParsed.height,
+                hasFinalData: hasFinalData,
+                fullData: finalParsed
+            });
+            
             if (hasFinalData) {
-                console.log('[ONBOARDING] ✓ Final check passed, showing profile');
+                console.log('[ONBOARDING] ✓✓✓ Final check PASSED, showing profile');
                 userData = finalParsed; // Обновляем userData из сохраненных данных
-                showProfileScreen();
+                // Дополнительная проверка перед показом
+                if (userData.dateOfBirth && userData.height) {
+                    showProfileScreen();
+                    console.log('[ONBOARDING] ✓✓✓ Profile screen shown successfully');
+                } else {
+                    console.error('[ONBOARDING] ✗✗✗ userData still incomplete after assignment!');
+                    console.error('[ONBOARDING] userData:', userData);
+                    showNotification('Ошибка: данные неполные. Пожалуйста, попробуйте еще раз.');
+                }
             } else {
-                console.error('[ONBOARDING] ✗ Final check FAILED - data incomplete!');
+                console.error('[ONBOARDING] ✗✗✗ Final check FAILED - data incomplete!');
+                console.error('[ONBOARDING] Missing:', {
+                    dateOfBirth: !finalParsed.dateOfBirth,
+                    height: !finalParsed.height
+                });
                 console.error('[ONBOARDING] Final data:', finalParsed);
                 showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
             }
         } catch (e) {
-            console.error('[ONBOARDING] ✗ Final check error:', e);
+            console.error('[ONBOARDING] ✗✗✗ Final check error:', e);
+            console.error('[ONBOARDING] Error stack:', e.stack);
             showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
         }
     } else {
-        console.error('[ONBOARDING] ✗ Final check FAILED - no data found!');
-        showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+        console.error('[ONBOARDING] ✗✗✗ Final check FAILED - no data found in localStorage!');
+        showNotification('Критическая ошибка: данные не сохранились. Пожалуйста, попробуйте еще раз.');
     }
 }
 
