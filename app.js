@@ -1167,8 +1167,29 @@ async function completeOnboarding() {
         }
     }
     
-    // Показываем профиль
-    showProfileScreen();
+    // КРИТИЧНО: Проверяем еще раз перед показом профиля
+    const finalCheck = loadFromStorageSync('klyro_user_data');
+    if (finalCheck) {
+        try {
+            const finalParsed = JSON.parse(finalCheck);
+            const hasFinalData = finalParsed.dateOfBirth && finalParsed.height;
+            if (hasFinalData) {
+                console.log('[ONBOARDING] ✓ Final check passed, showing profile');
+                userData = finalParsed; // Обновляем userData из сохраненных данных
+                showProfileScreen();
+            } else {
+                console.error('[ONBOARDING] ✗ Final check FAILED - data incomplete!');
+                console.error('[ONBOARDING] Final data:', finalParsed);
+                showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+            }
+        } catch (e) {
+            console.error('[ONBOARDING] ✗ Final check error:', e);
+            showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+        }
+    } else {
+        console.error('[ONBOARDING] ✗ Final check FAILED - no data found!');
+        showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
+    }
 }
 
 // Расчёт калорий по формуле Mifflin-St Jeor
@@ -1213,7 +1234,7 @@ function calculateCalories() {
 async function saveUserData() {
     if (!userData) {
         console.warn('[USERDATA] No userData to save');
-        return;
+        return false;
     }
     
     const userDataStr = JSON.stringify(userData);
@@ -1240,9 +1261,11 @@ async function saveUserData() {
         } else {
             console.error('[USERDATA] ✗ localStorage verification FAILED!');
             console.error('[USERDATA] Expected length:', userDataStr.length, 'Got:', verify ? verify.length : 'null');
+            return false;
         }
     } catch (e) {
         console.error('[USERDATA] ✗ localStorage save error:', e);
+        return false;
     }
     
     // Обновляем хэш для отслеживания изменений
@@ -1255,6 +1278,8 @@ async function saveUserData() {
     } catch (e) {
         console.warn('[USERDATA] ⚠ CloudStorage save failed (but localStorage is OK):', e);
     }
+    
+    return true;
 }
 
 // Загрузка данных пользователя
