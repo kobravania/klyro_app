@@ -353,14 +353,44 @@ function initApp() {
         }
     }
     
+    // КРИТИЧНО: Гарантируем показ экрана через 1 секунду максимум
+    const screenTimeout = setTimeout(() => {
+        console.warn('[INIT] Timeout: Forcing screen display after 1 second');
+        if (typeof hideAllScreens === 'function') {
+            hideAllScreens();
+        }
+        // Проверяем, есть ли активный экран
+        const activeScreen = document.querySelector('.screen.active');
+        if (!activeScreen) {
+            console.warn('[INIT] No active screen found, showing default');
+            if (window.Telegram && window.Telegram.WebApp) {
+                if (typeof showOnboardingScreen === 'function') {
+                    showOnboardingScreen();
+                }
+            } else {
+                if (typeof showAuthScreen === 'function') {
+                    showAuthScreen();
+                }
+            }
+        }
+    }, 1000);
+    
     // Проверяем данные пользователя - это единственное место, где решается, что показывать
-    checkUserAuth().catch(e => {
+    checkUserAuth().then(() => {
+        clearTimeout(screenTimeout);
+        console.log('[INIT] checkUserAuth completed successfully');
+    }).catch(e => {
+        clearTimeout(screenTimeout);
         console.error('[INIT] Error in checkUserAuth:', e);
         // Fallback - показываем онбординг или авторизацию
         if (window.Telegram && window.Telegram.WebApp) {
-            showOnboardingScreen();
+            if (typeof showOnboardingScreen === 'function') {
+                showOnboardingScreen();
+            }
         } else {
-            showAuthScreen();
+            if (typeof showAuthScreen === 'function') {
+                showAuthScreen();
+            }
         }
     });
 }
@@ -393,21 +423,27 @@ async function checkUserAuth() {
         if (loadingScreen) {
             loadingScreen.classList.remove('active');
             loadingScreen.style.display = 'none';
+            loadingScreen.style.visibility = 'hidden';
+            loadingScreen.style.opacity = '0';
         }
         
         // Загружаем данные из хранилища
         let savedData = null;
         
         // Сначала проверяем localStorage (быстро)
-        savedData = loadFromStorageSync('klyro_user_data');
-        console.log('[AUTH] localStorage check:', savedData ? 'found' : 'not found');
+        try {
+            savedData = loadFromStorageSync('klyro_user_data');
+            console.log('[AUTH] localStorage check:', savedData ? 'found' : 'not found');
+        } catch (e) {
+            console.error('[AUTH] localStorage read error:', e);
+        }
         
         // Если нет данных в localStorage, пробуем CloudStorage (с таймаутом)
         if (!savedData && tgReady && tg && tg.CloudStorage) {
             try {
                 console.log('[AUTH] Trying CloudStorage...');
                 const cloudPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
                 console.log('[AUTH] CloudStorage result:', savedData ? 'found' : 'not found');
             } catch (e) {
@@ -1071,21 +1107,44 @@ async function completeOnboarding() {
         calories: userData.calories
     });
     
-    await saveUserData();
+    // КРИТИЧНО: Сохраняем данные и ждем подтверждения
+    const saveResult = await saveUserData();
+    console.log('[ONBOARDING] saveUserData result:', saveResult);
+    
+    // Небольшая задержка для гарантии сохранения
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     console.log('[ONBOARDING] User data saved, verifying...');
     
     // Проверяем, что данные сохранились (проверяем и localStorage и CloudStorage)
     const checkLocalData = loadFromStorageSync('klyro_user_data');
     if (checkLocalData) {
-        const parsed = JSON.parse(checkLocalData);
-        console.log('[ONBOARDING] ✓ Verification - localStorage data:', {
-            dateOfBirth: parsed.dateOfBirth,
-            height: parsed.height,
-            weight: parsed.weight,
-            gender: parsed.gender
-        });
+        try {
+            const parsed = JSON.parse(checkLocalData);
+            const hasRequiredData = parsed.dateOfBirth && parsed.height;
+            console.log('[ONBOARDING] ✓ Verification - localStorage data:', {
+                dateOfBirth: parsed.dateOfBirth,
+                height: parsed.height,
+                weight: parsed.weight,
+                gender: parsed.gender,
+                hasRequiredData: hasRequiredData
+            });
+            
+            if (!hasRequiredData) {
+                console.error('[ONBOARDING] ✗ ERROR: Required data missing in saved data!');
+                console.error('[ONBOARDING] Missing:', {
+                    dateOfBirth: !parsed.dateOfBirth,
+                    height: !parsed.height
+                });
+            }
+        } catch (e) {
+            console.error('[ONBOARDING] ✗ ERROR parsing saved data:', e);
+        }
     } else {
         console.error('[ONBOARDING] ✗ ERROR: Data was not saved to localStorage!');
+        // Пытаемся сохранить еще раз
+        console.log('[ONBOARDING] Retrying save...');
+        await saveUserData();
     }
     
     // Проверяем CloudStorage
