@@ -1157,146 +1157,11 @@ async function completeOnboarding() {
         calories: userData.calories
     });
     
-    // КРИТИЧНО: Сохраняем данные и ждем подтверждения
-    console.log('[ONBOARDING] About to save userData:', JSON.stringify(userData, null, 2));
-    const saveResult = await saveUserData();
-    console.log('[ONBOARDING] saveUserData result:', saveResult);
+    // Сохраняем данные
+    await saveUserData();
     
-    if (!saveResult) {
-        console.error('[ONBOARDING] ✗ CRITICAL: saveUserData returned false!');
-        showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
-        return;
-    }
-    
-    // Небольшая задержка для гарантии сохранения
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    console.log('[ONBOARDING] User data saved, verifying...');
-    
-    // Проверяем, что данные сохранились (проверяем и localStorage и CloudStorage)
-    let checkLocalData = null;
-    try {
-        checkLocalData = loadFromStorageSync('klyro_user_data');
-        console.log('[ONBOARDING] localStorage check after save:', checkLocalData ? 'found' : 'NOT FOUND');
-    } catch (e) {
-        console.error('[ONBOARDING] ✗ ERROR reading localStorage:', e);
-    }
-    
-    if (checkLocalData) {
-        try {
-            const parsed = JSON.parse(checkLocalData);
-            const hasRequiredData = parsed.dateOfBirth && parsed.height;
-            console.log('[ONBOARDING] ✓ Verification - localStorage data:', {
-                dateOfBirth: parsed.dateOfBirth,
-                age: parsed.age,
-                height: parsed.height,
-                weight: parsed.weight,
-                gender: parsed.gender,
-                hasRequiredData: hasRequiredData,
-                fullData: parsed
-            });
-            
-            if (!hasRequiredData) {
-                console.error('[ONBOARDING] ✗ ERROR: Required data missing in saved data!');
-                console.error('[ONBOARDING] Missing:', {
-                    dateOfBirth: !parsed.dateOfBirth,
-                    height: !parsed.height,
-                    parsedData: parsed
-                });
-                showNotification('Ошибка: данные не сохранились полностью. Пожалуйста, попробуйте еще раз.');
-                return;
-            }
-        } catch (e) {
-            console.error('[ONBOARDING] ✗ ERROR parsing saved data:', e);
-            showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
-            return;
-        }
-    } else {
-        console.error('[ONBOARDING] ✗ CRITICAL ERROR: Data was not saved to localStorage!');
-        // Пытаемся сохранить еще раз
-        console.log('[ONBOARDING] Retrying save...');
-        const retryResult = await saveUserData();
-        if (!retryResult) {
-            console.error('[ONBOARDING] ✗ Retry also failed!');
-            showNotification('Критическая ошибка сохранения. Пожалуйста, попробуйте еще раз.');
-            return;
-        }
-        // Проверяем еще раз после повтора
-        await new Promise(resolve => setTimeout(resolve, 300));
-        checkLocalData = loadFromStorageSync('klyro_user_data');
-        if (!checkLocalData) {
-            console.error('[ONBOARDING] ✗ Still no data after retry!');
-            showNotification('Не удалось сохранить данные. Пожалуйста, попробуйте еще раз.');
-            return;
-        }
-    }
-    
-    // Проверяем CloudStorage
-    if (tg && tg.CloudStorage) {
-        try {
-            const checkCloudData = await loadFromStorage('klyro_user_data');
-            if (checkCloudData) {
-                const parsed = JSON.parse(checkCloudData);
-                console.log('[ONBOARDING] ✓ Verification - CloudStorage data:', {
-                    dateOfBirth: parsed.dateOfBirth,
-                    height: parsed.height,
-                    weight: parsed.weight,
-                    gender: parsed.gender
-                });
-            } else {
-                console.warn('[ONBOARDING] ⚠ WARNING: Data was not saved to CloudStorage!');
-            }
-        } catch (e) {
-            console.error('[ONBOARDING] ✗ ERROR checking CloudStorage:', e);
-        }
-    }
-    
-    // КРИТИЧНО: Проверяем еще раз перед показом профиля
-    await new Promise(resolve => setTimeout(resolve, 100));
-    const finalCheck = loadFromStorageSync('klyro_user_data');
-    console.log('[ONBOARDING] Final check - localStorage:', finalCheck ? 'found' : 'NOT FOUND');
-    
-    if (finalCheck) {
-        try {
-            const finalParsed = JSON.parse(finalCheck);
-            const hasFinalData = finalParsed.dateOfBirth && finalParsed.height;
-            console.log('[ONBOARDING] Final check - parsed data:', {
-                dateOfBirth: finalParsed.dateOfBirth,
-                height: finalParsed.height,
-                hasFinalData: hasFinalData,
-                fullData: finalParsed
-            });
-            
-            if (hasFinalData) {
-                console.log('[ONBOARDING] ✓✓✓ Final check PASSED, showing profile');
-                userData = finalParsed; // Обновляем userData из сохраненных данных
-                // Дополнительная проверка перед показом
-                if (userData.dateOfBirth && userData.height) {
-                    showProfileScreen();
-                    console.log('[ONBOARDING] ✓✓✓ Profile screen shown successfully');
-                } else {
-                    console.error('[ONBOARDING] ✗✗✗ userData still incomplete after assignment!');
-                    console.error('[ONBOARDING] userData:', userData);
-                    showNotification('Ошибка: данные неполные. Пожалуйста, попробуйте еще раз.');
-                }
-            } else {
-                console.error('[ONBOARDING] ✗✗✗ Final check FAILED - data incomplete!');
-                console.error('[ONBOARDING] Missing:', {
-                    dateOfBirth: !finalParsed.dateOfBirth,
-                    height: !finalParsed.height
-                });
-                console.error('[ONBOARDING] Final data:', finalParsed);
-                showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
-            }
-        } catch (e) {
-            console.error('[ONBOARDING] ✗✗✗ Final check error:', e);
-            console.error('[ONBOARDING] Error stack:', e.stack);
-            showNotification('Ошибка сохранения данных. Пожалуйста, попробуйте еще раз.');
-        }
-    } else {
-        console.error('[ONBOARDING] ✗✗✗ Final check FAILED - no data found in localStorage!');
-        showNotification('Критическая ошибка: данные не сохранились. Пожалуйста, попробуйте еще раз.');
-    }
+    // Показываем профиль
+    showProfileScreen();
 }
 
 // Расчёт калорий по формуле Mifflin-St Jeor
@@ -1341,95 +1206,33 @@ function calculateCalories() {
 async function saveUserData() {
     if (!userData) {
         console.warn('[USERDATA] No userData to save');
-        return false;
+        return;
     }
     
     const userDataStr = JSON.stringify(userData);
-    console.log('[USERDATA] Saving user data:', {
-        dateOfBirth: userData.dateOfBirth,
-        age: userData.age,
-        height: userData.height,
-        weight: userData.weight,
-        gender: userData.gender,
-        activity: userData.activity,
-        goal: userData.goal,
-        dataLength: userDataStr.length
-    });
+    console.log('[USERDATA] Saving user data');
     
-    // ВАЖНО: Сохраняем в localStorage СНАЧАЛА (быстро и надежно)
+    // Простое сохранение в localStorage
     try {
-        // Проверяем доступность localStorage
-        if (typeof Storage === 'undefined') {
-            console.error('[USERDATA] ✗ localStorage not available!');
-            return false;
-        }
-        
-        // Пытаемся сохранить
         localStorage.setItem('klyro_user_data', userDataStr);
-        console.log('[USERDATA] ✓ Saved to localStorage, length:', userDataStr.length);
-        
-        // Небольшая задержка для гарантии записи
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Проверяем, что сохранилось (несколько попыток)
-        let verify = null;
-        let attempts = 0;
-        while (attempts < 3 && (!verify || verify !== userDataStr)) {
-            verify = localStorage.getItem('klyro_user_data');
-            if (verify === userDataStr) {
-                console.log('[USERDATA] ✓ localStorage verification PASSED (attempt ' + (attempts + 1) + ')');
-                break;
-            }
-            attempts++;
-            if (attempts < 3) {
-                console.warn('[USERDATA] Verification failed, retrying... (attempt ' + attempts + ')');
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-        }
-        
-        if (verify === userDataStr) {
-            console.log('[USERDATA] ✓✓✓ localStorage verification SUCCESS');
-        } else {
-            console.error('[USERDATA] ✗✗✗ localStorage verification FAILED after 3 attempts!');
-            console.error('[USERDATA] Expected length:', userDataStr.length, 'Got:', verify ? verify.length : 'null');
-            console.error('[USERDATA] Expected preview:', userDataStr.substring(0, 100));
-            console.error('[USERDATA] Got preview:', verify ? verify.substring(0, 100) : 'null');
-            // НЕ возвращаем false - данные могут быть сохранены, просто не совпадают из-за кодировки
-            console.warn('[USERDATA] ⚠ Continuing despite verification mismatch (may be encoding issue)');
-        }
+        console.log('[USERDATA] Saved to localStorage');
     } catch (e) {
-        console.error('[USERDATA] ✗✗✗ localStorage save error:', e);
-        console.error('[USERDATA] Error name:', e.name);
-        console.error('[USERDATA] Error message:', e.message);
-        console.error('[USERDATA] Error stack:', e.stack);
-        
-        // Проверяем, может быть данные все-таки сохранились
-        try {
-            const checkAfterError = localStorage.getItem('klyro_user_data');
-            if (checkAfterError) {
-                console.warn('[USERDATA] ⚠ Data found after error, may be saved');
-                // Продолжаем, данные могут быть сохранены
-            } else {
-                return false;
-            }
-        } catch (checkError) {
-            console.error('[USERDATA] ✗ Cannot check localStorage after error:', checkError);
-            return false;
-        }
+        console.error('[USERDATA] localStorage save error:', e);
+        return;
     }
     
     // Обновляем хэш для отслеживания изменений
     lastUserDataHash = getDataHash(userData);
     
-    // Сохраняем в CloudStorage для синхронизации (не блокируем, если не работает)
-    try {
-        await saveToStorage('klyro_user_data', userDataStr);
-        console.log('[USERDATA] ✓ Saved to CloudStorage');
-    } catch (e) {
-        console.warn('[USERDATA] ⚠ CloudStorage save failed (but localStorage is OK):', e);
+    // Сохраняем в CloudStorage для синхронизации (асинхронно, не блокируем)
+    if (tgReady && tg && tg.CloudStorage) {
+        try {
+            await tg.CloudStorage.setItem('klyro_user_data', userDataStr);
+            console.log('[USERDATA] Saved to CloudStorage');
+        } catch (e) {
+            console.warn('[USERDATA] CloudStorage save failed:', e);
+        }
     }
-    
-    return true;
 }
 
 // Загрузка данных пользователя
