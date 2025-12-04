@@ -526,28 +526,66 @@ function initApp() {
             }
         }
         
-        if (tg && tgReady && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            addDebugLog('info', 'Запуск синхронизации данных', null, {
-                tgReady: tgReady,
-                hasCloudStorage: !!tg.CloudStorage,
-                hasSetItem: typeof tg.CloudStorage.setItem === 'function',
-                hasGetItem: typeof tg.CloudStorage.getItem === 'function'
-            });
-            startDataSync();
-        } else {
-            addDebugLog('warn', 'Синхронизация данных не запущена - CloudStorage недоступен', null, {
-                tgReady: tgReady,
-                hasTg: !!tg,
-                hasCloudStorage: tg ? !!tg.CloudStorage : false,
-                hasSetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false,
-                hasGetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false
-            });
+        // Ждем инициализации CloudStorage перед запуском синхронизации
+        let waitAttempts = 0;
+        const maxWaitAttempts = 50; // Максимум 5 секунд ожидания
+        
+        function waitForCloudStorageAndStart() {
+            waitAttempts++;
+            
+            if (tgReady) {
+                addDebugLog('info', '✅ CloudStorage готов, запускаем синхронизацию и проверку авторизации', null, {
+                    waitAttempts: waitAttempts,
+                    tgReady: tgReady
+                });
+                
+                if (tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+                    addDebugLog('info', '✅ Запуск синхронизации данных', null, {
+                        tgReady: tgReady,
+                        hasCloudStorage: !!tg.CloudStorage,
+                        hasSetItem: typeof tg.CloudStorage.setItem === 'function',
+                        hasGetItem: typeof tg.CloudStorage.getItem === 'function'
+                    });
+                    startDataSync();
+                } else {
+                    addDebugLog('warn', '⚠️ Синхронизация данных не запущена - CloudStorage недоступен', null, {
+                        tgReady: tgReady,
+                        hasTg: !!tg,
+                        hasCloudStorage: tg ? !!tg.CloudStorage : false,
+                        hasSetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false,
+                        hasGetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false
+                    });
+                }
+                
+                addDebugLog('info', 'Запуск проверки авторизации');
+                checkUserAuth().catch(e => {
+                    addDebugLog('error', 'Ошибка в checkUserAuth', e);
+                });
+            } else if (waitAttempts < maxWaitAttempts) {
+                // Ждем еще 100ms и проверяем снова
+                if (waitAttempts % 10 === 0) { // Логируем каждые 10 попыток
+                    addDebugLog('info', `Ожидание инициализации CloudStorage... (попытка ${waitAttempts}/${maxWaitAttempts})`, null, {
+                        tgReady: tgReady,
+                        hasTg: !!tg,
+                        hasCloudStorage: tg ? !!tg.CloudStorage : false
+                    });
+                }
+                setTimeout(waitForCloudStorageAndStart, 100);
+            } else {
+                // Таймаут - запускаем без CloudStorage
+                addDebugLog('warn', '⚠️ Таймаут ожидания CloudStorage, запускаем без синхронизации', null, {
+                    waitAttempts: waitAttempts,
+                    tgReady: tgReady
+                });
+                addDebugLog('info', 'Запуск проверки авторизации (без CloudStorage)');
+                checkUserAuth().catch(e => {
+                    addDebugLog('error', 'Ошибка в checkUserAuth', e);
+                });
+            }
         }
         
-        addDebugLog('info', 'Запуск проверки авторизации');
-        checkUserAuth().catch(e => {
-            addDebugLog('error', 'Ошибка в checkUserAuth', e);
-        });
+        // Начинаем ожидание инициализации
+        waitForCloudStorageAndStart();
     } catch (e) {
         addDebugLog('error', 'Критическая ошибка при инициализации приложения', e);
         const screen = document.getElementById('auth-screen') || document.getElementById('onboarding-screen');
