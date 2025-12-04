@@ -1300,35 +1300,67 @@ function setQuickAmount(grams) {
 }
 
 function addFoodToDiary() {
-    if (!selectedProduct) {
-        showNotification('Выберите продукт');
-        return;
-    }
-    
-    const gramsEl = document.getElementById('product-grams');
-    if (!gramsEl) return;
-    
-    const grams = parseFloat(gramsEl.value) || 100;
-    const multiplier = grams / 100;
-    
-    const entry = {
-        id: Date.now().toString(),
-        name: selectedProduct.name,
-        grams: grams,
-        kcal: selectedProduct.kcal * multiplier,
-        protein: selectedProduct.protein * multiplier,
-        fat: selectedProduct.fat * multiplier,
-        carbs: selectedProduct.carbs * multiplier,
-        timestamp: new Date().toISOString()
-    };
-    
-    addDiaryEntry(currentDiaryDate, entry).then(() => {
-        showNotification('Продукт добавлен в дневник!');
-        showDiaryScreen();
-    }).catch(e => {
-        console.error('[DIARY] Error:', e);
+    try {
+        if (!selectedProduct) {
+            showNotification('Выберите продукт');
+            return;
+        }
+        
+        // Проверяем, что у продукта есть все необходимые поля
+        if (!selectedProduct.name || selectedProduct.kcal === undefined) {
+            console.error('[DIARY] Invalid product data:', selectedProduct);
+            showNotification('Ошибка: неверные данные продукта');
+            return;
+        }
+        
+        const gramsEl = document.getElementById('product-grams');
+        if (!gramsEl) {
+            console.error('[DIARY] product-grams element not found');
+            return;
+        }
+        
+        const grams = parseFloat(gramsEl.value) || 100;
+        if (isNaN(grams) || grams <= 0) {
+            showNotification('Введите корректное количество');
+            return;
+        }
+        
+        const multiplier = grams / 100;
+        
+        const entry = {
+            id: Date.now().toString(),
+            name: selectedProduct.name || 'Неизвестный продукт',
+            grams: grams,
+            kcal: (selectedProduct.kcal || 0) * multiplier,
+            protein: (selectedProduct.protein || 0) * multiplier,
+            fat: (selectedProduct.fat || 0) * multiplier,
+            carbs: (selectedProduct.carbs || 0) * multiplier,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Проверяем, что entry валиден перед сохранением
+        if (!entry.id || !entry.name || entry.kcal === undefined) {
+            console.error('[DIARY] Invalid entry:', entry);
+            showNotification('Ошибка: неверные данные записи');
+            return;
+        }
+        
+        addDiaryEntry(currentDiaryDate, entry).then(() => {
+            showNotification('Продукт добавлен в дневник!');
+            showDiaryScreen();
+        }).catch(e => {
+            console.error('[DIARY] Error adding entry:', e);
+            console.error('[DIARY] Error details:', {
+                name: e?.name,
+                message: e?.message,
+                stack: e?.stack
+            });
+            showNotification('Ошибка при добавлении продукта');
+        });
+    } catch (e) {
+        console.error('[DIARY] Unexpected error in addFoodToDiary:', e);
         showNotification('Ошибка при добавлении продукта');
-    });
+    }
 }
 
 function showCustomProductForm() {
@@ -1374,16 +1406,37 @@ async function loadDiaryFromCloud() {
 }
 
 function getDiary() {
-    const diaryStr = loadFromStorageSync('klyro_diary');
-    return diaryStr ? JSON.parse(diaryStr) : {};
+    try {
+        const diaryStr = loadFromStorageSync('klyro_diary');
+        if (!diaryStr) return {};
+        return JSON.parse(diaryStr);
+    } catch (e) {
+        console.error('[DIARY] Error parsing diary:', e);
+        // Если данные повреждены, возвращаем пустой объект
+        localStorage.removeItem('klyro_diary');
+        return {};
+    }
 }
 
 async function saveDiary(diary) {
-    const diaryStr = JSON.stringify(diary);
-    
-    // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
-    await saveToStorage('klyro_diary', diaryStr);
-    lastDiaryHash = getDataHash(diary);
+    try {
+        const diaryStr = JSON.stringify(diary);
+        
+        // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
+        await saveToStorage('klyro_diary', diaryStr);
+        lastDiaryHash = getDataHash(diary);
+    } catch (e) {
+        console.error('[DIARY] Save error:', e);
+        // Пытаемся сохранить хотя бы в localStorage
+        try {
+            const diaryStr = JSON.stringify(diary);
+            localStorage.setItem('klyro_diary', diaryStr);
+            lastDiaryHash = getDataHash(diary);
+        } catch (e2) {
+            console.error('[DIARY] localStorage save also failed:', e2);
+            throw e; // Пробрасываем исходную ошибку
+        }
+    }
 }
 
 function getDiaryForDate(date) {
@@ -1392,12 +1445,22 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    const diary = getDiary();
-    if (!diary[date]) {
-        diary[date] = [];
+    try {
+        // Проверяем, что entry содержит все необходимые поля
+        if (!entry || !entry.id || !entry.name || entry.kcal === undefined) {
+            throw new Error('Invalid entry data');
+        }
+        
+        const diary = getDiary();
+        if (!diary[date]) {
+            diary[date] = [];
+        }
+        diary[date].push(entry);
+        await saveDiary(diary);
+    } catch (e) {
+        console.error('[DIARY] Add entry error:', e);
+        throw e; // Пробрасываем ошибку для обработки в addFoodToDiary
     }
-    diary[date].push(entry);
-    await saveDiary(diary);
 }
 
 async function removeDiaryEntry(date, entryId) {
