@@ -509,11 +509,22 @@ function initApp() {
             }
         }
         
-        if (tg && tgReady && tg.CloudStorage) {
-            addDebugLog('info', 'Запуск синхронизации данных');
+        if (tg && tgReady && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            addDebugLog('info', 'Запуск синхронизации данных', null, {
+                tgReady: tgReady,
+                hasCloudStorage: !!tg.CloudStorage,
+                hasSetItem: typeof tg.CloudStorage.setItem === 'function',
+                hasGetItem: typeof tg.CloudStorage.getItem === 'function'
+            });
             startDataSync();
         } else {
-            addDebugLog('warn', 'Синхронизация данных не запущена - CloudStorage недоступен');
+            addDebugLog('warn', 'Синхронизация данных не запущена - CloudStorage недоступен', null, {
+                tgReady: tgReady,
+                hasTg: !!tg,
+                hasCloudStorage: tg ? !!tg.CloudStorage : false,
+                hasSetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false,
+                hasGetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false
+            });
         }
         
         addDebugLog('info', 'Запуск проверки авторизации');
