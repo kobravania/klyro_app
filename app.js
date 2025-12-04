@@ -8,9 +8,17 @@ function initTelegramWebApp() {
         tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
+        
+        // Увеличиваем задержку для полной инициализации CloudStorage в Telegram Web App
         setTimeout(() => {
-            tgReady = true;
-        }, 100);
+            // Проверяем, что CloudStorage действительно доступен
+            if (tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+                tgReady = true;
+            } else {
+                // Если CloudStorage недоступен, все равно помечаем как готовый (будет использоваться только localStorage)
+                tgReady = true;
+            }
+        }, 300);
     } else {
         tg = {
             ready: () => {},
@@ -39,24 +47,41 @@ async function saveToStorage(key, value) {
         localStorage.setItem(key, value);
         
         // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
-        if (tgReady && tg && tg.CloudStorage) {
+        // Проверяем готовность более тщательно
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
             try {
-                await tg.CloudStorage.setItem(key, value);
+                // Используем Promise с таймаутом для CloudStorage (может зависнуть)
+                const savePromise = tg.CloudStorage.setItem(key, value);
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('CloudStorage timeout')), 5000)
+                );
+                
+                await Promise.race([savePromise, timeoutPromise]);
+                
                 // Обновляем хэш после успешного сохранения
                 if (key === 'klyro_diary') {
-                    const diary = JSON.parse(value);
-                    lastDiaryHash = getDataHash(diary);
+                    try {
+                        const diary = JSON.parse(value);
+                        lastDiaryHash = getDataHash(diary);
+                    } catch (e) {
+                        // Игнорируем ошибку парсинга для хэша
+                    }
                 } else if (key === 'klyro_user_data') {
-                    const data = JSON.parse(value);
-                    lastUserDataHash = getDataHash(data);
+                    try {
+                        const data = JSON.parse(value);
+                        lastUserDataHash = getDataHash(data);
+                    } catch (e) {
+                        // Игнорируем ошибку парсинга для хэша
+                    }
                 }
             } catch (e) {
-                console.error(`[STORAGE] CloudStorage save error:`, e);
+                // Если CloudStorage не работает, данные все равно сохранены в localStorage
+                // Не пробрасываем ошибку дальше - localStorage достаточно
             }
         }
         return true;
     } catch (error) {
-        console.error(`[STORAGE] Error saving ${key}:`, error);
+        // Критическая ошибка - пытаемся сохранить хотя бы в localStorage
         try {
             localStorage.setItem(key, value);
             return true;
@@ -1422,9 +1447,22 @@ async function saveDiary(diary) {
     try {
         const diaryStr = JSON.stringify(diary);
         
-        // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
-        await saveToStorage('klyro_diary', diaryStr);
+        // Сохраняем в localStorage сразу
+        localStorage.setItem('klyro_diary', diaryStr);
         lastDiaryHash = getDataHash(diary);
+        
+        // Затем синхронизируем в CloudStorage (не блокируем, если не работает)
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            try {
+                const savePromise = tg.CloudStorage.setItem('klyro_diary', diaryStr);
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 3000)
+                );
+                await Promise.race([savePromise, timeoutPromise]);
+            } catch (e) {
+                // Игнорируем ошибки CloudStorage - данные уже в localStorage
+            }
+        }
     } catch (e) {
         console.error('[DIARY] Save error:', e);
         // Пытаемся сохранить хотя бы в localStorage
@@ -1434,7 +1472,7 @@ async function saveDiary(diary) {
             lastDiaryHash = getDataHash(diary);
         } catch (e2) {
             console.error('[DIARY] localStorage save also failed:', e2);
-            throw e; // Пробрасываем исходную ошибку
+            throw e; // Пробрасываем исходную ошибку только если localStorage тоже не работает
         }
     }
 }
