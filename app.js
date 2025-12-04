@@ -1692,7 +1692,7 @@ function setQuickAmount(grams) {
     updateProductPreview();
 }
 
-async function addFoodToDiary() {
+function addFoodToDiary() {
     if (!selectedProduct) {
         console.error('[DIARY] No product selected');
         showNotification('Выберите продукт');
@@ -1725,15 +1725,15 @@ async function addFoodToDiary() {
         timestamp: new Date().toISOString()
     };
     
-    try {
-        await addDiaryEntry(currentDiaryDate, entry);
+    // Выполняем добавление асинхронно, но не блокируем UI
+    addDiaryEntry(currentDiaryDate, entry).then(() => {
         console.log('[DIARY] ✓ Food added successfully');
         showNotification('Продукт добавлен в дневник!');
         showDiaryScreen();
-    } catch (e) {
+    }).catch(e => {
         console.error('[DIARY] ✗ Error adding food:', e);
         showNotification('Ошибка при добавлении продукта');
-    }
+    });
 }
 
 function showCustomProductForm() {
