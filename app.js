@@ -606,14 +606,45 @@ function initApp() {
         showDefaultScreen();
     }
     
-    // КРИТИЧНО: Дополнительная проверка через 2 секунды - если ничего не показалось, показываем экран по умолчанию
-    setTimeout(() => {
-        const activeScreen = document.querySelector('.screen.active');
-        if (!activeScreen || activeScreen.style.display === 'none') {
-            addDebugLog('warn', '⚠️ Ни один экран не активен через 2 секунды, показываем экран по умолчанию');
-            showDefaultScreen();
-        }
-    }, 2000);
+        // КРИТИЧНО: Дополнительная проверка через 1 секунду - если ничего не показалось, показываем экран по умолчанию
+        setTimeout(() => {
+            const activeScreen = document.querySelector('.screen.active');
+            const isVisible = activeScreen && 
+                             activeScreen.style.display !== 'none' && 
+                             activeScreen.style.visibility !== 'hidden' &&
+                             activeScreen.style.opacity !== '0';
+            if (!isVisible) {
+                addDebugLog('warn', '⚠️ Ни один экран не виден через 1 секунду, показываем экран по умолчанию', null, {
+                    hasActiveScreen: !!activeScreen,
+                    display: activeScreen?.style.display,
+                    visibility: activeScreen?.style.visibility,
+                    opacity: activeScreen?.style.opacity
+                });
+                showDefaultScreen();
+            }
+        }, 1000);
+        
+        // Еще одна проверка через 3 секунды для надежности
+        setTimeout(() => {
+            const activeScreen = document.querySelector('.screen.active');
+            const isVisible = activeScreen && 
+                             activeScreen.style.display !== 'none' && 
+                             activeScreen.style.visibility !== 'hidden' &&
+                             activeScreen.style.opacity !== '0';
+            if (!isVisible) {
+                addDebugLog('error', '❌ КРИТИЧНО: Ни один экран не виден через 3 секунды!', null, {
+                    hasActiveScreen: !!activeScreen,
+                    allScreens: Array.from(document.querySelectorAll('.screen')).map(s => ({
+                        id: s.id,
+                        hasActive: s.classList.contains('active'),
+                        display: s.style.display,
+                        visibility: s.style.visibility,
+                        opacity: s.style.opacity
+                    }))
+                });
+                showDefaultScreen();
+            }
+        }, 3000);
 }
 
 function startApp() {
