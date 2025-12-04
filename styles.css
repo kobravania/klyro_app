@@ -1574,3 +1574,96 @@ select.input {
     }
 }
 
+/* Debug Screen */
+.debug-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--background-card);
+    border-radius: 12px;
+}
+
+.debug-controls .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.debug-logs {
+    background: var(--background-card);
+    border-radius: 12px;
+    padding: 15px;
+    max-height: 60vh;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+.debug-log-entry {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.debug-log-entry.info {
+    border-left-color: #5DADE2;
+}
+
+.debug-log-entry.warn {
+    border-left-color: #F39C12;
+    background: rgba(243, 156, 18, 0.1);
+}
+
+.debug-log-entry.error {
+    border-left-color: #E74C3C;
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.debug-log-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.debug-log-time {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.debug-log-level {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.debug-log-message {
+    color: var(--text-primary);
+    margin: 5px 0;
+    word-break: break-word;
+}
+
+.debug-error-details,
+.debug-context {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.debug-error-details pre,
+.debug-context pre {
+    margin-top: 5px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-secondary);
+}
+
