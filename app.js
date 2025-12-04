@@ -35,10 +35,21 @@ if (document.readyState === 'loading') {
 
 async function saveToStorage(key, value) {
     try {
+        // Сначала сохраняем в localStorage для быстрого доступа
         localStorage.setItem(key, value);
+        
+        // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
         if (tgReady && tg && tg.CloudStorage) {
             try {
                 await tg.CloudStorage.setItem(key, value);
+                // Обновляем хэш после успешного сохранения
+                if (key === 'klyro_diary') {
+                    const diary = JSON.parse(value);
+                    lastDiaryHash = getDataHash(diary);
+                } else if (key === 'klyro_user_data') {
+                    const data = JSON.parse(value);
+                    lastUserDataHash = getDataHash(data);
+                }
             } catch (e) {
                 console.error(`[STORAGE] CloudStorage save error:`, e);
             }
@@ -64,6 +75,14 @@ async function loadFromStorage(key) {
                 if (value !== null && value !== undefined && value !== '') {
                     // Обновляем localStorage для быстрого доступа
                     localStorage.setItem(key, value);
+                    // Обновляем хэш
+                    if (key === 'klyro_diary') {
+                        const diary = JSON.parse(value);
+                        lastDiaryHash = getDataHash(diary);
+                    } else if (key === 'klyro_user_data') {
+                        const data = JSON.parse(value);
+                        lastUserDataHash = getDataHash(data);
+                    }
                     return value;
                 }
             } catch (e) {
@@ -73,7 +92,7 @@ async function loadFromStorage(key) {
         // Fallback на localStorage
         const value = localStorage.getItem(key);
         if (value !== null && value !== '') {
-            // Синхронизируем в CloudStorage в фоне
+            // Синхронизируем в CloudStorage в фоне (если данных нет в CloudStorage)
             if (tgReady && tg && tg.CloudStorage) {
                 tg.CloudStorage.setItem(key, value).catch(() => {});
             }
@@ -197,15 +216,15 @@ function startDataSync() {
     // Сначала загружаем данные из CloudStorage при старте
     syncFromCloud();
     
-    // Периодическая синхронизация: отправка изменений каждые 10 секунд
+    // Периодическая синхронизация: отправка изменений каждые 5 секунд (быстрее для лучшей синхронизации)
     setInterval(() => {
         syncToCloud();
-    }, 10000);
+    }, 5000);
     
-    // Периодическая загрузка изменений каждые 15 секунд
+    // Периодическая загрузка изменений каждые 5 секунд (чаще проверяем обновления)
     setInterval(() => {
         syncFromCloud();
-    }, 15000);
+    }, 5000);
     
     // Синхронизация при фокусе окна
     window.addEventListener('focus', async () => {
@@ -659,6 +678,19 @@ function showProfileScreen() {
         profileScreen.style.opacity = '1';
     }
     
+    // Синхронизируем данные пользователя из CloudStorage перед показом
+    if (tgReady && tg && tg.CloudStorage) {
+        syncFromCloud().then(() => {
+            renderProfileScreen();
+        }).catch(() => {
+            renderProfileScreen();
+        });
+    } else {
+        renderProfileScreen();
+    }
+}
+
+function renderProfileScreen() {
     if (userData) {
         document.getElementById('user-name').textContent = 
             `${userData.firstName} ${userData.lastName || ''}`.trim();
@@ -703,6 +735,11 @@ function showProfileScreen() {
         
         const calories = calculateCalories();
         document.getElementById('calories-value').textContent = Math.round(calories);
+    }
+    
+    // Обновляем username
+    if (typeof updateUsernameDisplay === 'function') {
+        updateUsernameDisplay();
     }
 }
 
@@ -1410,12 +1447,17 @@ function showDiaryScreen() {
         screen.style.opacity = '1';
     }
     
+    // Сначала показываем локальные данные
     renderDiary();
     
-    loadDiaryFromCloud().then(() => {
+    // Затем синхронизируем с CloudStorage для получения актуальных данных с других устройств
+    syncFromCloud().then(() => {
         renderDiary();
+        if (typeof updateDashboard === 'function') {
+            updateDashboard();
+        }
     }).catch(e => {
-        console.error('[DIARY] Error:', e);
+        console.error('[DIARY] Sync error:', e);
     });
 }
 
