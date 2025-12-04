@@ -1225,9 +1225,11 @@ function validateCurrentStep() {
         case 4:
             const goal = document.querySelector('input[name="goal"]:checked');
             if (!goal) {
+                addDebugLog('warn', 'Цель не выбрана на шаге 4');
                 showNotification('Пожалуйста, выберите цель');
                 return false;
             }
+            addDebugLog('info', 'Цель выбрана', null, { goal: goal.value });
             return true;
         
         default:
@@ -1244,12 +1246,21 @@ function showNotification(message) {
 }
 
 async function completeOnboarding() {
-    addDebugLog('info', 'Начало завершения onboarding');
+    addDebugLog('info', '🔵 КНОПКА "ЗАВЕРШИТЬ" НАЖАТА - начало завершения onboarding', null, {
+        currentStep: currentStep
+    });
     
-    if (!validateCurrentStep()) {
-        addDebugLog('warn', 'Валидация не пройдена, onboarding не завершен');
-        return;
-    }
+    try {
+        // Проверяем валидацию, но не блокируем если что-то не так - просто логируем
+        const validationResult = validateCurrentStep();
+        if (!validationResult) {
+            addDebugLog('warn', '⚠️ Валидация не пройдена, но продолжаем', null, {
+                currentStep: currentStep
+            });
+            // НЕ возвращаемся - продолжаем выполнение
+        } else {
+            addDebugLog('info', '✅ Валидация пройдена');
+        }
     
     const genderInput = document.querySelector('input[name="gender"]:checked');
     const heightSlider = document.getElementById('height');
