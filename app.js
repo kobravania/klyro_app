@@ -452,16 +452,48 @@ async function checkUserAuth() {
             console.error('[AUTH] localStorage read error:', e);
         }
         
-        // Если нет данных в localStorage, пробуем CloudStorage (с таймаутом)
+        // Если нет данных в localStorage, пробуем CloudStorage (с увеличенным таймаутом)
         if (!savedData && tgReady && tg && tg.CloudStorage) {
             try {
                 console.log('[AUTH] Trying CloudStorage...');
                 const cloudPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
-                console.log('[AUTH] CloudStorage result:', savedData ? 'found' : 'not found');
+                console.log('[AUTH] CloudStorage result:', savedData ? `found (${savedData.length} chars)` : 'not found');
+                
+                // Если данные найдены в CloudStorage, сохраняем в localStorage для быстрого доступа
+                if (savedData) {
+                    try {
+                        localStorage.setItem('klyro_user_data', savedData);
+                        console.log('[AUTH] Synced CloudStorage to localStorage');
+                    } catch (e) {
+                        console.warn('[AUTH] Failed to sync to localStorage:', e);
+                    }
+                }
             } catch (e) {
                 console.warn('[AUTH] CloudStorage load failed:', e);
+            }
+        }
+        
+        // Если все еще нет данных, ждем еще немного и пробуем снова (для медленных соединений)
+        if (!savedData && tgReady && tg && tg.CloudStorage) {
+            try {
+                console.log('[AUTH] Retrying CloudStorage after delay...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const cloudPromise = loadFromStorage('klyro_user_data');
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+                savedData = await Promise.race([cloudPromise, timeoutPromise]);
+                if (savedData) {
+                    console.log('[AUTH] CloudStorage retry successful');
+                    try {
+                        localStorage.setItem('klyro_user_data', savedData);
+                        console.log('[AUTH] Synced CloudStorage to localStorage (retry)');
+                    } catch (e) {
+                        console.warn('[AUTH] Failed to sync to localStorage (retry):', e);
+                    }
+                }
+            } catch (e) {
+                console.warn('[AUTH] CloudStorage retry failed:', e);
             }
         }
         
@@ -1545,9 +1577,17 @@ showProfileScreen = showProfileScreenExtended;
 async function showAddFoodScreen() {
     hideAllScreens();
     const screen = document.getElementById('add-food-screen');
-    screen.classList.add('active');
-    document.getElementById('food-search').value = '';
-    document.getElementById('food-search').focus();
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
+    const foodSearch = document.getElementById('food-search');
+    if (foodSearch) {
+        foodSearch.value = '';
+        foodSearch.focus();
+    }
     
     // Lazy loading: загружаем базу продуктов только при открытии экрана
     if (!productsDatabaseLoaded || productsDatabase.length === 0) {
@@ -1665,7 +1705,13 @@ function addFoodToDiary() {
 
 function showCustomProductForm() {
     hideAllScreens();
-    document.getElementById('custom-product-screen').classList.add('active');
+    const screen = document.getElementById('custom-product-screen');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
 }
 
 function saveCustomProduct() {
@@ -1767,7 +1813,12 @@ function removeDiaryEntry(date, entryId) {
 function showDiaryScreen() {
     hideAllScreens();
     const screen = document.getElementById('diary-screen');
-    screen.classList.add('active');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
     renderDiary();
 }
 
@@ -1854,7 +1905,12 @@ function deleteDiaryEntry(entryId) {
 function showHistoryScreen() {
     hideAllScreens();
     const screen = document.getElementById('history-screen');
-    screen.classList.add('active');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
     setTimeout(() => {
         renderHistoryCharts();
     }, 100);
@@ -1967,7 +2023,12 @@ const activityMET = {
 function showActivityScreen() {
     hideAllScreens();
     const screen = document.getElementById('activity-screen');
-    screen.classList.add('active');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
     renderActivities();
 }
 
@@ -2047,8 +2108,17 @@ function saveActivity() {
 
 function showAddActivityForm() {
     hideAllScreens();
-    document.getElementById('add-activity-screen').classList.add('active');
-    document.getElementById('activity-duration').value = 30;
+    const screen = document.getElementById('add-activity-screen');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
+    const durationEl = document.getElementById('activity-duration');
+    if (durationEl) {
+        durationEl.value = 30;
+    }
     updateActivityCalories();
 }
 
@@ -2101,7 +2171,12 @@ window.showProfileScreen = showProfileScreenExtended;
 function showSettingsScreen() {
     hideAllScreens();
     const screen = document.getElementById('settings-screen');
-    screen.classList.add('active');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
     
     // Загружаем сохранённые единицы измерения
     const units = loadFromStorageSync('klyro_units') || 'metric';
