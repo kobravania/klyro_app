@@ -693,16 +693,26 @@ async function checkUserAuth() {
                     dateOfBirth: userData.dateOfBirth,
                     age: userData.age,
                     height: userData.height,
-                    allKeys: Object.keys(userData)
+                    allKeys: Object.keys(userData),
+                    fullUserData: userData
                 });
                 
-                if (!hasProfileData) {
+                // УЛУЧШЕННАЯ ПРОВЕРКА: проверяем более гибко
+                // Если есть хотя бы dateOfBirth ИЛИ age, и есть height - считаем профиль заполненным
+                const hasAnyDate = !!(userData.dateOfBirth || userData.age);
+                const hasAnyHeight = !!userData.height;
+                const isProfileComplete = hasAnyDate && hasAnyHeight;
+                
+                if (!isProfileComplete) {
                     addDebugLog('warn', '⚠️ Профиль не заполнен, показываем onboarding/auth', null, {
                         missingDateOfBirth: !hasDateOfBirth,
                         missingHeight: !hasHeight,
+                        hasAnyDate: hasAnyDate,
+                        hasAnyHeight: hasAnyHeight,
                         dateOfBirth: userData.dateOfBirth,
                         age: userData.age,
-                        height: userData.height
+                        height: userData.height,
+                        fullUserData: userData
                     });
                     if (window.Telegram && window.Telegram.WebApp) {
                         showOnboardingScreen();
@@ -1299,6 +1309,17 @@ async function completeOnboarding() {
     });
     
     addDebugLog('info', 'Сохранение данных пользователя');
+    
+    // КРИТИЧНО: Сохраняем в localStorage СРАЗУ и ПРЯМО, без await
+    const userDataStr = JSON.stringify(userData);
+    try {
+        localStorage.setItem('klyro_user_data', userDataStr);
+        addDebugLog('info', '✅ Данные сохранены в localStorage напрямую');
+    } catch (e) {
+        addDebugLog('error', '❌ Ошибка сохранения в localStorage', e);
+    }
+    
+    // Затем сохраняем через saveToStorage для синхронизации
     await saveUserData();
     
     // Проверяем, что данные сохранились
@@ -1306,7 +1327,7 @@ async function completeOnboarding() {
     if (savedCheck) {
         try {
             const savedData = JSON.parse(savedCheck);
-            addDebugLog('info', '✅ Данные успешно сохранены', null, {
+            addDebugLog('info', '✅ Данные успешно сохранены и проверены', null, {
                 hasDateOfBirth: !!(savedData.dateOfBirth || savedData.age),
                 hasHeight: !!savedData.height,
                 savedHeight: savedData.height,
@@ -1316,7 +1337,7 @@ async function completeOnboarding() {
             addDebugLog('error', 'Ошибка проверки сохраненных данных', e);
         }
     } else {
-        addDebugLog('error', '❌ Данные НЕ сохранились в localStorage!');
+        addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА: Данные НЕ сохранились в localStorage!');
     }
     
     showProfileScreen();
