@@ -1652,10 +1652,21 @@ function showProductAmountScreen() {
     
     hideAllScreens();
     const screen = document.getElementById('product-amount-screen');
-    screen.classList.add('active');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
     
-    document.getElementById('selected-product-name').textContent = selectedProduct.name;
-    document.getElementById('product-grams').value = 100;
+    const productNameEl = document.getElementById('selected-product-name');
+    if (productNameEl) {
+        productNameEl.textContent = selectedProduct.name;
+    }
+    const productGramsEl = document.getElementById('product-grams');
+    if (productGramsEl) {
+        productGramsEl.value = 100;
+    }
     updateProductPreview();
 }
 
