@@ -353,27 +353,40 @@ function initApp() {
         }
     }
     
-    // КРИТИЧНО: Гарантируем показ экрана через 1 секунду максимум
+    // КРИТИЧНО: Гарантируем показ экрана через 500ms максимум
     const screenTimeout = setTimeout(() => {
-        console.warn('[INIT] Timeout: Forcing screen display after 1 second');
-        if (typeof hideAllScreens === 'function') {
-            hideAllScreens();
-        }
-        // Проверяем, есть ли активный экран
+        console.warn('[INIT] Timeout: Forcing screen display after 500ms');
         const activeScreen = document.querySelector('.screen.active');
         if (!activeScreen) {
             console.warn('[INIT] No active screen found, showing default');
+            hideAllScreens();
             if (window.Telegram && window.Telegram.WebApp) {
                 if (typeof showOnboardingScreen === 'function') {
                     showOnboardingScreen();
+                } else {
+                    const screen = document.getElementById('onboarding-screen');
+                    if (screen) {
+                        screen.classList.add('active');
+                        screen.style.display = 'block';
+                        screen.style.visibility = 'visible';
+                        screen.style.opacity = '1';
+                    }
                 }
             } else {
                 if (typeof showAuthScreen === 'function') {
                     showAuthScreen();
+                } else {
+                    const screen = document.getElementById('auth-screen');
+                    if (screen) {
+                        screen.classList.add('active');
+                        screen.style.display = 'block';
+                        screen.style.visibility = 'visible';
+                        screen.style.opacity = '1';
+                    }
                 }
             }
         }
-    }, 1000);
+    }, 500);
     
     // Проверяем данные пользователя - это единственное место, где решается, что показывать
     checkUserAuth().then(() => {
@@ -382,14 +395,32 @@ function initApp() {
     }).catch(e => {
         clearTimeout(screenTimeout);
         console.error('[INIT] Error in checkUserAuth:', e);
+        console.error('[INIT] Error stack:', e.stack);
         // Fallback - показываем онбординг или авторизацию
+        hideAllScreens();
         if (window.Telegram && window.Telegram.WebApp) {
             if (typeof showOnboardingScreen === 'function') {
                 showOnboardingScreen();
+            } else {
+                const screen = document.getElementById('onboarding-screen');
+                if (screen) {
+                    screen.classList.add('active');
+                    screen.style.display = 'block';
+                    screen.style.visibility = 'visible';
+                    screen.style.opacity = '1';
+                }
             }
         } else {
             if (typeof showAuthScreen === 'function') {
                 showAuthScreen();
+            } else {
+                const screen = document.getElementById('auth-screen');
+                if (screen) {
+                    screen.classList.add('active');
+                    screen.style.display = 'block';
+                    screen.style.visibility = 'visible';
+                    screen.style.opacity = '1';
+                }
             }
         }
     });
@@ -434,66 +465,30 @@ async function checkUserAuth() {
         try {
             savedData = loadFromStorageSync('klyro_user_data');
             console.log('[AUTH] localStorage check:', savedData ? `found (${savedData.length} chars)` : 'not found');
-            if (savedData) {
-                try {
-                    const testParse = JSON.parse(savedData);
-                    console.log('[AUTH] localStorage test parse:', {
-                        hasDateOfBirth: !!testParse.dateOfBirth,
-                        hasAge: !!testParse.age,
-                        hasHeight: !!testParse.height,
-                        dateOfBirth: testParse.dateOfBirth,
-                        height: testParse.height
-                    });
-                } catch (e) {
-                    console.error('[AUTH] localStorage parse error:', e);
-                }
-            }
         } catch (e) {
             console.error('[AUTH] localStorage read error:', e);
         }
         
-        // Если нет данных в localStorage, пробуем CloudStorage (с увеличенным таймаутом)
+        // Если нет данных в localStorage, пробуем CloudStorage (с коротким таймаутом, не блокируем)
         if (!savedData && tgReady && tg && tg.CloudStorage) {
             try {
                 console.log('[AUTH] Trying CloudStorage...');
                 const cloudPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
-                console.log('[AUTH] CloudStorage result:', savedData ? `found (${savedData.length} chars)` : 'not found');
-                
-                // Если данные найдены в CloudStorage, сохраняем в localStorage для быстрого доступа
                 if (savedData) {
+                    console.log('[AUTH] CloudStorage result:', `found (${savedData.length} chars)`);
                     try {
                         localStorage.setItem('klyro_user_data', savedData);
                         console.log('[AUTH] Synced CloudStorage to localStorage');
                     } catch (e) {
                         console.warn('[AUTH] Failed to sync to localStorage:', e);
                     }
+                } else {
+                    console.log('[AUTH] CloudStorage timeout or empty');
                 }
             } catch (e) {
                 console.warn('[AUTH] CloudStorage load failed:', e);
-            }
-        }
-        
-        // Если все еще нет данных, ждем еще немного и пробуем снова (для медленных соединений)
-        if (!savedData && tgReady && tg && tg.CloudStorage) {
-            try {
-                console.log('[AUTH] Retrying CloudStorage after delay...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                const cloudPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
-                savedData = await Promise.race([cloudPromise, timeoutPromise]);
-                if (savedData) {
-                    console.log('[AUTH] CloudStorage retry successful');
-                    try {
-                        localStorage.setItem('klyro_user_data', savedData);
-                        console.log('[AUTH] Synced CloudStorage to localStorage (retry)');
-                    } catch (e) {
-                        console.warn('[AUTH] Failed to sync to localStorage (retry):', e);
-                    }
-                }
-            } catch (e) {
-                console.warn('[AUTH] CloudStorage retry failed:', e);
             }
         }
         
