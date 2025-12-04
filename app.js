@@ -765,10 +765,16 @@ async function checkUserAuth() {
                         height: userData.height,
                         fullUserData: userData
                     });
-                    if (window.Telegram && window.Telegram.WebApp) {
-                        showOnboardingScreen();
+                    // НЕ переключаем экран, если он уже показан - просто убеждаемся что он виден
+                    const currentScreen = document.querySelector('.screen.active');
+                    if (!currentScreen || (currentScreen.id !== 'onboarding-screen' && currentScreen.id !== 'auth-screen')) {
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            showOnboardingScreen();
+                        } else {
+                            showAuthScreen();
+                        }
                     } else {
-                        showAuthScreen();
+                        addDebugLog('info', 'Экран onboarding/auth уже показан, не переключаем');
                     }
                     return;
                 }
