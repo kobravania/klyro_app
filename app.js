@@ -1204,7 +1204,6 @@ async function completeOnboarding() {
         showNotification('Ошибка при сохранении данных. Попробуйте еще раз.');
     }
 }
-}
 
 function calculateCalories() {
     const age = getUserAge();
@@ -1729,43 +1728,17 @@ function getDiary() {
 }
 
 async function saveDiary(diary) {
-    try {
-        addDebugLog('info', 'Начало сохранения дневника', null, {
-            datesCount: Object.keys(diary).length,
-            totalEntries: Object.values(diary).reduce((sum, entries) => sum + entries.length, 0)
+    const diaryStr = JSON.stringify(diary);
+    
+    // ВСЕГДА сохраняем в localStorage первым делом
+    localStorage.setItem('klyro_diary', diaryStr);
+    lastDiaryHash = getDataHash(diary);
+    
+    // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+        tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {
+            // Игнорируем ошибки - данные уже в localStorage
         });
-        
-        const diaryStr = JSON.stringify(diary);
-        
-        // ВСЕГДА сохраняем в localStorage первым делом
-        localStorage.setItem('klyro_diary', diaryStr);
-        lastDiaryHash = getDataHash(diary);
-        
-        addDebugLog('info', 'Дневник сохранен в localStorage', null, {
-            dataLength: diaryStr.length,
-            hash: lastDiaryHash
-        });
-        
-        // Затем синхронизируем в CloudStorage в фоне (не блокируем)
-        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            addDebugLog('info', 'Начало синхронизации в CloudStorage');
-            // Выполняем асинхронно, не ждем результата
-            tg.CloudStorage.setItem('klyro_diary', diaryStr).then(() => {
-                addDebugLog('info', 'Дневник синхронизирован в CloudStorage');
-            }).catch((e) => {
-                addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
-            });
-        } else {
-            addDebugLog('warn', 'CloudStorage недоступен для синхронизации', null, {
-                tgReady: tgReady,
-                hasTg: !!tg,
-                hasCloudStorage: tg ? !!tg.CloudStorage : false,
-                hasSetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false
-            });
-        }
-    } catch (e) {
-        addDebugLog('error', 'Критическая ошибка при сохранении дневника', e);
-        throw e;
     }
 }
 
@@ -1775,34 +1748,12 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    try {
-        addDebugLog('info', 'Добавление записи в дневник', null, {
-            date: date,
-            entryId: entry.id,
-            entryName: entry.name
-        });
-        
-        const diary = getDiary();
-        if (!diary[date]) {
-            diary[date] = [];
-        }
-        diary[date].push(entry);
-        
-        addDebugLog('info', 'Запись добавлена в объект дневника', null, {
-            entriesCount: diary[date].length,
-            totalDates: Object.keys(diary).length
-        });
-        
-        await saveDiary(diary);
-        
-        addDebugLog('info', 'Дневник сохранен после добавления записи');
-    } catch (e) {
-        addDebugLog('error', 'Ошибка в addDiaryEntry', e, {
-            date: date,
-            entry: entry
-        });
-        throw e;
+    const diary = getDiary();
+    if (!diary[date]) {
+        diary[date] = [];
     }
+    diary[date].push(entry);
+    await saveDiary(diary);
 }
 
 async function removeDiaryEntry(date, entryId) {
