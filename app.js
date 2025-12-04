@@ -1692,11 +1692,27 @@ function setQuickAmount(grams) {
     updateProductPreview();
 }
 
-function addFoodToDiary() {
-    if (!selectedProduct) return;
+async function addFoodToDiary() {
+    if (!selectedProduct) {
+        console.error('[DIARY] No product selected');
+        showNotification('Выберите продукт');
+        return;
+    }
     
-    const grams = parseFloat(document.getElementById('product-grams').value) || 100;
+    const gramsEl = document.getElementById('product-grams');
+    if (!gramsEl) {
+        console.error('[DIARY] product-grams element not found');
+        return;
+    }
+    
+    const grams = parseFloat(gramsEl.value) || 100;
     const multiplier = grams / 100;
+    
+    console.log('[DIARY] Adding food to diary:', {
+        product: selectedProduct.name,
+        grams: grams,
+        date: currentDiaryDate
+    });
     
     const entry = {
         id: Date.now().toString(),
@@ -1709,9 +1725,15 @@ function addFoodToDiary() {
         timestamp: new Date().toISOString()
     };
     
-    addDiaryEntry(currentDiaryDate, entry);
-    showNotification('Продукт добавлен в дневник!');
-    showDiaryScreen();
+    try {
+        await addDiaryEntry(currentDiaryDate, entry);
+        console.log('[DIARY] ✓ Food added successfully');
+        showNotification('Продукт добавлен в дневник!');
+        showDiaryScreen();
+    } catch (e) {
+        console.error('[DIARY] ✗ Error adding food:', e);
+        showNotification('Ошибка при добавлении продукта');
+    }
 }
 
 function showCustomProductForm() {
@@ -1758,27 +1780,35 @@ function saveCustomProduct() {
 // Загрузка дневника из CloudStorage
 async function loadDiaryFromCloud() {
     try {
-        if (tg && tg.CloudStorage) {
+        console.log('[DIARY] Loading from CloudStorage...');
+        if (tgReady && tg && tg.CloudStorage) {
             const diaryStr = await loadFromStorage('klyro_diary');
             if (diaryStr) {
                 const diary = JSON.parse(diaryStr);
+                const entriesCount = Object.keys(diary).reduce((sum, date) => sum + diary[date].length, 0);
+                console.log('[DIARY] ✓ Loaded from CloudStorage, dates:', Object.keys(diary).length, 'total entries:', entriesCount);
+                
                 // Обновляем локальный кэш
                 localStorage.setItem('klyro_diary', diaryStr);
                 // Обновляем хэш
                 lastDiaryHash = getDataHash(diary);
+                
                 // Обновляем отображение если на экране дневника
                 if (document.getElementById('diary-screen')?.classList.contains('active')) {
-                    const today = new Date().toISOString().split('T')[0];
-                    renderDiary(today);
+                    renderDiary();
                 }
                 // Обновляем dashboard
                 if (typeof updateDashboard === 'function') {
                     updateDashboard();
                 }
+            } else {
+                console.log('[DIARY] No diary data in CloudStorage');
             }
+        } else {
+            console.log('[DIARY] CloudStorage not available (tgReady:', tgReady, 'tg:', !!tg, 'CloudStorage:', tg ? !!tg.CloudStorage : 'N/A')');
         }
     } catch (e) {
-        console.error('[DIARY] Error loading from cloud:', e);
+        console.error('[DIARY] ✗ Error loading from cloud:', e);
     }
 }
 
@@ -1789,14 +1819,26 @@ function getDiary() {
 
 async function saveDiary(diary) {
     const diaryStr = JSON.stringify(diary);
+    console.log('[DIARY] Saving diary, entries count:', Object.keys(diary).length);
+    
     // Сохраняем в localStorage для быстрого доступа
-    localStorage.setItem('klyro_diary', diaryStr);
+    try {
+        localStorage.setItem('klyro_diary', diaryStr);
+        console.log('[DIARY] ✓ Saved to localStorage');
+    } catch (e) {
+        console.error('[DIARY] ✗ localStorage save failed:', e);
+    }
+    
     // Обновляем хэш для отслеживания изменений
     lastDiaryHash = getDataHash(diary);
-    // Сохраняем в CloudStorage для синхронизации (асинхронно, не блокируем UI)
-    saveToStorage('klyro_diary', diaryStr).catch(e => {
-        console.warn('[DIARY] CloudStorage save failed:', e);
-    });
+    
+    // Сохраняем в CloudStorage для синхронизации (ЖДЕМ завершения!)
+    try {
+        await saveToStorage('klyro_diary', diaryStr);
+        console.log('[DIARY] ✓ Saved to CloudStorage');
+    } catch (e) {
+        console.error('[DIARY] ✗ CloudStorage save failed:', e);
+    }
 }
 
 function getDiaryForDate(date) {
@@ -1804,24 +1846,27 @@ function getDiaryForDate(date) {
     return diary[date] || [];
 }
 
-function addDiaryEntry(date, entry) {
+async function addDiaryEntry(date, entry) {
+    console.log('[DIARY] Adding entry for date:', date, 'entry:', entry.name);
     const diary = getDiary();
     if (!diary[date]) {
         diary[date] = [];
     }
     diary[date].push(entry);
-    saveDiary(diary);
+    console.log('[DIARY] Entry added, total entries for date:', diary[date].length);
+    await saveDiary(diary);
+    console.log('[DIARY] Diary saved after adding entry');
 }
 
-function removeDiaryEntry(date, entryId) {
+async function removeDiaryEntry(date, entryId) {
     const diary = getDiary();
     if (diary[date]) {
         diary[date] = diary[date].filter(item => item.id !== entryId);
-        saveDiary(diary);
+        await saveDiary(diary);
     }
 }
 
-function showDiaryScreen() {
+async function showDiaryScreen() {
     hideAllScreens();
     const screen = document.getElementById('diary-screen');
     if (screen) {
@@ -1830,6 +1875,11 @@ function showDiaryScreen() {
         screen.style.visibility = 'visible';
         screen.style.opacity = '1';
     }
+    
+    // Загружаем дневник из CloudStorage при открытии экрана
+    console.log('[DIARY] Loading diary from cloud...');
+    await loadDiaryFromCloud();
+    
     renderDiary();
 }
 
@@ -1901,11 +1951,13 @@ function changeDiaryDate(days) {
     renderDiary();
 }
 
-function deleteDiaryEntry(entryId) {
+async function deleteDiaryEntry(entryId) {
     if (confirm('Удалить эту запись?')) {
-        removeDiaryEntry(currentDiaryDate, entryId);
+        await removeDiaryEntry(currentDiaryDate, entryId);
         renderDiary();
-        updateDashboard();
+        if (typeof updateDashboard === 'function') {
+            updateDashboard();
+        }
     }
 }
 
@@ -2072,7 +2124,7 @@ function getActivities() {
     return activitiesStr ? JSON.parse(activitiesStr) : [];
 }
 
-function saveActivity() {
+async function saveActivity() {
     const name = document.getElementById('activity-name').value;
     const duration = parseFloat(document.getElementById('activity-duration').value) || 0;
     const addToDiary = document.getElementById('add-to-diary').checked;
@@ -2110,7 +2162,7 @@ function saveActivity() {
             carbs: 0,
             timestamp: activity.timestamp
         };
-        addDiaryEntry(currentDiaryDate, entry);
+        await addDiaryEntry(currentDiaryDate, entry);
     }
     
     showNotification('Тренировка сохранена!');
