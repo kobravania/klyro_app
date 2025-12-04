@@ -1956,13 +1956,18 @@ function changeDiaryDate(days) {
     renderDiary();
 }
 
-async function deleteDiaryEntry(entryId) {
+function deleteDiaryEntry(entryId) {
     if (confirm('Удалить эту запись?')) {
-        await removeDiaryEntry(currentDiaryDate, entryId);
-        renderDiary();
-        if (typeof updateDashboard === 'function') {
-            updateDashboard();
-        }
+        // Выполняем удаление асинхронно, не блокируем UI
+        removeDiaryEntry(currentDiaryDate, entryId).then(() => {
+            renderDiary();
+            if (typeof updateDashboard === 'function') {
+                updateDashboard();
+            }
+        }).catch(e => {
+            console.error('[DIARY] Error deleting entry:', e);
+            showNotification('Ошибка при удалении записи');
+        });
     }
 }
 
