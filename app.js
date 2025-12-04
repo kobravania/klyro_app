@@ -1866,7 +1866,7 @@ async function removeDiaryEntry(date, entryId) {
     }
 }
 
-async function showDiaryScreen() {
+function showDiaryScreen() {
     hideAllScreens();
     const screen = document.getElementById('diary-screen');
     if (screen) {
@@ -1876,11 +1876,16 @@ async function showDiaryScreen() {
         screen.style.opacity = '1';
     }
     
-    // Загружаем дневник из CloudStorage при открытии экрана
-    console.log('[DIARY] Loading diary from cloud...');
-    await loadDiaryFromCloud();
-    
+    // Сначала показываем текущие данные
     renderDiary();
+    
+    // Затем загружаем дневник из CloudStorage в фоне (не блокируем UI)
+    loadDiaryFromCloud().then(() => {
+        // Обновляем отображение после загрузки
+        renderDiary();
+    }).catch(e => {
+        console.error('[DIARY] Error loading from cloud in showDiaryScreen:', e);
+    });
 }
 
 function renderDiary() {
@@ -2124,7 +2129,7 @@ function getActivities() {
     return activitiesStr ? JSON.parse(activitiesStr) : [];
 }
 
-async function saveActivity() {
+function saveActivity() {
     const name = document.getElementById('activity-name').value;
     const duration = parseFloat(document.getElementById('activity-duration').value) || 0;
     const addToDiary = document.getElementById('add-to-diary').checked;
@@ -2162,7 +2167,10 @@ async function saveActivity() {
             carbs: 0,
             timestamp: activity.timestamp
         };
-        await addDiaryEntry(currentDiaryDate, entry);
+        // Выполняем добавление асинхронно, не блокируем UI
+        addDiaryEntry(currentDiaryDate, entry).catch(e => {
+            console.error('[ACTIVITY] Error adding to diary:', e);
+        });
     }
     
     showNotification('Тренировка сохранена!');
