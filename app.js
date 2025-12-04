@@ -190,38 +190,55 @@ function initTelegramWebApp() {
         
         // Пробуем инициализировать CloudStorage с несколькими попытками
         let attempts = 0;
-        const maxAttempts = 5;
+        const maxAttempts = 10; // Увеличиваем количество попыток
         
         function checkCloudStorage() {
             attempts++;
+            const hasCloudStorage = !!tg.CloudStorage;
+            const hasSetItem = tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false;
+            const hasGetItem = tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false;
+            
             addDebugLog('info', `Попытка ${attempts} проверки CloudStorage`, null, {
-                hasCloudStorage: !!tg.CloudStorage,
-                hasSetItem: tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false,
-                hasGetItem: tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false,
-                tgReady: tgReady
+                hasCloudStorage: hasCloudStorage,
+                hasSetItem: hasSetItem,
+                hasGetItem: hasGetItem,
+                tgReady: tgReady,
+                cloudStorageType: typeof tg.CloudStorage
             });
             
-            if (tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' && typeof tg.CloudStorage.getItem === 'function') {
+            if (tg && tg.CloudStorage && hasSetItem && hasGetItem) {
                 tgReady = true;
-                addDebugLog('info', 'Telegram WebApp готов, CloudStorage доступен и готов к использованию', null, {
-                    attempt: attempts
+                addDebugLog('info', '✅ Telegram WebApp готов, CloudStorage доступен и готов к использованию', null, {
+                    attempt: attempts,
+                    hasSetItem: true,
+                    hasGetItem: true
                 });
+                // Уведомляем, что CloudStorage готов
+                if (typeof window.onCloudStorageReady === 'function') {
+                    window.onCloudStorageReady();
+                }
             } else if (attempts < maxAttempts) {
-                // Пробуем еще раз через 200ms
-                setTimeout(checkCloudStorage, 200);
+                // Пробуем еще раз через 300ms (увеличиваем интервал)
+                setTimeout(checkCloudStorage, 300);
             } else {
                 // Если CloudStorage недоступен после всех попыток, все равно помечаем как готовый
                 tgReady = true;
-                addDebugLog('warn', 'Telegram WebApp готов, но CloudStorage недоступен после всех попыток - будет использоваться только localStorage', null, {
+                addDebugLog('warn', '⚠️ Telegram WebApp готов, но CloudStorage недоступен после всех попыток - будет использоваться только localStorage', null, {
                     attempts: attempts,
-                    hasCloudStorage: !!tg.CloudStorage,
+                    hasCloudStorage: hasCloudStorage,
+                    hasSetItem: hasSetItem,
+                    hasGetItem: hasGetItem,
                     cloudStorageType: typeof tg.CloudStorage
                 });
+                // Уведомляем, что инициализация завершена (даже без CloudStorage)
+                if (typeof window.onCloudStorageReady === 'function') {
+                    window.onCloudStorageReady();
+                }
             }
         }
         
-        // Начинаем проверку через 100ms, затем повторяем
-        setTimeout(checkCloudStorage, 100);
+        // Начинаем проверку сразу, затем повторяем
+        checkCloudStorage();
     } else {
         tg = {
             ready: () => {},
