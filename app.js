@@ -342,47 +342,82 @@ console.error = function(...args) {
 
 // Инициализация приложения
 function initApp() {
-    console.log('=== Klyro App Initializing ===');
-    
-    // СНАЧАЛА показываем экран по умолчанию (не ждем загрузки данных)
-    hideAllScreens();
-    if (window.Telegram && window.Telegram.WebApp) {
-        const screen = document.getElementById('onboarding-screen');
-        if (screen) {
-            screen.classList.add('active');
-            screen.style.display = 'block';
-            screen.style.visibility = 'visible';
-            screen.style.opacity = '1';
-            console.log('[INIT] Showing onboarding screen immediately');
+    try {
+        console.log('=== Klyro App Initializing ===');
+        
+        // СНАЧАЛА показываем экран по умолчанию (не ждем загрузки данных)
+        try {
+            const screens = document.querySelectorAll('.screen');
+            screens.forEach(screen => {
+                screen.classList.remove('active');
+                screen.style.display = 'none';
+                screen.style.visibility = 'hidden';
+                screen.style.opacity = '0';
+            });
+        } catch (e) {
+            console.error('[INIT] Error hiding screens:', e);
         }
-    } else {
-        const screen = document.getElementById('auth-screen');
-        if (screen) {
-            screen.classList.add('active');
-            screen.style.display = 'block';
-            screen.style.visibility = 'visible';
-            screen.style.opacity = '1';
-            console.log('[INIT] Showing auth screen immediately');
+        
+        if (window.Telegram && window.Telegram.WebApp) {
+            const screen = document.getElementById('onboarding-screen');
+            if (screen) {
+                screen.classList.add('active');
+                screen.style.display = 'block';
+                screen.style.visibility = 'visible';
+                screen.style.opacity = '1';
+                console.log('[INIT] Showing onboarding screen immediately');
+            } else {
+                console.error('[INIT] onboarding-screen element not found!');
+            }
+        } else {
+            const screen = document.getElementById('auth-screen');
+            if (screen) {
+                screen.classList.add('active');
+                screen.style.display = 'block';
+                screen.style.visibility = 'visible';
+                screen.style.opacity = '1';
+                console.log('[INIT] Showing auth screen immediately');
+            } else {
+                console.error('[INIT] auth-screen element not found!');
+            }
         }
-    }
-    
-    // Telegram WebApp уже инициализирован в initTelegramWebApp()
-    if (tg && tgReady) {
-        console.log('Telegram WebApp initialized');
-        // Запускаем периодическую синхронизацию данных из CloudStorage
-        if (tg.CloudStorage) {
-            startDataSync();
+        
+        // Telegram WebApp уже инициализирован в initTelegramWebApp()
+        if (tg && tgReady) {
+            console.log('Telegram WebApp initialized');
+            // Запускаем периодическую синхронизацию данных из CloudStorage
+            if (tg.CloudStorage) {
+                try {
+                    startDataSync();
+                } catch (e) {
+                    console.error('[INIT] Error starting data sync:', e);
+                }
+            }
         }
-    }
-    
-    // Затем проверяем данные пользователя в фоне и обновляем экран
-    checkUserAuth().then(() => {
-        console.log('[INIT] checkUserAuth completed successfully');
-    }).catch(e => {
-        console.error('[INIT] Error in checkUserAuth:', e);
+        
+        // Затем проверяем данные пользователя в фоне и обновляем экран
+        checkUserAuth().then(() => {
+            console.log('[INIT] checkUserAuth completed successfully');
+        }).catch(e => {
+            console.error('[INIT] Error in checkUserAuth:', e);
+            console.error('[INIT] Error stack:', e.stack);
+            // Оставляем текущий экран (онбординг или авторизацию)
+        });
+    } catch (e) {
+        console.error('[INIT] CRITICAL ERROR in initApp:', e);
         console.error('[INIT] Error stack:', e.stack);
-        // Оставляем текущий экран (онбординг или авторизацию)
-    });
+        // Пытаемся показать хотя бы какой-то экран
+        try {
+            const screen = document.getElementById('auth-screen') || document.getElementById('onboarding-screen');
+            if (screen) {
+                screen.style.display = 'block';
+                screen.style.visibility = 'visible';
+                screen.style.opacity = '1';
+            }
+        } catch (fallbackError) {
+            console.error('[INIT] Even fallback failed:', fallbackError);
+        }
+    }
 }
 
 // Функция для запуска инициализации
