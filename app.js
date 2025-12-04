@@ -496,15 +496,12 @@ let userData = null;
 function initApp() {
     addDebugLog('info', 'Инициализация приложения');
     
-    try {
-        addDebugLog('info', 'Скрытие всех экранов');
-        const screens = document.querySelectorAll('.screen');
-        screens.forEach(screen => {
-            screen.classList.remove('active');
-            screen.style.display = 'none';
-            screen.style.visibility = 'hidden';
-            screen.style.opacity = '0';
-        });
+    // КРИТИЧНО: Сразу показываем экран по умолчанию, чтобы пользователь не видел темный экран
+    let defaultScreenShown = false;
+    
+    function showDefaultScreen() {
+        if (defaultScreenShown) return;
+        defaultScreenShown = true;
         
         if (window.Telegram && window.Telegram.WebApp) {
             addDebugLog('info', 'Telegram WebApp обнаружен, показываем onboarding');
@@ -525,6 +522,21 @@ function initApp() {
                 screen.style.opacity = '1';
             }
         }
+    }
+    
+    // Показываем экран по умолчанию СРАЗУ
+    showDefaultScreen();
+    
+    try {
+        addDebugLog('info', 'Скрытие всех экранов кроме нужного');
+        const screens = document.querySelectorAll('.screen');
+        screens.forEach(screen => {
+            if (!screen.classList.contains('active')) {
+                screen.style.display = 'none';
+                screen.style.visibility = 'hidden';
+                screen.style.opacity = '0';
+            }
+        });
         
         // Ждем инициализации CloudStorage перед запуском синхронизации
         let waitAttempts = 0;
@@ -580,6 +592,8 @@ function initApp() {
                 addDebugLog('info', 'Запуск проверки авторизации (без CloudStorage)');
                 checkUserAuth().catch(e => {
                     addDebugLog('error', 'Ошибка в checkUserAuth', e);
+                    // КРИТИЧНО: При ошибке показываем экран по умолчанию
+                    showDefaultScreen();
                 });
             }
         }
@@ -588,13 +602,18 @@ function initApp() {
         waitForCloudStorageAndStart();
     } catch (e) {
         addDebugLog('error', 'Критическая ошибка при инициализации приложения', e);
-        const screen = document.getElementById('auth-screen') || document.getElementById('onboarding-screen');
-        if (screen) {
-            screen.style.display = 'block';
-            screen.style.visibility = 'visible';
-            screen.style.opacity = '1';
-        }
+        // КРИТИЧНО: При ошибке показываем экран по умолчанию
+        showDefaultScreen();
     }
+    
+    // КРИТИЧНО: Дополнительная проверка через 2 секунды - если ничего не показалось, показываем экран по умолчанию
+    setTimeout(() => {
+        const activeScreen = document.querySelector('.screen.active');
+        if (!activeScreen || activeScreen.style.display === 'none') {
+            addDebugLog('warn', '⚠️ Ни один экран не активен через 2 секунды, показываем экран по умолчанию');
+            showDefaultScreen();
+        }
+    }, 2000);
 }
 
 function startApp() {
