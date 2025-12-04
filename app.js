@@ -1728,17 +1728,22 @@ function getDiary() {
 }
 
 async function saveDiary(diary) {
-    const diaryStr = JSON.stringify(diary);
-    
-    // ВСЕГДА сохраняем в localStorage первым делом
-    localStorage.setItem('klyro_diary', diaryStr);
-    lastDiaryHash = getDataHash(diary);
-    
-    // Затем синхронизируем в CloudStorage в фоне (не блокируем)
-    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-        tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {
-            // Игнорируем ошибки - данные уже в localStorage
-        });
+    try {
+        const diaryStr = JSON.stringify(diary);
+        
+        // ВСЕГДА сохраняем в localStorage первым делом
+        localStorage.setItem('klyro_diary', diaryStr);
+        lastDiaryHash = getDataHash(diary);
+        
+        // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {
+                // Игнорируем ошибки - данные уже в localStorage
+            });
+        }
+    } catch (e) {
+        addDebugLog('error', 'Ошибка в saveDiary', e);
+        throw e;
     }
 }
 
@@ -1748,12 +1753,17 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    const diary = getDiary();
-    if (!diary[date]) {
-        diary[date] = [];
+    try {
+        const diary = getDiary();
+        if (!diary[date]) {
+            diary[date] = [];
+        }
+        diary[date].push(entry);
+        await saveDiary(diary);
+    } catch (e) {
+        addDebugLog('error', 'Ошибка в addDiaryEntry', e, { date, entry });
+        throw e;
     }
-    diary[date].push(entry);
-    await saveDiary(diary);
 }
 
 async function removeDiaryEntry(date, entryId) {
