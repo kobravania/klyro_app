@@ -952,25 +952,9 @@ async function saveUserData() {
     
     const userDataStr = JSON.stringify(userData);
     
-    try {
-        localStorage.setItem('klyro_user_data', userDataStr);
-    } catch (e) {
-        console.error('[USERDATA] localStorage save error:', e);
-        return;
-    }
-    
+    // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
+    await saveToStorage('klyro_user_data', userDataStr);
     lastUserDataHash = getDataHash(userData);
-    
-    // Сразу синхронизируем в CloudStorage
-    if (tgReady && tg && tg.CloudStorage) {
-        try {
-            await tg.CloudStorage.setItem('klyro_user_data', userDataStr);
-            // Также запускаем общую синхронизацию
-            syncToCloud();
-        } catch (e) {
-            console.error('[USERDATA] CloudStorage save error:', e);
-        }
-    }
 }
 
 function editProfile() {
@@ -1397,22 +1381,9 @@ function getDiary() {
 async function saveDiary(diary) {
     const diaryStr = JSON.stringify(diary);
     
-    try {
-        localStorage.setItem('klyro_diary', diaryStr);
-    } catch (e) {
-        console.error('[DIARY] localStorage save failed:', e);
-    }
-    
+    // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
+    await saveToStorage('klyro_diary', diaryStr);
     lastDiaryHash = getDataHash(diary);
-    
-    // Сразу синхронизируем в CloudStorage
-    try {
-        await saveToStorage('klyro_diary', diaryStr);
-        // Также запускаем общую синхронизацию
-        syncToCloud();
-    } catch (e) {
-        console.error('[DIARY] CloudStorage save failed:', e);
-    }
 }
 
 function getDiaryForDate(date) {
