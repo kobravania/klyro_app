@@ -2,29 +2,14 @@
 let tg;
 let tgReady = false;
 
-// Инициализация Telegram WebApp (вызывается после загрузки страницы)
+// Инициализация Telegram WebApp
 function initTelegramWebApp() {
     if (window.Telegram && window.Telegram.WebApp) {
         tg = window.Telegram.WebApp;
-        console.log('[TELEGRAM] Telegram WebApp API found');
-        
-        // Вызываем ready() для инициализации
         tg.ready();
         tg.expand();
-        
-        // Небольшая задержка для полной инициализации CloudStorage
         setTimeout(() => {
             tgReady = true;
-            console.log('[TELEGRAM] Telegram WebApp ready');
-            console.log('[TELEGRAM] CloudStorage available:', !!tg.CloudStorage);
-            if (tg.CloudStorage) {
-                console.log('[TELEGRAM] CloudStorage methods:', {
-                    setItem: typeof tg.CloudStorage.setItem,
-                    getItem: typeof tg.CloudStorage.getItem,
-                    getItems: typeof tg.CloudStorage.getItems,
-                    removeItem: typeof tg.CloudStorage.removeItem
-                });
-            }
         }, 100);
     } else {
         tg = {
@@ -34,12 +19,10 @@ function initTelegramWebApp() {
             showAlert: (message) => alert(message),
             CloudStorage: null
         };
-        tgReady = true; // В браузере считаем готовым сразу
-        console.log('[TELEGRAM] Telegram WebApp API not found, using fallback');
+        tgReady = true;
     }
 }
 
-// Инициализируем при загрузке
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initTelegramWebApp);
 } else {
@@ -47,316 +30,138 @@ if (document.readyState === 'loading') {
 }
 
 // ============================================
-// ОБЕРТКА ДЛЯ ХРАНЕНИЯ ДАННЫХ (CloudStorage + localStorage fallback)
+// ХРАНЕНИЕ ДАННЫХ (CloudStorage + localStorage)
 // ============================================
 
-// Асинхронное сохранение данных с синхронизацией между устройствами
 async function saveToStorage(key, value) {
     try {
-        console.log(`[STORAGE] Attempting to save ${key}, value length: ${value ? value.length : 0}`);
-        
-        // ВАЖНО: Сначала сохраняем в localStorage для быстрого доступа
-        try {
-            localStorage.setItem(key, value);
-            console.log(`[STORAGE] ✓ Saved to localStorage: ${key}`);
-        } catch (e) {
-            console.warn('[STORAGE] localStorage save failed:', e);
-        }
-        
-        // Затем сохраняем в Telegram Cloud Storage (синхронизируется между устройствами)
-        // ВАЖНО: Проверяем, что WebApp готов и CloudStorage доступен
+        localStorage.setItem(key, value);
         if (tgReady && tg && tg.CloudStorage) {
             try {
-                console.log(`[STORAGE] Saving to CloudStorage...`);
-                console.log(`[STORAGE] tgReady: ${tgReady}, tg.CloudStorage available:`, !!tg.CloudStorage);
-                console.log(`[STORAGE] tg.CloudStorage.setItem available:`, typeof tg.CloudStorage.setItem);
-                
-                // Сохраняем в CloudStorage
                 await tg.CloudStorage.setItem(key, value);
-                
-                // Небольшая задержка перед проверкой (CloudStorage может быть асинхронным)
-                await new Promise(resolve => setTimeout(resolve, 50));
-                
-                // Проверяем, что данные действительно сохранились
-                const verifyValue = await tg.CloudStorage.getItem(key);
-                if (verifyValue === value) {
-                    console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key} (verified)`);
-                } else if (verifyValue && verifyValue.length > 0) {
-                    // Если значения не совпадают, но данные есть - возможно, это нормально (версионирование)
-                    console.log(`[STORAGE] ✓ Saved to CloudStorage: ${key} (data exists, length: ${verifyValue.length})`);
-                } else {
-                    console.warn(`[STORAGE] ⚠ Saved to CloudStorage but verification failed for: ${key}`);
-                    console.warn(`[STORAGE] Expected length: ${value.length}, Got: ${verifyValue ? verifyValue.length : 'null/undefined'}`);
-                }
-                return true;
-            } catch (cloudError) {
-                console.error(`[STORAGE] ✗ CloudStorage save error:`, cloudError);
-                console.error(`[STORAGE] Error details:`, {
-                    name: cloudError?.name,
-                    message: cloudError?.message,
-                    stack: cloudError?.stack
-                });
-                // Если CloudStorage не работает, хотя бы localStorage сохранен
-                return true;
+            } catch (e) {
+                console.error(`[STORAGE] CloudStorage save error:`, e);
             }
-        } else {
-            console.log(`[STORAGE] CloudStorage not available (tgReady: ${tgReady}, tg: ${!!tg}, CloudStorage: ${tg ? !!tg.CloudStorage : 'N/A'}), only localStorage used`);
-            return true;
         }
+        return true;
     } catch (error) {
-        console.error(`[STORAGE] ✗ Error saving ${key}:`, error);
-        // Fallback на localStorage при ошибке
+        console.error(`[STORAGE] Error saving ${key}:`, error);
         try {
             localStorage.setItem(key, value);
-            console.log(`[STORAGE] ✓ Fallback to localStorage: ${key}`);
             return true;
         } catch (e) {
-            console.error(`[STORAGE] ✗ localStorage fallback failed:`, e);
             return false;
         }
     }
 }
 
-// Асинхронная загрузка данных (приоритет CloudStorage для синхронизации)
 async function loadFromStorage(key) {
     try {
-        // ВСЕГДА сначала пробуем загрузить из Telegram Cloud Storage (для синхронизации между устройствами)
-        // ВАЖНО: Проверяем, что WebApp готов
         if (tgReady && tg && tg.CloudStorage) {
             try {
                 const value = await tg.CloudStorage.getItem(key);
                 if (value !== null && value !== undefined && value !== '') {
-                    console.log(`[STORAGE] ✓ Loaded from CloudStorage: ${key}, length: ${value.length}`);
-                    // Обновляем localStorage для быстрого доступа
-                    try {
-                        localStorage.setItem(key, value);
-                    } catch (e) {
-                        console.warn('[STORAGE] localStorage sync failed:', e);
-                    }
+                    localStorage.setItem(key, value);
                     return value;
                 }
-            } catch (cloudError) {
-                console.error(`[STORAGE] CloudStorage getItem error for ${key}:`, cloudError);
+            } catch (e) {
+                // Fallback to localStorage
             }
         }
-        
-        // Fallback на localStorage (только если CloudStorage пуст или недоступен)
         const value = localStorage.getItem(key);
         if (value !== null && value !== '') {
-            console.log(`[STORAGE] Loaded from localStorage: ${key}`);
-            // Если CloudStorage доступен, но был пуст, синхронизируем данные из localStorage (асинхронно, не блокируем)
             if (tgReady && tg && tg.CloudStorage) {
-                // Делаем синхронизацию асинхронно, не ждем
-                tg.CloudStorage.setItem(key, value).then(() => {
-                    console.log(`[STORAGE] ✓ Synced localStorage to CloudStorage: ${key}`);
-                }).catch(e => {
-                    console.warn('[STORAGE] CloudStorage sync failed:', e);
-                });
+                tg.CloudStorage.setItem(key, value).catch(() => {});
             }
             return value;
         }
-        
         return null;
     } catch (error) {
-        console.error(`[STORAGE] Error loading ${key}:`, error);
-        // Fallback на localStorage
         try {
-            const value = localStorage.getItem(key);
-            return value;
+            return localStorage.getItem(key);
         } catch (e) {
-            console.error(`[STORAGE] localStorage fallback failed:`, e);
             return null;
         }
     }
 }
 
-// Синхронная версия для обратной совместимости (использует localStorage как кэш)
 function loadFromStorageSync(key) {
     try {
         return localStorage.getItem(key);
     } catch (e) {
-        console.error(`[STORAGE] Sync load failed:`, e);
         return null;
     }
 }
 
-// Отслеживание изменений для оптимизированной синхронизации
 let lastDiaryHash = null;
 let lastUserDataHash = null;
 let pendingSync = false;
 
-// Вычисление хэша данных для отслеживания изменений
 function getDataHash(data) {
     return btoa(JSON.stringify(data)).substring(0, 16);
 }
 
-// Оптимизированная синхронизация данных из CloudStorage (только при изменениях)
 function startDataSync() {
-    if (!tgReady || !tg || !tg.CloudStorage) {
-        console.log('[SYNC] CloudStorage not ready, skipping sync');
-        return;
-    }
+    if (!tgReady || !tg || !tg.CloudStorage) return;
     
-    // Инициализируем хэши при старте
     const currentDiary = getDiary();
     lastDiaryHash = getDataHash(currentDiary);
     if (userData) {
         lastUserDataHash = getDataHash(userData);
     }
     
-    // Синхронизация только при изменениях (проверка каждые 60 секунд)
     setInterval(async () => {
-        if (pendingSync) {
-            console.log('[SYNC] Sync already in progress, skipping...');
-            return;
-        }
+        if (pendingSync) return;
         
         try {
-            // Проверяем, были ли изменения локально
             const currentDiary = getDiary();
             const currentDiaryHash = getDataHash(currentDiary);
             const currentUserDataHash = userData ? getDataHash(userData) : null;
             
-            let needsSync = false;
-            
-            // Проверяем изменения дневника
             if (currentDiaryHash !== lastDiaryHash) {
-                console.log('[SYNC] Diary changed locally, syncing...');
                 pendingSync = true;
                 await saveToStorage('klyro_diary', JSON.stringify(currentDiary));
                 lastDiaryHash = currentDiaryHash;
-                needsSync = true;
                 pendingSync = false;
             }
             
-            // Проверяем изменения данных пользователя
             if (userData && currentUserDataHash !== lastUserDataHash) {
-                console.log('[SYNC] User data changed locally, syncing...');
                 pendingSync = true;
                 await saveToStorage('klyro_user_data', JSON.stringify(userData));
                 lastUserDataHash = currentUserDataHash;
-                needsSync = true;
                 pendingSync = false;
             }
-            
-            // Загружаем изменения из CloudStorage (только если нет локальных изменений)
-            if (!needsSync) {
-                const cloudDiaryStr = await loadFromStorage('klyro_diary');
-                if (cloudDiaryStr) {
-                    const cloudDiary = JSON.parse(cloudDiaryStr);
-                    const cloudDiaryHash = getDataHash(cloudDiary);
-                    if (cloudDiaryHash !== lastDiaryHash) {
-                        console.log('[SYNC] Cloud diary updated, applying...');
-                        localStorage.setItem('klyro_diary', cloudDiaryStr);
-                        lastDiaryHash = cloudDiaryHash;
-                        // Обновляем отображение если нужно
-                        if (document.getElementById('diary-screen')?.classList.contains('active')) {
-                            const today = new Date().toISOString().split('T')[0];
-                            renderDiary(today);
-                        }
-                        if (typeof updateDashboard === 'function') {
-                            updateDashboard();
-                        }
-                    }
-                }
-            }
         } catch (e) {
-            console.error('[SYNC] Sync error:', e);
+            console.error('[SYNC] Error:', e);
             pendingSync = false;
         }
-    }, 60000); // 60 секунд (увеличено с 30)
+    }, 60000);
     
-    // Синхронизируем при фокусе окна
     window.addEventListener('focus', async () => {
-        console.log('[SYNC] Window focused, checking for updates...');
         await loadDiaryFromCloud();
     });
     
-    // Синхронизируем при видимости страницы
     document.addEventListener('visibilitychange', async () => {
         if (!document.hidden) {
-            console.log('[SYNC] Page visible, checking for updates...');
             await loadDiaryFromCloud();
         }
     });
 }
 
-// Состояние приложения
 let currentStep = 1;
 const totalSteps = 4;
 let userData = null;
 
-// Простая функция для скрытия loading и показа auth
-function forceShowAuth() {
-    console.log('Force showing auth screen');
-    try {
-        // Скрываем все экраны
-        const allScreens = document.querySelectorAll('.screen');
-        allScreens.forEach(screen => {
-            screen.classList.remove('active');
-            screen.style.display = 'none';
-        });
-        
-        // Показываем auth screen
-        const authScreen = document.getElementById('auth-screen');
-        if (authScreen) {
-            authScreen.classList.add('active');
-            authScreen.style.display = 'block';
-            console.log('Auth screen should be visible now');
-        } else {
-            console.error('Auth screen element not found!');
-        }
-    } catch (e) {
-        console.error('Error in forceShowAuth:', e);
-    }
-}
-
-// Функция для отправки логов на сервер (для отладки)
-function sendLogToServer(level, message) {
-    try {
-        // Отправляем только важные логи
-        if (level === 'error' || message.includes('ERROR') || message.includes('❌')) {
-            fetch('https://9d8bc4492f90.ngrok-free.app/log', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    level,
-                    message,
-                    userAgent: navigator.userAgent,
-                    timestamp: new Date().toISOString(),
-                    telegram: window.Telegram && window.Telegram.WebApp ? 'yes' : 'no'
-                })
-            }).catch(() => {}); // Игнорируем ошибки отправки
-        }
-    } catch (e) {
-        // Игнорируем ошибки
-    }
-}
-
-// Перехватываем console.error для отправки на сервер
-const originalError = console.error;
-console.error = function(...args) {
-    originalError.apply(console, args);
-    sendLogToServer('error', args.join(' '));
-};
-
 // Инициализация приложения
 function initApp() {
     try {
-        console.log('=== Klyro App Initializing ===');
-        
-        // СНАЧАЛА показываем экран по умолчанию (не ждем загрузки данных)
-        try {
-            const screens = document.querySelectorAll('.screen');
-            screens.forEach(screen => {
-                screen.classList.remove('active');
-                screen.style.display = 'none';
-                screen.style.visibility = 'hidden';
-                screen.style.opacity = '0';
-            });
-        } catch (e) {
-            console.error('[INIT] Error hiding screens:', e);
-        }
+        const screens = document.querySelectorAll('.screen');
+        screens.forEach(screen => {
+            screen.classList.remove('active');
+            screen.style.display = 'none';
+            screen.style.visibility = 'hidden';
+            screen.style.opacity = '0';
+        });
         
         if (window.Telegram && window.Telegram.WebApp) {
             const screen = document.getElementById('onboarding-screen');
@@ -365,9 +170,6 @@ function initApp() {
                 screen.style.display = 'block';
                 screen.style.visibility = 'visible';
                 screen.style.opacity = '1';
-                console.log('[INIT] Showing onboarding screen immediately');
-            } else {
-                console.error('[INIT] onboarding-screen element not found!');
             }
         } else {
             const screen = document.getElementById('auth-screen');
@@ -376,151 +178,73 @@ function initApp() {
                 screen.style.display = 'block';
                 screen.style.visibility = 'visible';
                 screen.style.opacity = '1';
-                console.log('[INIT] Showing auth screen immediately');
-            } else {
-                console.error('[INIT] auth-screen element not found!');
             }
         }
         
-        // Telegram WebApp уже инициализирован в initTelegramWebApp()
-        if (tg && tgReady) {
-            console.log('Telegram WebApp initialized');
-            // Запускаем периодическую синхронизацию данных из CloudStorage
-            if (tg.CloudStorage) {
-                try {
-                    startDataSync();
-                } catch (e) {
-                    console.error('[INIT] Error starting data sync:', e);
-                }
-            }
+        if (tg && tgReady && tg.CloudStorage) {
+            startDataSync();
         }
         
-        // Затем проверяем данные пользователя в фоне и обновляем экран
-        checkUserAuth().then(() => {
-            console.log('[INIT] checkUserAuth completed successfully');
-        }).catch(e => {
-            console.error('[INIT] Error in checkUserAuth:', e);
-            console.error('[INIT] Error stack:', e.stack);
-            // Оставляем текущий экран (онбординг или авторизацию)
+        checkUserAuth().catch(e => {
+            console.error('[INIT] Error:', e);
         });
     } catch (e) {
-        console.error('[INIT] CRITICAL ERROR in initApp:', e);
-        console.error('[INIT] Error stack:', e.stack);
-        // Пытаемся показать хотя бы какой-то экран
-        try {
-            const screen = document.getElementById('auth-screen') || document.getElementById('onboarding-screen');
-            if (screen) {
-                screen.style.display = 'block';
-                screen.style.visibility = 'visible';
-                screen.style.opacity = '1';
-            }
-        } catch (fallbackError) {
-            console.error('[INIT] Even fallback failed:', fallbackError);
+        console.error('[INIT] Critical error:', e);
+        const screen = document.getElementById('auth-screen') || document.getElementById('onboarding-screen');
+        if (screen) {
+            screen.style.display = 'block';
+            screen.style.visibility = 'visible';
+            screen.style.opacity = '1';
         }
     }
 }
 
-// Функция для запуска инициализации
 function startApp() {
-    // Ждём готовности DOM
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initApp);
     } else {
-        // DOM уже загружен, запускаем сразу
         initApp();
     }
 }
 
-// Запускаем инициализацию только после полной загрузки скрипта
 if (document.readyState === 'complete') {
     startApp();
 } else {
     window.addEventListener('load', startApp);
 }
 
-// Проверка авторизации и загрузка данных
 async function checkUserAuth() {
     try {
-        console.log('[AUTH] Starting checkUserAuth...');
-        
-        // Скрываем loading screen
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
-            loadingScreen.classList.remove('active');
             loadingScreen.style.display = 'none';
             loadingScreen.style.visibility = 'hidden';
             loadingScreen.style.opacity = '0';
         }
         
-        // Загружаем данные из хранилища
-        let savedData = null;
+        let savedData = loadFromStorageSync('klyro_user_data');
         
-        // Сначала проверяем localStorage (быстро)
-        try {
-            savedData = loadFromStorageSync('klyro_user_data');
-            console.log('[AUTH] localStorage check:', savedData ? `found (${savedData.length} chars)` : 'not found');
-        } catch (e) {
-            console.error('[AUTH] localStorage read error:', e);
-        }
-        
-        // Если нет данных в localStorage, пробуем CloudStorage (с коротким таймаутом, не блокируем)
         if (!savedData && tgReady && tg && tg.CloudStorage) {
             try {
-                console.log('[AUTH] Trying CloudStorage...');
                 const cloudPromise = loadFromStorage('klyro_user_data');
                 const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
                 if (savedData) {
-                    console.log('[AUTH] CloudStorage result:', `found (${savedData.length} chars)`);
-                    try {
-                        localStorage.setItem('klyro_user_data', savedData);
-                        console.log('[AUTH] Synced CloudStorage to localStorage');
-                    } catch (e) {
-                        console.warn('[AUTH] Failed to sync to localStorage:', e);
-                    }
-                } else {
-                    console.log('[AUTH] CloudStorage timeout or empty');
+                    localStorage.setItem('klyro_user_data', savedData);
                 }
             } catch (e) {
-                console.warn('[AUTH] CloudStorage load failed:', e);
+                // Ignore
             }
         }
         
         if (savedData) {
             try {
                 userData = JSON.parse(savedData);
-                console.log('[AUTH] Parsed userData:', {
-                    dateOfBirth: userData.dateOfBirth,
-                    age: userData.age,
-                    height: userData.height,
-                    weight: userData.weight,
-                    gender: userData.gender,
-                    fullData: userData
-                });
-                
-                // КРИТИЧНО: Проверяем наличие ОБЯЗАТЕЛЬНЫХ полей
                 const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
                 const hasHeight = !!userData.height;
                 const hasProfileData = hasDateOfBirth && hasHeight;
                 
-                console.log('[AUTH] Profile data check:', {
-                    hasProfileData: hasProfileData,
-                    hasDateOfBirth: hasDateOfBirth,
-                    hasAge: !!userData.age,
-                    hasHeight: hasHeight,
-                    dateOfBirthValue: userData.dateOfBirth,
-                    heightValue: userData.height
-                });
-                
                 if (!hasProfileData) {
-                    console.warn('[AUTH] Missing profile data:', {
-                        hasDateOfBirth: hasDateOfBirth,
-                        hasAge: !!userData.age,
-                        hasHeight: hasHeight,
-                        dateOfBirth: userData.dateOfBirth,
-                        height: userData.height
-                    });
-                    // Если данных нет, показываем онбординг
                     if (window.Telegram && window.Telegram.WebApp) {
                         showOnboardingScreen();
                     } else {
@@ -530,7 +254,6 @@ async function checkUserAuth() {
                 }
                 
                 if (hasProfileData) {
-                    // Инициализируем хэши для синхронизации
                     lastUserDataHash = getDataHash(userData);
                     if (typeof getDiary === 'function') {
                         const diary = getDiary();
@@ -538,7 +261,6 @@ async function checkUserAuth() {
                             lastDiaryHash = getDataHash(diary);
                         }
                     }
-                    console.log('[AUTH] Showing profile screen');
                     showProfileScreen();
                     if (typeof updateUsernameDisplay === 'function') {
                         updateUsernameDisplay();
@@ -549,44 +271,30 @@ async function checkUserAuth() {
                     return;
                 }
             } catch (e) {
-                console.error('[AUTH] Error parsing saved data:', e);
+                console.error('[AUTH] Parse error:', e);
                 localStorage.removeItem('klyro_user_data');
             }
         }
 
-        // Обновляем данные Telegram, если доступны
-        // ВАЖНО: Не перезаписываем существующие данные профиля!
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
             const initData = window.Telegram.WebApp.initDataUnsafe;
             if (initData.user) {
                 if (!userData) userData = {};
                 const telegramUser = initData.user;
-                
-                // Обновляем только Telegram-специфичные поля, НЕ трогаем данные профиля
                 userData.id = telegramUser.id;
                 userData.firstName = telegramUser.first_name || userData.firstName || 'Пользователь';
                 userData.lastName = telegramUser.last_name || userData.lastName || '';
                 userData.username = telegramUser.username || userData.username || '';
                 userData.photoUrl = telegramUser.photo_url || userData.photoUrl || '';
                 
-                console.log('[AUTH] Telegram data merged:', {
-                    id: userData.id,
-                    firstName: userData.firstName,
-                    username: userData.username,
-                    hasProfileData: !!(userData.dateOfBirth || userData.age) && !!userData.height
-                });
-                
                 if (typeof updateUsernameDisplay === 'function') {
                     updateUsernameDisplay();
                 }
                 
-                // Проверяем, есть ли данные профиля (НЕ перезаписываем их!)
                 const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                console.log('[AUTH] After Telegram merge - hasExistingProfile:', hasExistingProfile);
                 if (hasExistingProfile) {
                     lastUserDataHash = getDataHash(userData);
-                    await saveUserData(); // Сохраняем объединенные данные
-                    console.log('[AUTH] Showing profile screen (from Telegram + saved data)');
+                    await saveUserData();
                     showProfileScreen();
                     if (typeof loadDiaryFromCloud === 'function') {
                         loadDiaryFromCloud();
@@ -596,17 +304,13 @@ async function checkUserAuth() {
             }
         }
         
-        // Если нет данных профиля, показываем онбординг или авторизацию
-        console.log('[AUTH] No profile data, showing onboarding/auth');
         if (window.Telegram && window.Telegram.WebApp) {
             showOnboardingScreen();
         } else {
             showAuthScreen();
         }
     } catch (e) {
-        console.error('[AUTH] Error in checkUserAuth:', e);
-        console.error('[AUTH] Stack:', e.stack);
-        // ВАЖНО: Всегда показываем экран, даже при ошибке
+        console.error('[AUTH] Error:', e);
         if (window.Telegram && window.Telegram.WebApp) {
             showOnboardingScreen();
         } else {
@@ -615,9 +319,7 @@ async function checkUserAuth() {
     }
 }
 
-// Показать экран авторизации
 function showAuthScreen() {
-    console.log('[SCREEN] showAuthScreen called');
     hideAllScreens();
     const authScreen = document.getElementById('auth-screen');
     if (authScreen) {
@@ -625,48 +327,38 @@ function showAuthScreen() {
         authScreen.style.display = 'block';
         authScreen.style.visibility = 'visible';
         authScreen.style.opacity = '1';
-        console.log('[SCREEN] Auth screen shown');
-    } else {
-        console.error('[SCREEN] Auth screen element not found!');
-        return;
     }
     
     const authButton = document.getElementById('auth-button');
     if (authButton) {
-        // Удаляем старые обработчики, если есть
         const newAuthButton = authButton.cloneNode(true);
         authButton.parentNode.replaceChild(newAuthButton, authButton);
         
         newAuthButton.addEventListener('click', () => {
-        // В реальном приложении здесь должна быть проверка через Telegram
-        // Для демо используем данные из initDataUnsafe или создаём тестовые
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            const telegramUser = tg.initDataUnsafe.user;
-            userData = {
-                id: telegramUser.id,
-                firstName: telegramUser.first_name || 'Пользователь',
-                lastName: telegramUser.last_name || '',
-                username: telegramUser.username || '',
-                photoUrl: telegramUser.photo_url || ''
-            };
-            // Обновляем username
-            updateUsernameDisplay();
-        } else {
-            // Тестовые данные для разработки
-            userData = {
-                id: Date.now(),
-                firstName: 'Тестовый',
-                lastName: 'Пользователь',
-                username: 'test_user',
-                photoUrl: ''
-            };
-        }
-        showOnboardingScreen();
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const telegramUser = tg.initDataUnsafe.user;
+                userData = {
+                    id: telegramUser.id,
+                    firstName: telegramUser.first_name || 'Пользователь',
+                    lastName: telegramUser.last_name || '',
+                    username: telegramUser.username || '',
+                    photoUrl: telegramUser.photo_url || ''
+                };
+                updateUsernameDisplay();
+            } else {
+                userData = {
+                    id: Date.now(),
+                    firstName: 'Тестовый',
+                    lastName: 'Пользователь',
+                    username: 'test_user',
+                    photoUrl: ''
+                };
+            }
+            showOnboardingScreen();
         });
     }
 }
 
-// Инициализация кастомного date picker
 function initDateInput() {
     const dateInput = document.getElementById('dateOfBirth');
     const datePicker = document.getElementById('datePicker');
@@ -688,7 +380,6 @@ function initDateInput() {
     let currentDate = new Date();
     let selectedDate = null;
     
-    // Заполняем месяцы
     const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
                         'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
     
@@ -699,7 +390,6 @@ function initDateInput() {
         datePickerMonth.appendChild(option);
     });
     
-    // Заполняем годы
     for (let year = maxYear; year >= minYear; year--) {
         const option = document.createElement('option');
         option.value = year;
@@ -707,7 +397,6 @@ function initDateInput() {
         datePickerYear.appendChild(option);
     }
     
-    // Инициализация из userData
     if (userData && userData.dateOfBirth) {
         selectedDate = new Date(userData.dateOfBirth);
         currentDate = new Date(selectedDate);
@@ -721,7 +410,6 @@ function initDateInput() {
         currentDate = new Date(maxYear, 0, 1);
     }
     
-    // Обновление календаря
     function updateCalendar() {
         datePickerMonth.value = currentDate.getMonth();
         datePickerYear.value = currentDate.getFullYear();
@@ -731,18 +419,16 @@ function initDateInput() {
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
-        const startingDayOfWeek = (firstDay.getDay() + 6) % 7; // Понедельник = 0
+        const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
         
         datePickerDays.innerHTML = '';
         
-        // Пустые ячейки для дней предыдущего месяца
         for (let i = 0; i < startingDayOfWeek; i++) {
             const dayCell = document.createElement('div');
             dayCell.className = 'date-picker-day date-picker-day-other';
             datePickerDays.appendChild(dayCell);
         }
         
-        // Дни текущего месяца
         for (let day = 1; day <= daysInMonth; day++) {
             const dayCell = document.createElement('div');
             dayCell.className = 'date-picker-day';
@@ -762,7 +448,6 @@ function initDateInput() {
             
             dayCell.addEventListener('click', () => {
                 selectedDate = new Date(year, month, day);
-                console.log('[DATE] Date selected:', selectedDate);
                 updateCalendar();
                 updateDateInput();
             });
@@ -771,7 +456,6 @@ function initDateInput() {
         }
     }
     
-    // Обновление отображаемой даты
     function updateDateInput() {
         if (selectedDate) {
             const day = selectedDate.getDate();
@@ -783,22 +467,13 @@ function initDateInput() {
             dateInput.value = dateString;
             if (dateOfBirthValue) {
                 dateOfBirthValue.value = isoDate;
-                console.log('[DATE] Date updated:', {
-                    display: dateString,
-                    iso: isoDate,
-                    hiddenValue: dateOfBirthValue.value
-                });
-            } else {
-                console.error('[DATE] dateOfBirthValue element not found!');
             }
         } else {
             if (dateInput) dateInput.value = '';
             if (dateOfBirthValue) dateOfBirthValue.value = '';
-            console.log('[DATE] Date cleared');
         }
     }
     
-    // Навигация
     datePickerMonth.addEventListener('change', () => {
         currentDate.setMonth(parseInt(datePickerMonth.value));
         updateCalendar();
@@ -822,7 +497,7 @@ function initDateInput() {
     resetBtn.addEventListener('click', () => {
         selectedDate = null;
         dateInput.value = '';
-        dateOfBirthValue.value = '';
+        if (dateOfBirthValue) dateOfBirthValue.value = '';
         updateCalendar();
     });
     
@@ -830,7 +505,6 @@ function initDateInput() {
         datePicker.style.display = 'none';
     });
     
-    // Открытие календаря
     dateInput.addEventListener('click', (e) => {
         e.preventDefault();
         if (datePicker.style.display === 'none') {
@@ -841,28 +515,24 @@ function initDateInput() {
         }
     });
     
-    // Закрытие при клике вне календаря
     document.addEventListener('click', (e) => {
         if (!datePicker.contains(e.target) && e.target !== dateInput) {
             datePicker.style.display = 'none';
         }
     });
     
-    // Инициализация
     updateCalendar();
     if (selectedDate) {
         updateDateInput();
     }
 }
 
-// Инициализация слайдеров роста и веса
 function initHeightWeightSliders() {
     const heightSlider = document.getElementById('height');
     const weightSlider = document.getElementById('weight');
     const heightValue = document.getElementById('heightValue');
     const weightValue = document.getElementById('weightValue');
     
-    // Инициализация значений из userData или дефолтные
     if (userData && userData.height) {
         if (heightSlider) heightSlider.value = userData.height;
         if (heightValue) heightValue.textContent = userData.height + ' см';
@@ -886,9 +556,7 @@ function initHeightWeightSliders() {
     }
 }
 
-// Показать экран онбординга
 function showOnboardingScreen() {
-    console.log('[SCREEN] showOnboardingScreen called');
     hideAllScreens();
     const onboardingScreen = document.getElementById('onboarding-screen');
     if (onboardingScreen) {
@@ -899,19 +567,12 @@ function showOnboardingScreen() {
         currentStep = 1;
         updateProgress();
         showStep(1);
-        
-        // Инициализируем input для даты рождения и слайдеры для роста и веса
         initDateInput();
         initHeightWeightSliders();
-        console.log('[SCREEN] Onboarding screen shown');
-    } else {
-        console.error('[SCREEN] Onboarding screen element not found!');
     }
 }
 
-// Показать экран профиля
 function showProfileScreen() {
-    console.log('[SCREEN] showProfileScreen called');
     hideAllScreens();
     const profileScreen = document.getElementById('profile-screen');
     if (profileScreen) {
@@ -919,21 +580,14 @@ function showProfileScreen() {
         profileScreen.style.display = 'block';
         profileScreen.style.visibility = 'visible';
         profileScreen.style.opacity = '1';
-        console.log('[SCREEN] Profile screen shown');
-    } else {
-        console.error('[SCREEN] Profile screen element not found!');
-        return;
     }
     
     if (userData) {
-        // Заполняем данные профиля
         document.getElementById('user-name').textContent = 
             `${userData.firstName} ${userData.lastName || ''}`.trim();
         
-        // Обновляем username в углу
         updateUsernameDisplay();
         
-        // Показываем параметры
         const age = getUserAge();
         if (age !== null) {
             document.getElementById('profile-age').textContent = age;
@@ -970,13 +624,11 @@ function showProfileScreen() {
             document.getElementById('profile-goal').textContent = goalMap[userData.goal] || userData.goal;
         }
         
-        // Показываем калории
         const calories = calculateCalories();
         document.getElementById('calories-value').textContent = Math.round(calories);
     }
 }
 
-// Управление шагами онбординга
 function showStep(step) {
     const steps = document.querySelectorAll('.onboarding-step');
     steps.forEach(s => s.classList.remove('active'));
@@ -990,7 +642,6 @@ function showStep(step) {
 }
 
 function nextStep() {
-    // Валидация текущего шага
     if (!validateCurrentStep()) {
         return;
     }
@@ -1013,7 +664,6 @@ function updateProgress() {
     document.getElementById('progress-fill').style.width = `${progress}%`;
 }
 
-// Вычисление возраста из даты рождения
 function calculateAge(dateOfBirth) {
     if (!dateOfBirth) return null;
     const birthDate = new Date(dateOfBirth);
@@ -1026,12 +676,10 @@ function calculateAge(dateOfBirth) {
     return age;
 }
 
-// Получение возраста пользователя (из dateOfBirth или age для обратной совместимости)
 function getUserAge() {
     if (userData && userData.dateOfBirth) {
         return calculateAge(userData.dateOfBirth);
     }
-    // Обратная совместимость: если есть age, используем его
     if (userData && userData.age) {
         return userData.age;
     }
@@ -1098,7 +746,6 @@ function validateCurrentStep() {
     }
 }
 
-// Показать уведомление
 function showNotification(message) {
     if (window.Telegram?.WebApp) {
         tg.showAlert(message);
@@ -1107,13 +754,11 @@ function showNotification(message) {
     }
 }
 
-// Завершение онбординга
 async function completeOnboarding() {
     if (!validateCurrentStep()) {
         return;
     }
     
-    // Собираем все данные из слайдеров
     const genderInput = document.querySelector('input[name="gender"]:checked');
     const heightSlider = document.getElementById('height');
     const weightSlider = document.getElementById('weight');
@@ -1124,75 +769,44 @@ async function completeOnboarding() {
         userData = {};
     }
     
-    // Сохраняем дату рождения (не возраст)
     const dateOfBirthValue = document.getElementById('dateOfBirthValue');
     const dateInput = document.getElementById('dateOfBirth');
-    console.log('[ONBOARDING] Date inputs:', {
-        dateOfBirthValue: dateOfBirthValue ? dateOfBirthValue.value : 'element not found',
-        dateInput: dateInput ? dateInput.value : 'element not found'
-    });
     
     if (dateOfBirthValue && dateOfBirthValue.value) {
         userData.dateOfBirth = dateOfBirthValue.value;
-        // Вычисляем и сохраняем возраст для обратной совместимости
         userData.age = calculateAge(dateOfBirthValue.value);
-        console.log('[ONBOARDING] Date of birth saved:', userData.dateOfBirth, 'Age:', userData.age);
     } else if (dateInput && dateInput.value) {
-        // Fallback: пытаемся распарсить из текстового поля (формат DD.MM.YYYY)
         const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
         if (dateMatch) {
             const day = parseInt(dateMatch[1]);
-            const month = parseInt(dateMatch[2]) - 1; // месяцы в JS начинаются с 0
+            const month = parseInt(dateMatch[2]) - 1;
             const year = parseInt(dateMatch[3]);
             const date = new Date(year, month, day);
             if (!isNaN(date.getTime())) {
                 userData.dateOfBirth = date.toISOString().split('T')[0];
                 userData.age = calculateAge(userData.dateOfBirth);
-                console.log('[ONBOARDING] Date parsed from input field:', userData.dateOfBirth);
             }
         }
     }
     
-    if (!userData.dateOfBirth) {
-        console.error('[ONBOARDING] ✗ ERROR: Date of birth is missing!');
-    }
     if (genderInput) userData.gender = genderInput.value;
     if (heightSlider) userData.height = parseInt(heightSlider.value);
     if (weightSlider) userData.weight = parseFloat(weightSlider.value);
     if (activityInput) userData.activity = activityInput.value;
     if (goalInput) userData.goal = goalInput.value;
     
-    // Рассчитываем калории
     userData.calories = calculateCalories();
     
-    // Сохраняем данные
-    console.log('[ONBOARDING] Saving user data before showing profile...');
-    console.log('[ONBOARDING] User data to save:', {
-        dateOfBirth: userData.dateOfBirth,
-        age: userData.age,
-        height: userData.height,
-        weight: userData.weight,
-        gender: userData.gender,
-        activity: userData.activity,
-        goal: userData.goal,
-        calories: userData.calories
-    });
-    
-    // Сохраняем данные
     await saveUserData();
-    
-    // Показываем профиль
     showProfileScreen();
 }
 
-// Расчёт калорий по формуле Mifflin-St Jeor
 function calculateCalories() {
     const age = getUserAge();
     if (!userData || age === null || !userData.gender || !userData.height || !userData.weight) {
         return 0;
     }
     
-    // BMR (Basal Metabolic Rate) по формуле Mifflin-St Jeor
     let bmr;
     if (userData.gender === 'male') {
         bmr = 10 * userData.weight + 6.25 * userData.height - 5 * age + 5;
@@ -1200,7 +814,6 @@ function calculateCalories() {
         bmr = 10 * userData.weight + 6.25 * userData.height - 5 * age - 161;
     }
     
-    // Коэффициент активности
     const activityMultipliers = {
         'low': 1.2,
         'moderate': 1.55,
@@ -1210,69 +823,42 @@ function calculateCalories() {
     const activityMultiplier = activityMultipliers[userData.activity] || 1.2;
     let tdee = bmr * activityMultiplier;
     
-    // Корректировка в зависимости от цели
     const goalAdjustments = {
-        'lose': 0.85,      // Дефицит 15%
-        'maintain': 1.0,   // Без изменений
-        'gain': 1.15       // Профицит 15%
+        'lose': 0.85,
+        'maintain': 1.0,
+        'gain': 1.15
     };
     
     const goalAdjustment = goalAdjustments[userData.goal] || 1.0;
-    const finalCalories = tdee * goalAdjustment;
-    
-    return finalCalories;
+    return tdee * goalAdjustment;
 }
 
-// Сохранение данных пользователя
 async function saveUserData() {
-    if (!userData) {
-        console.warn('[USERDATA] No userData to save');
-        return;
-    }
+    if (!userData) return;
     
     const userDataStr = JSON.stringify(userData);
-    console.log('[USERDATA] Saving user data');
     
-    // Простое сохранение в localStorage
     try {
         localStorage.setItem('klyro_user_data', userDataStr);
-        console.log('[USERDATA] Saved to localStorage');
     } catch (e) {
         console.error('[USERDATA] localStorage save error:', e);
         return;
     }
     
-    // Обновляем хэш для отслеживания изменений
     lastUserDataHash = getDataHash(userData);
     
-    // Сохраняем в CloudStorage для синхронизации (асинхронно, не блокируем)
     if (tgReady && tg && tg.CloudStorage) {
         try {
             await tg.CloudStorage.setItem('klyro_user_data', userDataStr);
-            console.log('[USERDATA] Saved to CloudStorage');
         } catch (e) {
-            console.warn('[USERDATA] CloudStorage save failed:', e);
+            // Ignore
         }
     }
 }
 
-// Загрузка данных пользователя
-async function loadUserData() {
-    const savedData = await loadFromStorage('klyro_user_data');
-    if (savedData) {
-        userData = JSON.parse(savedData);
-        return true;
-    }
-    return false;
-}
-
-// Редактирование профиля
 function editProfile() {
-    // Переходим к онбордингу - слайдеры автоматически заполнятся из userData
-    // через функции initDateSliders и initHeightWeightSliders
     showOnboardingScreen();
     
-    // Устанавливаем пол если есть
     if (userData.gender) {
         const genderInput = document.querySelector(`input[name="gender"][value="${userData.gender}"]`);
         if (genderInput) {
@@ -1292,12 +878,10 @@ function editProfile() {
         }
     }
     
-    // Начинаем с первого шага для редактирования
     currentStep = 1;
     showOnboardingScreen();
 }
 
-// Пересчёт калорий
 function recalculateCalories() {
     if (!userData) {
         showNotification('Сначала заполните данные профиля');
@@ -1309,12 +893,9 @@ function recalculateCalories() {
     saveUserData();
     
     document.getElementById('calories-value').textContent = Math.round(newCalories);
-    
-    // Показываем уведомление
     showNotification('Калории пересчитаны!');
 }
 
-// Скрыть все экраны
 function hideAllScreens() {
     try {
         const screens = document.querySelectorAll('.screen');
@@ -1324,17 +905,15 @@ function hideAllScreens() {
             screen.style.visibility = 'hidden';
             screen.style.opacity = '0';
         });
-        console.log('[SCREEN] All screens hidden');
     } catch (e) {
-        console.error('[SCREEN] Error hiding screens:', e);
+        console.error('[SCREEN] Error:', e);
     }
 }
 
 // ============================================
-// НОВЫЕ МОДУЛИ: Трекер питания и активности
+// ТРЕКЕР ПИТАНИЯ
 // ============================================
 
-// Глобальные переменные для новых модулей
 let productsDatabase = [];
 let selectedProduct = null;
 let macrosChart = null;
@@ -1342,23 +921,18 @@ let caloriesChart = null;
 let weightChart = null;
 let currentDiaryDate = new Date().toISOString().split('T')[0];
 let currentHistoryPeriod = 7;
-let productsDatabaseLoaded = false; // Флаг загрузки базы продуктов
+let productsDatabaseLoaded = false;
 
-// Версия базы продуктов для кэширования (увеличивать при обновлении базы)
 const PRODUCTS_DB_VERSION = '1.0';
 const PRODUCTS_CACHE_KEY = 'klyro_products_db';
 const PRODUCTS_CACHE_VERSION_KEY = 'klyro_products_db_version';
 
-// Загрузка базы продуктов с кэшированием и lazy loading
 async function loadProductsDatabase() {
-    // Если уже загружена, не загружаем снова
     if (productsDatabaseLoaded && productsDatabase.length > 0) {
-        console.log('[PRODUCTS] Database already loaded from memory');
         return;
     }
     
     try {
-        // Проверяем кэш в localStorage
         const cachedVersion = localStorage.getItem(PRODUCTS_CACHE_VERSION_KEY);
         const cachedData = localStorage.getItem(PRODUCTS_CACHE_KEY);
         
@@ -1366,19 +940,14 @@ async function loadProductsDatabase() {
             try {
                 productsDatabase = JSON.parse(cachedData);
                 productsDatabaseLoaded = true;
-                console.log(`[PRODUCTS] Loaded ${productsDatabase.length} products from cache`);
-                // Загружаем в фоне для обновления кэша
                 updateProductsCache();
                 return;
             } catch (e) {
-                console.warn('[PRODUCTS] Cache parse error, loading from server:', e);
                 localStorage.removeItem(PRODUCTS_CACHE_KEY);
                 localStorage.removeItem(PRODUCTS_CACHE_VERSION_KEY);
             }
         }
         
-        // Загружаем с сервера
-        console.log('[PRODUCTS] Loading from server...');
         const response = await fetch('data/products.json?v=' + PRODUCTS_DB_VERSION);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -1386,30 +955,25 @@ async function loadProductsDatabase() {
         productsDatabase = await response.json();
         productsDatabaseLoaded = true;
         
-        // Сохраняем в кэш
         try {
             localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsDatabase));
             localStorage.setItem(PRODUCTS_CACHE_VERSION_KEY, PRODUCTS_DB_VERSION);
-            console.log(`[PRODUCTS] Loaded ${productsDatabase.length} products and cached`);
         } catch (e) {
-            console.warn('[PRODUCTS] Cache save failed (quota exceeded?):', e);
-            // Если localStorage переполнен, удаляем старые данные
             try {
                 localStorage.removeItem('klyro_products_db');
                 localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(productsDatabase));
                 localStorage.setItem(PRODUCTS_CACHE_VERSION_KEY, PRODUCTS_DB_VERSION);
             } catch (e2) {
-                console.error('[PRODUCTS] Failed to save cache:', e2);
+                console.error('[PRODUCTS] Cache save failed:', e2);
             }
         }
     } catch (e) {
-        console.error('[PRODUCTS] Error loading products:', e);
+        console.error('[PRODUCTS] Error:', e);
         productsDatabase = [];
         productsDatabaseLoaded = false;
     }
 }
 
-// Обновление кэша в фоне (без блокировки UI)
 async function updateProductsCache() {
     try {
         const response = await fetch('data/products.json?v=' + PRODUCTS_DB_VERSION + '&t=' + Date.now());
@@ -1419,43 +983,23 @@ async function updateProductsCache() {
                 productsDatabase = freshData;
                 localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(freshData));
                 localStorage.setItem(PRODUCTS_CACHE_VERSION_KEY, PRODUCTS_DB_VERSION);
-                console.log('[PRODUCTS] Cache updated in background');
             }
         }
     } catch (e) {
-        console.warn('[PRODUCTS] Background cache update failed:', e);
+        // Ignore
     }
 }
 
-// Lazy loading: база продуктов загружается только при открытии экрана поиска
-// Не загружаем при старте приложения для быстрой первой загрузки
-
-// ============================================
-// РАСШИРЕНИЕ DASHBOARD (профиля)
-// ============================================
-
-// Обновление Dashboard с данными за сегодня
 function updateDashboard() {
-    if (!userData) {
-        console.log('[DASHBOARD] No userData, skipping');
-        return;
-    }
+    if (!userData) return;
     
-    // Проверяем наличие элементов
     const consumedEl = document.getElementById('consumed-calories');
     const targetEl = document.getElementById('target-calories');
     const progressEl = document.getElementById('calories-progress-fill');
     const dateEl = document.getElementById('today-date');
     const chartEl = document.getElementById('macros-chart');
     
-    if (!consumedEl || !targetEl || !progressEl) {
-        console.error('[DASHBOARD] Required elements not found!', {
-            consumed: !!consumedEl,
-            target: !!targetEl,
-            progress: !!progressEl
-        });
-        return;
-    }
+    if (!consumedEl || !targetEl || !progressEl) return;
     
     const today = new Date().toISOString().split('T')[0];
     const diary = getDiaryForDate(today);
@@ -1466,42 +1010,29 @@ function updateDashboard() {
     
     const targetCalories = calculateCalories();
     
-    // Обновляем калории сегодня
     consumedEl.textContent = Math.round(totalKcal);
     targetEl.textContent = Math.round(targetCalories);
     
-    // Прогресс-бар калорий
     const progress = targetCalories > 0 ? Math.min((totalKcal / targetCalories) * 100, 100) : 0;
     progressEl.style.width = `${progress}%`;
     
-    // Обновляем дату
     if (dateEl) {
         const date = new Date();
         dateEl.textContent = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
     }
     
-    // Обновляем макросы только если canvas существует
     if (chartEl) {
         updateMacrosChart(totalProtein, totalFat, totalCarbs);
-    } else {
-        console.warn('[DASHBOARD] Macros chart canvas not found');
     }
 }
 
-// Обновление графика макросов (donut chart)
 function updateMacrosChart(protein, fat, carbs) {
     const ctx = document.getElementById('macros-chart');
     if (!ctx) return;
     
-    // Удаляем старый график если есть
     if (macrosChart) {
         macrosChart.destroy();
     }
-    
-    const total = protein + fat + carbs;
-    const proteinPercent = total > 0 ? (protein / total * 100).toFixed(1) : 0;
-    const fatPercent = total > 0 ? (fat / total * 100).toFixed(1) : 0;
-    const carbsPercent = total > 0 ? (carbs / total * 100).toFixed(1) : 0;
     
     macrosChart = new Chart(ctx, {
         type: 'doughnut',
@@ -1532,36 +1063,25 @@ function updateMacrosChart(protein, fat, carbs) {
         }
     });
     
-    // Обновляем значения в легенде
     document.getElementById('protein-value').textContent = `${protein.toFixed(1)}г`;
     document.getElementById('fat-value').textContent = `${fat.toFixed(1)}г`;
     document.getElementById('carbs-value').textContent = `${carbs.toFixed(1)}г`;
 }
 
-// Сохраняем оригинальную функцию showProfileScreen
 const originalShowProfileScreen = showProfileScreen;
 
-// Переопределяем showProfileScreen для обновления Dashboard
 function showProfileScreenExtended() {
     originalShowProfileScreen();
-    // Увеличиваем задержку для гарантии загрузки DOM
     setTimeout(() => {
-        console.log('[DASHBOARD] Updating dashboard...');
         try {
             updateDashboard();
-            console.log('[DASHBOARD] Dashboard updated successfully');
         } catch (e) {
-            console.error('[DASHBOARD] Error updating dashboard:', e);
+            console.error('[DASHBOARD] Error:', e);
         }
     }, 300);
 }
 
-// Заменяем функцию
 showProfileScreen = showProfileScreenExtended;
-
-// ============================================
-// ЭКРАН ДОБАВЛЕНИЯ ЕДЫ
-// ============================================
 
 async function showAddFoodScreen() {
     hideAllScreens();
@@ -1578,9 +1098,7 @@ async function showAddFoodScreen() {
         foodSearch.focus();
     }
     
-    // Lazy loading: загружаем базу продуктов только при открытии экрана
     if (!productsDatabaseLoaded || productsDatabase.length === 0) {
-        // Показываем индикатор загрузки
         const productsList = document.getElementById('products-list');
         if (productsList) {
             productsList.innerHTML = '<div class="loading-indicator">Загрузка базы продуктов...</div>';
@@ -1632,7 +1150,6 @@ function renderProductsList(products) {
 function selectProduct(productId) {
     selectedProduct = productsDatabase.find(p => p.id === String(productId));
     if (!selectedProduct) return;
-    
     showProductAmountScreen();
 }
 
@@ -1683,25 +1200,15 @@ function setQuickAmount(grams) {
 
 function addFoodToDiary() {
     if (!selectedProduct) {
-        console.error('[DIARY] No product selected');
         showNotification('Выберите продукт');
         return;
     }
     
     const gramsEl = document.getElementById('product-grams');
-    if (!gramsEl) {
-        console.error('[DIARY] product-grams element not found');
-        return;
-    }
+    if (!gramsEl) return;
     
     const grams = parseFloat(gramsEl.value) || 100;
     const multiplier = grams / 100;
-    
-    console.log('[DIARY] Adding food to diary:', {
-        product: selectedProduct.name,
-        grams: grams,
-        date: currentDiaryDate
-    });
     
     const entry = {
         id: Date.now().toString(),
@@ -1714,13 +1221,11 @@ function addFoodToDiary() {
         timestamp: new Date().toISOString()
     };
     
-    // Выполняем добавление асинхронно, но не блокируем UI
     addDiaryEntry(currentDiaryDate, entry).then(() => {
-        console.log('[DIARY] ✓ Food added successfully');
         showNotification('Продукт добавлен в дневник!');
         showDiaryScreen();
     }).catch(e => {
-        console.error('[DIARY] ✗ Error adding food:', e);
+        console.error('[DIARY] Error:', e);
         showNotification('Ошибка при добавлении продукта');
     });
 }
@@ -1762,42 +1267,25 @@ function saveCustomProduct() {
     showProductAmountScreen();
 }
 
-// ============================================
-// ДНЕВНИК ПИТАНИЯ
-// ============================================
-
-// Загрузка дневника из CloudStorage
 async function loadDiaryFromCloud() {
     try {
-        console.log('[DIARY] Loading from CloudStorage...');
         if (tgReady && tg && tg.CloudStorage) {
             const diaryStr = await loadFromStorage('klyro_diary');
             if (diaryStr) {
                 const diary = JSON.parse(diaryStr);
-                const entriesCount = Object.keys(diary).reduce((sum, date) => sum + diary[date].length, 0);
-                console.log('[DIARY] ✓ Loaded from CloudStorage, dates:', Object.keys(diary).length, 'total entries:', entriesCount);
-                
-                // Обновляем локальный кэш
                 localStorage.setItem('klyro_diary', diaryStr);
-                // Обновляем хэш
                 lastDiaryHash = getDataHash(diary);
                 
-                // Обновляем отображение если на экране дневника
                 if (document.getElementById('diary-screen')?.classList.contains('active')) {
                     renderDiary();
                 }
-                // Обновляем dashboard
                 if (typeof updateDashboard === 'function') {
                     updateDashboard();
                 }
-            } else {
-                console.log('[DIARY] No diary data in CloudStorage');
             }
-        } else {
-            console.log('[DIARY] CloudStorage not available (tgReady:', tgReady, 'tg:', !!tg, 'CloudStorage:', tg ? !!tg.CloudStorage : 'N/A')');
         }
     } catch (e) {
-        console.error('[DIARY] ✗ Error loading from cloud:', e);
+        console.error('[DIARY] Error:', e);
     }
 }
 
@@ -1808,25 +1296,19 @@ function getDiary() {
 
 async function saveDiary(diary) {
     const diaryStr = JSON.stringify(diary);
-    console.log('[DIARY] Saving diary, entries count:', Object.keys(diary).length);
     
-    // Сохраняем в localStorage для быстрого доступа
     try {
         localStorage.setItem('klyro_diary', diaryStr);
-        console.log('[DIARY] ✓ Saved to localStorage');
     } catch (e) {
-        console.error('[DIARY] ✗ localStorage save failed:', e);
+        console.error('[DIARY] localStorage save failed:', e);
     }
     
-    // Обновляем хэш для отслеживания изменений
     lastDiaryHash = getDataHash(diary);
     
-    // Сохраняем в CloudStorage для синхронизации (ЖДЕМ завершения!)
     try {
         await saveToStorage('klyro_diary', diaryStr);
-        console.log('[DIARY] ✓ Saved to CloudStorage');
     } catch (e) {
-        console.error('[DIARY] ✗ CloudStorage save failed:', e);
+        console.error('[DIARY] CloudStorage save failed:', e);
     }
 }
 
@@ -1836,15 +1318,12 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    console.log('[DIARY] Adding entry for date:', date, 'entry:', entry.name);
     const diary = getDiary();
     if (!diary[date]) {
         diary[date] = [];
     }
     diary[date].push(entry);
-    console.log('[DIARY] Entry added, total entries for date:', diary[date].length);
     await saveDiary(diary);
-    console.log('[DIARY] Diary saved after adding entry');
 }
 
 async function removeDiaryEntry(date, entryId) {
@@ -1865,15 +1344,12 @@ function showDiaryScreen() {
         screen.style.opacity = '1';
     }
     
-    // Сначала показываем текущие данные
     renderDiary();
     
-    // Затем загружаем дневник из CloudStorage в фоне (не блокируем UI)
     loadDiaryFromCloud().then(() => {
-        // Обновляем отображение после загрузки
         renderDiary();
     }).catch(e => {
-        console.error('[DIARY] Error loading from cloud in showDiaryScreen:', e);
+        console.error('[DIARY] Error:', e);
     });
 }
 
@@ -1881,7 +1357,6 @@ function renderDiary() {
     const date = currentDiaryDate;
     const entries = getDiaryForDate(date);
     
-    // Обновляем дату
     const dateObj = new Date(date);
     document.getElementById('diary-date').textContent = dateObj.toLocaleDateString('ru-RU', { 
         day: 'numeric', 
@@ -1889,7 +1364,6 @@ function renderDiary() {
         weekday: 'long'
     });
     
-    // Подсчитываем итоги
     const totalKcal = entries.reduce((sum, item) => sum + item.kcal, 0);
     const totalProtein = entries.reduce((sum, item) => sum + item.protein, 0);
     const totalFat = entries.reduce((sum, item) => sum + item.fat, 0);
@@ -1900,14 +1374,12 @@ function renderDiary() {
     document.getElementById('diary-total-fat').textContent = `${totalFat.toFixed(1)}г`;
     document.getElementById('diary-total-carbs').textContent = `${totalCarbs.toFixed(1)}г`;
     
-    // Рендерим приёмы пищи
     const mealsContainer = document.getElementById('diary-meals');
     if (entries.length === 0) {
         mealsContainer.innerHTML = '<div class="empty-state">Нет записей за этот день</div>';
         return;
     }
     
-    // Группируем по времени (можно улучшить)
     mealsContainer.innerHTML = entries.map(entry => {
         const time = new Date(entry.timestamp).toLocaleTimeString('ru-RU', { 
             hour: '2-digit', 
@@ -1947,22 +1419,17 @@ function changeDiaryDate(days) {
 
 function deleteDiaryEntry(entryId) {
     if (confirm('Удалить эту запись?')) {
-        // Выполняем удаление асинхронно, не блокируем UI
         removeDiaryEntry(currentDiaryDate, entryId).then(() => {
             renderDiary();
             if (typeof updateDashboard === 'function') {
                 updateDashboard();
             }
         }).catch(e => {
-            console.error('[DIARY] Error deleting entry:', e);
+            console.error('[DIARY] Error:', e);
             showNotification('Ошибка при удалении записи');
         });
     }
 }
-
-// ============================================
-// ИСТОРИЯ И ГРАФИКИ
-// ============================================
 
 function showHistoryScreen() {
     hideAllScreens();
@@ -2000,12 +1467,9 @@ function renderHistoryCharts() {
         const entries = diary[dateStr] || [];
         const totalKcal = entries.reduce((sum, item) => sum + item.kcal, 0);
         calories.push(Math.round(totalKcal));
-        
-        // Вес можно добавить позже в userData
         weights.push(null);
     }
     
-    // График калорий
     const caloriesCtx = document.getElementById('calories-chart');
     if (caloriesCtx) {
         if (caloriesChart) caloriesChart.destroy();
@@ -2036,7 +1500,6 @@ function renderHistoryCharts() {
         });
     }
     
-    // График веса (если есть данные)
     const weightCtx = document.getElementById('weight-chart');
     if (weightCtx && weights.some(w => w !== null)) {
         if (weightChart) weightChart.destroy();
@@ -2062,10 +1525,6 @@ function renderHistoryCharts() {
         });
     }
 }
-
-// ============================================
-// ТРЕНИРОВКИ И АКТИВНОСТЬ
-// ============================================
 
 const activityMET = {
     'running': 11.5,
@@ -2123,6 +1582,10 @@ function getActivities() {
     return activitiesStr ? JSON.parse(activitiesStr) : [];
 }
 
+function saveActivities(activities) {
+    localStorage.setItem('klyro_activities', JSON.stringify(activities));
+}
+
 function saveActivity() {
     const name = document.getElementById('activity-name').value;
     const duration = parseFloat(document.getElementById('activity-duration').value) || 0;
@@ -2150,7 +1613,6 @@ function saveActivity() {
     saveActivities(activities);
     
     if (addToDiary) {
-        // Добавляем как отрицательные калории (можно улучшить)
         const entry = {
             id: `activity_${activity.id}`,
             name: `Тренировка: ${activity.name}`,
@@ -2161,9 +1623,8 @@ function saveActivity() {
             carbs: 0,
             timestamp: activity.timestamp
         };
-        // Выполняем добавление асинхронно, не блокируем UI
         addDiaryEntry(currentDiaryDate, entry).catch(e => {
-            console.error('[ACTIVITY] Error adding to diary:', e);
+            console.error('[ACTIVITY] Error:', e);
         });
     }
     
@@ -2202,14 +1663,11 @@ function updateActivityCalories() {
     document.getElementById('activity-calories').textContent = calories;
 }
 
-// Экспорт функций для использования в HTML
 window.nextStep = nextStep;
 window.prevStep = prevStep;
 window.completeOnboarding = completeOnboarding;
 window.editProfile = editProfile;
 window.recalculateCalories = recalculateCalories;
-
-// Новые функции
 window.showAddFoodScreen = showAddFoodScreen;
 window.showDiaryScreen = showDiaryScreen;
 window.showHistoryScreen = showHistoryScreen;
@@ -2229,10 +1687,6 @@ window.updateActivityCalories = updateActivityCalories;
 window.saveActivity = saveActivity;
 window.showProfileScreen = showProfileScreenExtended;
 
-// ============================================
-// НАСТРОЙКИ
-// ============================================
-
 function showSettingsScreen() {
     hideAllScreens();
     const screen = document.getElementById('settings-screen');
@@ -2243,7 +1697,6 @@ function showSettingsScreen() {
         screen.style.opacity = '1';
     }
     
-    // Загружаем сохранённые единицы измерения
     const units = loadFromStorageSync('klyro_units') || 'metric';
     const unitInput = document.querySelector(`input[name="units"][value="${units}"]`);
     if (unitInput) unitInput.checked = true;
@@ -2261,7 +1714,6 @@ function exportData() {
     const savedUserData = loadFromStorageSync('klyro_user_data');
     const userData = savedUserData ? JSON.parse(savedUserData) : {};
     
-    // Создаём CSV для дневника
     let csv = 'Дата,Продукт,Вес (г),Калории,Белки (г),Жиры (г),Углеводы (г),Время\n';
     
     Object.keys(diary).forEach(date => {
@@ -2271,7 +1723,6 @@ function exportData() {
         });
     });
     
-    // Добавляем тренировки
     csv += '\nТренировки\n';
     csv += 'Дата,Активность,Длительность (мин),Калории\n';
     activities.forEach(activity => {
@@ -2279,7 +1730,6 @@ function exportData() {
         csv += `${date},"${activity.name}",${activity.duration},${activity.calories}\n`;
     });
     
-    // Создаём и скачиваем файл
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -2308,7 +1758,6 @@ function importData(event) {
                 return;
             }
             
-            // Парсим CSV (упрощённая версия)
             const diary = getDiary();
             let imported = 0;
             
@@ -2346,10 +1795,9 @@ function importData(event) {
             saveDiary(diary);
             showNotification(`Импортировано ${imported} записей`);
             
-            // Очищаем input
             event.target.value = '';
         } catch (error) {
-            console.error('Ошибка импорта:', error);
+            console.error('Import error:', error);
             showNotification('Ошибка при импорте данных');
         }
     };
@@ -2361,11 +1809,6 @@ window.setUnits = setUnits;
 window.exportData = exportData;
 window.importData = importData;
 
-// ============================================
-// ФУНКЦИЯ ОТОБРАЖЕНИЯ USERNAME
-// ============================================
-
-// Обновление отображения username в углу экрана
 function updateUsernameDisplay() {
     if (!userData) {
         const badge = document.getElementById('username-badge');
@@ -2376,15 +1819,12 @@ function updateUsernameDisplay() {
     const badge = document.getElementById('username-badge');
     if (!badge) return;
     
-    // Получаем username из Telegram или используем firstName
     let username = userData.username || userData.firstName || 'Пользователь';
     
-    // Если есть @, убираем его
     if (username.startsWith('@')) {
         username = username.substring(1);
     }
     
-    // Если нет username, используем firstName
     if (!userData.username && userData.firstName) {
         username = userData.firstName;
     }
@@ -2393,6 +1833,6 @@ function updateUsernameDisplay() {
     badge.style.display = 'block';
 }
 
-// Экспорт функции
 window.updateUsernameDisplay = updateUsernameDisplay;
 
+window.updateUsernameDisplay = updateUsernameDisplay;
