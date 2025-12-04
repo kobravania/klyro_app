@@ -173,19 +173,29 @@ window.exportDebugLogs = exportDebugLogs;
 
 // Инициализация Telegram WebApp
 function initTelegramWebApp() {
+    addDebugLog('info', 'Инициализация Telegram WebApp');
+    
     if (window.Telegram && window.Telegram.WebApp) {
         tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
+        
+        addDebugLog('info', 'Telegram WebApp API найден', null, {
+            hasCloudStorage: !!tg.CloudStorage,
+            hasSetItem: tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false,
+            hasGetItem: tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false
+        });
         
         // Увеличиваем задержку для полной инициализации CloudStorage в Telegram Web App
         setTimeout(() => {
             // Проверяем, что CloudStorage действительно доступен
             if (tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
                 tgReady = true;
+                addDebugLog('info', 'Telegram WebApp готов, CloudStorage доступен');
             } else {
                 // Если CloudStorage недоступен, все равно помечаем как готовый (будет использоваться только localStorage)
                 tgReady = true;
+                addDebugLog('warn', 'Telegram WebApp готов, но CloudStorage недоступен - будет использоваться только localStorage');
             }
         }, 300);
     } else {
@@ -197,6 +207,7 @@ function initTelegramWebApp() {
             CloudStorage: null
         };
         tgReady = true;
+        addDebugLog('warn', 'Telegram WebApp API не найден - работа в режиме без Telegram');
     }
 }
 
@@ -488,16 +499,28 @@ function initApp() {
 }
 
 function startApp() {
+    addDebugLog('info', 'Запуск приложения', null, {
+        readyState: document.readyState,
+        hasTelegram: !!(window.Telegram && window.Telegram.WebApp)
+    });
+    
     if (document.readyState === 'loading') {
+        addDebugLog('info', 'Документ еще загружается, ждем DOMContentLoaded');
         document.addEventListener('DOMContentLoaded', initApp);
     } else {
+        addDebugLog('info', 'Документ готов, запускаем initApp');
         initApp();
     }
 }
 
+// Инициализация системы логирования при загрузке скрипта
+addDebugLog('info', 'Скрипт app.js загружен, система логирования инициализирована');
+
 if (document.readyState === 'complete') {
+    addDebugLog('info', 'Документ уже загружен, запускаем startApp');
     startApp();
 } else {
+    addDebugLog('info', 'Ждем события load для запуска startApp');
     window.addEventListener('load', startApp);
 }
 
