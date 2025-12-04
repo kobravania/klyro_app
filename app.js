@@ -57,10 +57,12 @@ async function saveToStorage(key, value) {
 
 async function loadFromStorage(key) {
     try {
+        // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
         if (tgReady && tg && tg.CloudStorage) {
             try {
                 const value = await tg.CloudStorage.getItem(key);
                 if (value !== null && value !== undefined && value !== '') {
+                    // Обновляем localStorage для быстрого доступа
                     localStorage.setItem(key, value);
                     return value;
                 }
@@ -68,8 +70,10 @@ async function loadFromStorage(key) {
                 // Fallback to localStorage
             }
         }
+        // Fallback на localStorage
         const value = localStorage.getItem(key);
         if (value !== null && value !== '') {
+            // Синхронизируем в CloudStorage в фоне
             if (tgReady && tg && tg.CloudStorage) {
                 tg.CloudStorage.setItem(key, value).catch(() => {});
             }
@@ -101,49 +105,117 @@ function getDataHash(data) {
     return btoa(JSON.stringify(data)).substring(0, 16);
 }
 
+// Функция для синхронизации данных в CloudStorage
+async function syncToCloud() {
+    if (!tgReady || !tg || !tg.CloudStorage || pendingSync) return;
+    
+    try {
+        pendingSync = true;
+        
+        // Синхронизируем дневник
+        const currentDiary = getDiary();
+        const currentDiaryHash = getDataHash(currentDiary);
+        if (currentDiaryHash !== lastDiaryHash) {
+            await saveToStorage('klyro_diary', JSON.stringify(currentDiary));
+            lastDiaryHash = currentDiaryHash;
+        }
+        
+        // Синхронизируем данные пользователя
+        if (userData) {
+            const currentUserDataHash = getDataHash(userData);
+            if (currentUserDataHash !== lastUserDataHash) {
+                await saveToStorage('klyro_user_data', JSON.stringify(userData));
+                lastUserDataHash = currentUserDataHash;
+            }
+        }
+        
+        pendingSync = false;
+    } catch (e) {
+        console.error('[SYNC] Error:', e);
+        pendingSync = false;
+    }
+}
+
+// Функция для загрузки данных из CloudStorage
+async function syncFromCloud() {
+    if (!tgReady || !tg || !tg.CloudStorage) return;
+    
+    try {
+        // Загружаем дневник
+        const cloudDiaryStr = await loadFromStorage('klyro_diary');
+        if (cloudDiaryStr) {
+            const cloudDiary = JSON.parse(cloudDiaryStr);
+            const cloudDiaryHash = getDataHash(cloudDiary);
+            if (cloudDiaryHash !== lastDiaryHash) {
+                localStorage.setItem('klyro_diary', cloudDiaryStr);
+                lastDiaryHash = cloudDiaryHash;
+                
+                // Обновляем отображение если нужно
+                if (document.getElementById('diary-screen')?.classList.contains('active')) {
+                    renderDiary();
+                }
+                if (typeof updateDashboard === 'function') {
+                    updateDashboard();
+                }
+            }
+        }
+        
+        // Загружаем данные пользователя
+        const cloudUserDataStr = await loadFromStorage('klyro_user_data');
+        if (cloudUserDataStr) {
+            const cloudUserData = JSON.parse(cloudUserDataStr);
+            const cloudUserDataHash = getDataHash(cloudUserData);
+            if (cloudUserDataHash !== lastUserDataHash) {
+                userData = cloudUserData;
+                localStorage.setItem('klyro_user_data', cloudUserDataStr);
+                lastUserDataHash = cloudUserDataHash;
+                
+                // Обновляем отображение если нужно
+                if (document.getElementById('profile-screen')?.classList.contains('active')) {
+                    showProfileScreen();
+                }
+                if (typeof updateUsernameDisplay === 'function') {
+                    updateUsernameDisplay();
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[SYNC] Load error:', e);
+    }
+}
+
 function startDataSync() {
     if (!tgReady || !tg || !tg.CloudStorage) return;
     
+    // Инициализируем хэши
     const currentDiary = getDiary();
     lastDiaryHash = getDataHash(currentDiary);
     if (userData) {
         lastUserDataHash = getDataHash(userData);
     }
     
-    setInterval(async () => {
-        if (pendingSync) return;
-        
-        try {
-            const currentDiary = getDiary();
-            const currentDiaryHash = getDataHash(currentDiary);
-            const currentUserDataHash = userData ? getDataHash(userData) : null;
-            
-            if (currentDiaryHash !== lastDiaryHash) {
-                pendingSync = true;
-                await saveToStorage('klyro_diary', JSON.stringify(currentDiary));
-                lastDiaryHash = currentDiaryHash;
-                pendingSync = false;
-            }
-            
-            if (userData && currentUserDataHash !== lastUserDataHash) {
-                pendingSync = true;
-                await saveToStorage('klyro_user_data', JSON.stringify(userData));
-                lastUserDataHash = currentUserDataHash;
-                pendingSync = false;
-            }
-        } catch (e) {
-            console.error('[SYNC] Error:', e);
-            pendingSync = false;
-        }
-    }, 60000);
+    // Сначала загружаем данные из CloudStorage при старте
+    syncFromCloud();
     
+    // Периодическая синхронизация: отправка изменений каждые 10 секунд
+    setInterval(() => {
+        syncToCloud();
+    }, 10000);
+    
+    // Периодическая загрузка изменений каждые 15 секунд
+    setInterval(() => {
+        syncFromCloud();
+    }, 15000);
+    
+    // Синхронизация при фокусе окна
     window.addEventListener('focus', async () => {
-        await loadDiaryFromCloud();
+        await syncFromCloud();
     });
     
+    // Синхронизация при видимости страницы
     document.addEventListener('visibilitychange', async () => {
         if (!document.hidden) {
-            await loadDiaryFromCloud();
+            await syncFromCloud();
         }
     });
 }
@@ -222,19 +294,24 @@ async function checkUserAuth() {
             loadingScreen.style.opacity = '0';
         }
         
-        let savedData = loadFromStorageSync('klyro_user_data');
-        
-        if (!savedData && tgReady && tg && tg.CloudStorage) {
+        // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
+        let savedData = null;
+        if (tgReady && tg && tg.CloudStorage) {
             try {
                 const cloudPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
                 if (savedData) {
                     localStorage.setItem('klyro_user_data', savedData);
                 }
             } catch (e) {
-                // Ignore
+                // Fallback to localStorage
             }
+        }
+        
+        // Fallback на localStorage если CloudStorage не дал результатов
+        if (!savedData) {
+            savedData = loadFromStorageSync('klyro_user_data');
         }
         
         if (savedData) {
@@ -847,11 +924,14 @@ async function saveUserData() {
     
     lastUserDataHash = getDataHash(userData);
     
+    // Сразу синхронизируем в CloudStorage
     if (tgReady && tg && tg.CloudStorage) {
         try {
             await tg.CloudStorage.setItem('klyro_user_data', userDataStr);
+            // Также запускаем общую синхронизацию
+            syncToCloud();
         } catch (e) {
-            // Ignore
+            console.error('[USERDATA] CloudStorage save error:', e);
         }
     }
 }
@@ -1268,25 +1348,8 @@ function saveCustomProduct() {
 }
 
 async function loadDiaryFromCloud() {
-    try {
-        if (tgReady && tg && tg.CloudStorage) {
-            const diaryStr = await loadFromStorage('klyro_diary');
-            if (diaryStr) {
-                const diary = JSON.parse(diaryStr);
-                localStorage.setItem('klyro_diary', diaryStr);
-                lastDiaryHash = getDataHash(diary);
-                
-                if (document.getElementById('diary-screen')?.classList.contains('active')) {
-                    renderDiary();
-                }
-                if (typeof updateDashboard === 'function') {
-                    updateDashboard();
-                }
-            }
-        }
-    } catch (e) {
-        console.error('[DIARY] Error:', e);
-    }
+    // Используем общую функцию синхронизации
+    await syncFromCloud();
 }
 
 function getDiary() {
@@ -1305,8 +1368,11 @@ async function saveDiary(diary) {
     
     lastDiaryHash = getDataHash(diary);
     
+    // Сразу синхронизируем в CloudStorage
     try {
         await saveToStorage('klyro_diary', diaryStr);
+        // Также запускаем общую синхронизацию
+        syncToCloud();
     } catch (e) {
         console.error('[DIARY] CloudStorage save failed:', e);
     }
@@ -1832,7 +1898,5 @@ function updateUsernameDisplay() {
     badge.textContent = `@${username}`;
     badge.style.display = 'block';
 }
-
-window.updateUsernameDisplay = updateUsernameDisplay;
 
 window.updateUsernameDisplay = updateUsernameDisplay;
