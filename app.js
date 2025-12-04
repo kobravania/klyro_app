@@ -344,6 +344,28 @@ console.error = function(...args) {
 function initApp() {
     console.log('=== Klyro App Initializing ===');
     
+    // СНАЧАЛА показываем экран по умолчанию (не ждем загрузки данных)
+    hideAllScreens();
+    if (window.Telegram && window.Telegram.WebApp) {
+        const screen = document.getElementById('onboarding-screen');
+        if (screen) {
+            screen.classList.add('active');
+            screen.style.display = 'block';
+            screen.style.visibility = 'visible';
+            screen.style.opacity = '1';
+            console.log('[INIT] Showing onboarding screen immediately');
+        }
+    } else {
+        const screen = document.getElementById('auth-screen');
+        if (screen) {
+            screen.classList.add('active');
+            screen.style.display = 'block';
+            screen.style.visibility = 'visible';
+            screen.style.opacity = '1';
+            console.log('[INIT] Showing auth screen immediately');
+        }
+    }
+    
     // Telegram WebApp уже инициализирован в initTelegramWebApp()
     if (tg && tgReady) {
         console.log('Telegram WebApp initialized');
@@ -353,76 +375,13 @@ function initApp() {
         }
     }
     
-    // КРИТИЧНО: Гарантируем показ экрана через 500ms максимум
-    const screenTimeout = setTimeout(() => {
-        console.warn('[INIT] Timeout: Forcing screen display after 500ms');
-        const activeScreen = document.querySelector('.screen.active');
-        if (!activeScreen) {
-            console.warn('[INIT] No active screen found, showing default');
-            hideAllScreens();
-            if (window.Telegram && window.Telegram.WebApp) {
-                if (typeof showOnboardingScreen === 'function') {
-                    showOnboardingScreen();
-                } else {
-                    const screen = document.getElementById('onboarding-screen');
-                    if (screen) {
-                        screen.classList.add('active');
-                        screen.style.display = 'block';
-                        screen.style.visibility = 'visible';
-                        screen.style.opacity = '1';
-                    }
-                }
-            } else {
-                if (typeof showAuthScreen === 'function') {
-                    showAuthScreen();
-                } else {
-                    const screen = document.getElementById('auth-screen');
-                    if (screen) {
-                        screen.classList.add('active');
-                        screen.style.display = 'block';
-                        screen.style.visibility = 'visible';
-                        screen.style.opacity = '1';
-                    }
-                }
-            }
-        }
-    }, 500);
-    
-    // Проверяем данные пользователя - это единственное место, где решается, что показывать
+    // Затем проверяем данные пользователя в фоне и обновляем экран
     checkUserAuth().then(() => {
-        clearTimeout(screenTimeout);
         console.log('[INIT] checkUserAuth completed successfully');
     }).catch(e => {
-        clearTimeout(screenTimeout);
         console.error('[INIT] Error in checkUserAuth:', e);
         console.error('[INIT] Error stack:', e.stack);
-        // Fallback - показываем онбординг или авторизацию
-        hideAllScreens();
-        if (window.Telegram && window.Telegram.WebApp) {
-            if (typeof showOnboardingScreen === 'function') {
-                showOnboardingScreen();
-            } else {
-                const screen = document.getElementById('onboarding-screen');
-                if (screen) {
-                    screen.classList.add('active');
-                    screen.style.display = 'block';
-                    screen.style.visibility = 'visible';
-                    screen.style.opacity = '1';
-                }
-            }
-        } else {
-            if (typeof showAuthScreen === 'function') {
-                showAuthScreen();
-            } else {
-                const screen = document.getElementById('auth-screen');
-                if (screen) {
-                    screen.classList.add('active');
-                    screen.style.display = 'block';
-                    screen.style.visibility = 'visible';
-                    screen.style.opacity = '1';
-                }
-            }
-        }
+        // Оставляем текущий экран (онбординг или авторизацию)
     });
 }
 
