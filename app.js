@@ -677,7 +677,10 @@ async function checkUserAuth() {
         
         if (savedData) {
             try {
-                addDebugLog('info', 'Парсинг данных пользователя');
+                addDebugLog('info', 'Парсинг данных пользователя', null, {
+                    dataLength: savedData.length,
+                    dataPreview: savedData.substring(0, 200)
+                });
                 userData = JSON.parse(savedData);
                 const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
                 const hasHeight = !!userData.height;
@@ -686,11 +689,21 @@ async function checkUserAuth() {
                 addDebugLog('info', 'Проверка данных профиля', null, {
                     hasDateOfBirth: hasDateOfBirth,
                     hasHeight: hasHeight,
-                    hasProfileData: hasProfileData
+                    hasProfileData: hasProfileData,
+                    dateOfBirth: userData.dateOfBirth,
+                    age: userData.age,
+                    height: userData.height,
+                    allKeys: Object.keys(userData)
                 });
                 
                 if (!hasProfileData) {
-                    addDebugLog('info', 'Профиль не заполнен, показываем onboarding/auth');
+                    addDebugLog('warn', '⚠️ Профиль не заполнен, показываем onboarding/auth', null, {
+                        missingDateOfBirth: !hasDateOfBirth,
+                        missingHeight: !hasHeight,
+                        dateOfBirth: userData.dateOfBirth,
+                        age: userData.age,
+                        height: userData.height
+                    });
                     if (window.Telegram && window.Telegram.WebApp) {
                         showOnboardingScreen();
                     } else {
@@ -1220,7 +1233,10 @@ function showNotification(message) {
 }
 
 async function completeOnboarding() {
+    addDebugLog('info', 'Начало завершения onboarding');
+    
     if (!validateCurrentStep()) {
+        addDebugLog('warn', 'Валидация не пройдена, onboarding не завершен');
         return;
     }
     
@@ -1240,6 +1256,10 @@ async function completeOnboarding() {
     if (dateOfBirthValue && dateOfBirthValue.value) {
         userData.dateOfBirth = dateOfBirthValue.value;
         userData.age = calculateAge(dateOfBirthValue.value);
+        addDebugLog('info', 'Дата рождения из dateOfBirthValue', null, {
+            dateOfBirth: userData.dateOfBirth,
+            age: userData.age
+        });
     } else if (dateInput && dateInput.value) {
         const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
         if (dateMatch) {
@@ -1250,6 +1270,10 @@ async function completeOnboarding() {
             if (!isNaN(date.getTime())) {
                 userData.dateOfBirth = date.toISOString().split('T')[0];
                 userData.age = calculateAge(userData.dateOfBirth);
+                addDebugLog('info', 'Дата рождения из dateInput', null, {
+                    dateOfBirth: userData.dateOfBirth,
+                    age: userData.age
+                });
             }
         }
     }
@@ -1262,7 +1286,39 @@ async function completeOnboarding() {
     
     userData.calories = calculateCalories();
     
+    addDebugLog('info', 'Данные пользователя собраны', null, {
+        hasDateOfBirth: !!(userData.dateOfBirth || userData.age),
+        hasHeight: !!userData.height,
+        hasWeight: !!userData.weight,
+        hasGender: !!userData.gender,
+        hasActivity: !!userData.activity,
+        hasGoal: !!userData.goal,
+        dateOfBirth: userData.dateOfBirth,
+        height: userData.height,
+        weight: userData.weight
+    });
+    
+    addDebugLog('info', 'Сохранение данных пользователя');
     await saveUserData();
+    
+    // Проверяем, что данные сохранились
+    const savedCheck = loadFromStorageSync('klyro_user_data');
+    if (savedCheck) {
+        try {
+            const savedData = JSON.parse(savedCheck);
+            addDebugLog('info', '✅ Данные успешно сохранены', null, {
+                hasDateOfBirth: !!(savedData.dateOfBirth || savedData.age),
+                hasHeight: !!savedData.height,
+                savedHeight: savedData.height,
+                savedDateOfBirth: savedData.dateOfBirth
+            });
+        } catch (e) {
+            addDebugLog('error', 'Ошибка проверки сохраненных данных', e);
+        }
+    } else {
+        addDebugLog('error', '❌ Данные НЕ сохранились в localStorage!');
+    }
+    
     showProfileScreen();
 }
 
@@ -1299,13 +1355,30 @@ function calculateCalories() {
 }
 
 async function saveUserData() {
-    if (!userData) return;
+    addDebugLog('info', 'saveUserData вызван', null, {
+        hasUserData: !!userData,
+        userDataKeys: userData ? Object.keys(userData) : []
+    });
+    
+    if (!userData) {
+        addDebugLog('warn', 'userData пуст, сохранение отменено');
+        return;
+    }
     
     const userDataStr = JSON.stringify(userData);
+    addDebugLog('info', 'Данные сериализованы', null, {
+        dataLength: userDataStr.length,
+        hasDateOfBirth: !!(userData.dateOfBirth || userData.age),
+        hasHeight: !!userData.height
+    });
     
     // Сохраняем через saveToStorage (он сохранит в localStorage и синхронизирует в CloudStorage)
     await saveToStorage('klyro_user_data', userDataStr);
     lastUserDataHash = getDataHash(userData);
+    
+    addDebugLog('info', 'saveUserData завершен', null, {
+        hash: lastUserDataHash
+    });
 }
 
 function editProfile() {
