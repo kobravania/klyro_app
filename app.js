@@ -1352,7 +1352,13 @@ async function completeOnboarding() {
         addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА: Данные НЕ сохранились в localStorage!');
     }
     
+    addDebugLog('info', '✅ Завершение onboarding успешно, показываем профиль');
     showProfileScreen();
+    } catch (e) {
+        addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА в completeOnboarding', e);
+        showNotification('Ошибка при сохранении данных. Попробуйте еще раз.');
+    }
+}
 }
 
 function calculateCalories() {
