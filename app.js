@@ -682,8 +682,9 @@ async function checkUserAuth() {
                     dataPreview: savedData.substring(0, 200)
                 });
                 userData = JSON.parse(savedData);
+                // УЛУЧШЕННАЯ ПРОВЕРКА: более гибкая проверка наличия данных
                 const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
-                const hasHeight = !!userData.height;
+                const hasHeight = !!userData.height && userData.height > 0;
                 const hasProfileData = hasDateOfBirth && hasHeight;
                 
                 addDebugLog('info', 'Проверка данных профиля', null, {
