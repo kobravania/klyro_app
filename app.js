@@ -603,52 +603,135 @@ if (document.readyState === 'complete') {
 }
 
 async function checkUserAuth() {
-    addDebugLog('info', 'Проверка авторизации (фоновая)');
+    addDebugLog('info', 'Начало проверки авторизации пользователя');
     
     try {
-        // Загружаем из CloudStorage для синхронизации
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+            loadingScreen.style.visibility = 'hidden';
+            loadingScreen.style.opacity = '0';
+            addDebugLog('info', 'Экран загрузки скрыт');
+        }
+        
+        // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
         let savedData = null;
-        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function') {
+        if (tgReady && tg && tg.CloudStorage) {
+            addDebugLog('info', 'Попытка загрузки данных из CloudStorage');
             try {
-                const cloudPromise = tg.CloudStorage.getItem('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+                const cloudPromise = loadFromStorage('klyro_user_data');
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
                 if (savedData) {
                     localStorage.setItem('klyro_user_data', savedData);
-                    addDebugLog('info', '✅ Данные синхронизированы из CloudStorage');
+                    addDebugLog('info', 'Данные загружены из CloudStorage', null, {
+                        dataLength: savedData.length
+                    });
+                } else {
+                    addDebugLog('warn', 'CloudStorage вернул null или таймаут');
                 }
             } catch (e) {
-                addDebugLog('warn', 'Ошибка загрузки из CloudStorage', e);
+                addDebugLog('warn', 'Ошибка при загрузке из CloudStorage', e);
+            }
+        } else {
+            addDebugLog('warn', 'CloudStorage недоступен для загрузки', null, {
+                tgReady: tgReady,
+                hasTg: !!tg,
+                hasCloudStorage: tg ? !!tg.CloudStorage : false
+            });
+        }
+        
+        // Fallback на localStorage если CloudStorage не дал результатов
+        if (!savedData) {
+            addDebugLog('info', 'Загрузка данных из localStorage');
+            savedData = loadFromStorageSync('klyro_user_data');
+            if (savedData) {
+                addDebugLog('info', 'Данные загружены из localStorage', null, {
+                    dataLength: savedData.length
+                });
+            } else {
+                addDebugLog('info', 'Данных в localStorage нет');
             }
         }
         
-        // Если CloudStorage дал данные, проверяем их
         if (savedData) {
             try {
-                const cloudUserData = JSON.parse(savedData);
-                const hasDate = !!(cloudUserData.dateOfBirth || cloudUserData.age);
-                const hasHeight = !!cloudUserData.height && cloudUserData.height > 0;
+                addDebugLog('info', 'Парсинг данных пользователя', null, {
+                    dataLength: savedData.length,
+                    dataPreview: savedData.substring(0, 200)
+                });
+                userData = JSON.parse(savedData);
+                // УЛУЧШЕННАЯ ПРОВЕРКА: более гибкая проверка наличия данных
+                const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
+                const hasHeight = !!userData.height && userData.height > 0;
+                const hasProfileData = hasDateOfBirth && hasHeight;
                 
-                if (hasDate && hasHeight) {
-                    // Обновляем userData и показываем профиль, если сейчас показан onboarding
+                addDebugLog('info', 'Проверка данных профиля', null, {
+                    hasDateOfBirth: hasDateOfBirth,
+                    hasHeight: hasHeight,
+                    hasProfileData: hasProfileData,
+                    dateOfBirth: userData.dateOfBirth,
+                    age: userData.age,
+                    height: userData.height,
+                    allKeys: Object.keys(userData),
+                    fullUserData: userData
+                });
+                
+                // УЛУЧШЕННАЯ ПРОВЕРКА: проверяем более гибко
+                // Если есть хотя бы dateOfBirth ИЛИ age, и есть height - считаем профиль заполненным
+                const hasAnyDate = !!(userData.dateOfBirth || userData.age);
+                const hasAnyHeight = !!userData.height;
+                const isProfileComplete = hasAnyDate && hasAnyHeight;
+                
+                if (!isProfileComplete) {
+                    addDebugLog('warn', '⚠️ Профиль не заполнен, показываем onboarding/auth', null, {
+                        missingDateOfBirth: !hasDateOfBirth,
+                        missingHeight: !hasHeight,
+                        hasAnyDate: hasAnyDate,
+                        hasAnyHeight: hasAnyHeight,
+                        dateOfBirth: userData.dateOfBirth,
+                        age: userData.age,
+                        height: userData.height,
+                        fullUserData: userData
+                    });
+                    // НЕ переключаем экран, если он уже показан - просто убеждаемся что он виден
                     const currentScreen = document.querySelector('.screen.active');
-                    if (currentScreen && (currentScreen.id === 'onboarding-screen' || currentScreen.id === 'auth-screen')) {
-                        addDebugLog('info', 'Профиль найден в CloudStorage, переключаем на профиль');
-                        userData = cloudUserData;
-                        showProfileScreen();
-                    } else if (currentScreen && currentScreen.id === 'profile-screen') {
-                        // Обновляем данные если уже на профиле
-                        userData = cloudUserData;
-                        renderProfileScreen();
+                    if (!currentScreen || (currentScreen.id !== 'onboarding-screen' && currentScreen.id !== 'auth-screen')) {
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            showOnboardingScreen();
+                        } else {
+                            showAuthScreen();
+                        }
+                    } else {
+                        addDebugLog('info', 'Экран onboarding/auth уже показан, не переключаем');
+                    }
+                    return;
+                }
+                
+                if (hasProfileData) {
+                    addDebugLog('info', 'Профиль заполнен, показываем главный экран');
+                    lastUserDataHash = getDataHash(userData);
+                    if (typeof getDiary === 'function') {
+                        const diary = getDiary();
+                        if (diary && Object.keys(diary).length > 0) {
+                            lastDiaryHash = getDataHash(diary);
+                        }
+                    }
+                    showProfileScreen();
+                    if (typeof updateUsernameDisplay === 'function') {
+                        updateUsernameDisplay();
+                    }
+                    if (typeof loadDiaryFromCloud === 'function') {
+                        loadDiaryFromCloud();
                     }
                     return;
                 }
             } catch (e) {
-                addDebugLog('warn', 'Ошибка парсинга данных из CloudStorage', e);
+                console.error('[AUTH] Parse error:', e);
+                localStorage.removeItem('klyro_user_data');
             }
         }
-        
-        // Обновляем данные Telegram пользователя если доступны
+
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
             const initData = window.Telegram.WebApp.initDataUnsafe;
             if (initData.user) {
@@ -664,15 +747,31 @@ async function checkUserAuth() {
                     updateUsernameDisplay();
                 }
                 
-                // Сохраняем обновленные данные Telegram только если профиль уже заполнен
-                if (userData.dateOfBirth && userData.height) {
+                const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
+                if (hasExistingProfile) {
+                    lastUserDataHash = getDataHash(userData);
                     await saveUserData();
+                    showProfileScreen();
+                    if (typeof loadDiaryFromCloud === 'function') {
+                        loadDiaryFromCloud();
+                    }
+                    return;
                 }
             }
         }
+        
+        if (window.Telegram && window.Telegram.WebApp) {
+            showOnboardingScreen();
+        } else {
+            showAuthScreen();
+        }
     } catch (e) {
-        addDebugLog('error', 'Ошибка в checkUserAuth', e);
-        // Не переключаем экран при ошибке - оставляем текущий
+        console.error('[AUTH] Error:', e);
+        if (window.Telegram && window.Telegram.WebApp) {
+            showOnboardingScreen();
+        } else {
+            showAuthScreen();
+        }
     }
 }
 
@@ -1132,118 +1231,84 @@ function showNotification(message) {
 }
 
 async function completeOnboarding() {
-    addDebugLog('info', '🔵 КНОПКА "ЗАВЕРШИТЬ" НАЖАТА - начало завершения onboarding', null, {
-        currentStep: currentStep
-    });
+    addDebugLog('info', '🔵 КНОПКА "ЗАВЕРШИТЬ" НАЖАТА', null, { currentStep: currentStep });
     
     try {
-        // Проверяем валидацию, но не блокируем если что-то не так - просто логируем
-        const validationResult = validateCurrentStep();
-        if (!validationResult) {
-            addDebugLog('warn', '⚠️ Валидация не пройдена, но продолжаем', null, {
-                currentStep: currentStep
-            });
-            // НЕ возвращаемся - продолжаем выполнение
-        } else {
-            addDebugLog('info', '✅ Валидация пройдена');
+        // Проверяем валидацию
+        if (!validateCurrentStep()) {
+            addDebugLog('warn', 'Валидация не пройдена');
+            return;
         }
-    
-    const genderInput = document.querySelector('input[name="gender"]:checked');
-    const heightSlider = document.getElementById('height');
-    const weightSlider = document.getElementById('weight');
-    const activityInput = document.querySelector('input[name="activity"]:checked');
-    const goalInput = document.querySelector('input[name="goal"]:checked');
-    
-    if (!userData) {
-        userData = {};
-    }
-    
-    const dateOfBirthValue = document.getElementById('dateOfBirthValue');
-    const dateInput = document.getElementById('dateOfBirth');
-    
-    if (dateOfBirthValue && dateOfBirthValue.value) {
-        userData.dateOfBirth = dateOfBirthValue.value;
-        userData.age = calculateAge(dateOfBirthValue.value);
-        addDebugLog('info', 'Дата рождения из dateOfBirthValue', null, {
-            dateOfBirth: userData.dateOfBirth,
-            age: userData.age
-        });
-    } else if (dateInput && dateInput.value) {
-        const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-        if (dateMatch) {
-            const day = parseInt(dateMatch[1]);
-            const month = parseInt(dateMatch[2]) - 1;
-            const year = parseInt(dateMatch[3]);
-            const date = new Date(year, month, day);
-            if (!isNaN(date.getTime())) {
-                userData.dateOfBirth = date.toISOString().split('T')[0];
-                userData.age = calculateAge(userData.dateOfBirth);
-                addDebugLog('info', 'Дата рождения из dateInput', null, {
-                    dateOfBirth: userData.dateOfBirth,
-                    age: userData.age
-                });
+        
+        const genderInput = document.querySelector('input[name="gender"]:checked');
+        const heightSlider = document.getElementById('height');
+        const weightSlider = document.getElementById('weight');
+        const activityInput = document.querySelector('input[name="activity"]:checked');
+        const goalInput = document.querySelector('input[name="goal"]:checked');
+        
+        if (!userData) {
+            userData = {};
+        }
+        
+        const dateOfBirthValue = document.getElementById('dateOfBirthValue');
+        const dateInput = document.getElementById('dateOfBirth');
+        
+        if (dateOfBirthValue && dateOfBirthValue.value) {
+            userData.dateOfBirth = dateOfBirthValue.value;
+            userData.age = calculateAge(dateOfBirthValue.value);
+        } else if (dateInput && dateInput.value) {
+            const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+            if (dateMatch) {
+                const day = parseInt(dateMatch[1]);
+                const month = parseInt(dateMatch[2]) - 1;
+                const year = parseInt(dateMatch[3]);
+                const date = new Date(year, month, day);
+                if (!isNaN(date.getTime())) {
+                    userData.dateOfBirth = date.toISOString().split('T')[0];
+                    userData.age = calculateAge(userData.dateOfBirth);
+                }
             }
         }
-    }
-    
-    if (genderInput) userData.gender = genderInput.value;
-    if (heightSlider) userData.height = parseInt(heightSlider.value);
-    if (weightSlider) userData.weight = parseFloat(weightSlider.value);
-    if (activityInput) userData.activity = activityInput.value;
-    if (goalInput) userData.goal = goalInput.value;
-    
-    userData.calories = calculateCalories();
-    
-    addDebugLog('info', 'Данные пользователя собраны', null, {
-        hasDateOfBirth: !!(userData.dateOfBirth || userData.age),
-        hasHeight: !!userData.height,
-        hasWeight: !!userData.weight,
-        hasGender: !!userData.gender,
-        hasActivity: !!userData.activity,
-        hasGoal: !!userData.goal,
-        dateOfBirth: userData.dateOfBirth,
-        height: userData.height,
-        weight: userData.weight
-    });
-    
-    addDebugLog('info', 'Сохранение данных пользователя');
-    
-    // КРИТИЧНО: Сохраняем в localStorage СРАЗУ и ПРЯМО, без await
-    const userDataStr = JSON.stringify(userData);
-    try {
+        
+        if (genderInput) userData.gender = genderInput.value;
+        if (heightSlider) userData.height = parseInt(heightSlider.value);
+        if (weightSlider) userData.weight = parseFloat(weightSlider.value);
+        if (activityInput) userData.activity = activityInput.value;
+        if (goalInput) userData.goal = goalInput.value;
+        
+        userData.calories = calculateCalories();
+        
+        addDebugLog('info', 'Данные собраны', null, {
+            hasDateOfBirth: !!(userData.dateOfBirth || userData.age),
+            hasHeight: !!userData.height,
+            height: userData.height
+        });
+        
+        // КРИТИЧНО: Сохраняем в localStorage СРАЗУ
+        const userDataStr = JSON.stringify(userData);
         localStorage.setItem('klyro_user_data', userDataStr);
-        addDebugLog('info', '✅ Данные сохранены в localStorage напрямую');
-    } catch (e) {
-        addDebugLog('error', '❌ Ошибка сохранения в localStorage', e);
-    }
-    
-    // Затем сохраняем через saveToStorage для синхронизации
-    await saveUserData();
-    
-    // Проверяем, что данные сохранились
-    const savedCheck = loadFromStorageSync('klyro_user_data');
-    if (savedCheck) {
-        try {
+        addDebugLog('info', '✅ Данные сохранены в localStorage');
+        
+        // Затем синхронизируем в CloudStorage
+        await saveUserData();
+        
+        // Проверяем сохранение
+        const savedCheck = loadFromStorageSync('klyro_user_data');
+        if (savedCheck) {
             const savedData = JSON.parse(savedCheck);
-            addDebugLog('info', '✅ Данные успешно сохранены и проверены', null, {
+            addDebugLog('info', '✅ Данные проверены', null, {
                 hasDateOfBirth: !!(savedData.dateOfBirth || savedData.age),
                 hasHeight: !!savedData.height,
-                savedHeight: savedData.height,
-                savedDateOfBirth: savedData.dateOfBirth
+                height: savedData.height
             });
-        } catch (e) {
-            addDebugLog('error', 'Ошибка проверки сохраненных данных', e);
         }
-    } else {
-        addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА: Данные НЕ сохранились в localStorage!');
-    }
-    
-    addDebugLog('info', '✅ Завершение onboarding успешно, показываем профиль');
-    showProfileScreen();
+        
+        showProfileScreen();
     } catch (e) {
-        addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА в completeOnboarding', e);
+        addDebugLog('error', 'Ошибка в completeOnboarding', e);
         showNotification('Ошибка при сохранении данных. Попробуйте еще раз.');
     }
+}
 }
 
 function calculateCalories() {
