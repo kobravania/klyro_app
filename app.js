@@ -648,109 +648,7 @@ async function checkUserAuth() {
             }
         }
         
-        // Если данных нет в CloudStorage, проверяем localStorage
-        if (!savedData) {
-            savedData = loadFromStorageSync('klyro_user_data');
-        }
-        
-        if (savedData) {
-            try {
-                const localUserData = JSON.parse(savedData);
-                const hasDate = !!(localUserData.dateOfBirth || localUserData.age);
-                const hasHeight = !!localUserData.height && localUserData.height > 0;
-                
-                if (hasDate && hasHeight) {
-                    // Если профиль полный, но показан onboarding - переключаем
-                    const currentScreen = document.querySelector('.screen.active');
-                    if (currentScreen && (currentScreen.id === 'onboarding-screen' || currentScreen.id === 'auth-screen')) {
-                        addDebugLog('info', 'Профиль найден в localStorage, переключаем на профиль');
-                        userData = localUserData;
-                        showProfileScreen();
-                    }
-                }
-            } catch (e) {
-                addDebugLog('warn', 'Ошибка парсинга данных из localStorage', e);
-            }
-        }
-        
-        if (savedData) {
-            try {
-                addDebugLog('info', 'Парсинг данных пользователя', null, {
-                    dataLength: savedData.length,
-                    dataPreview: savedData.substring(0, 200)
-                });
-                userData = JSON.parse(savedData);
-                // УЛУЧШЕННАЯ ПРОВЕРКА: более гибкая проверка наличия данных
-                const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
-                const hasHeight = !!userData.height && userData.height > 0;
-                const hasProfileData = hasDateOfBirth && hasHeight;
-                
-                addDebugLog('info', 'Проверка данных профиля', null, {
-                    hasDateOfBirth: hasDateOfBirth,
-                    hasHeight: hasHeight,
-                    hasProfileData: hasProfileData,
-                    dateOfBirth: userData.dateOfBirth,
-                    age: userData.age,
-                    height: userData.height,
-                    allKeys: Object.keys(userData),
-                    fullUserData: userData
-                });
-                
-                // УЛУЧШЕННАЯ ПРОВЕРКА: проверяем более гибко
-                // Если есть хотя бы dateOfBirth ИЛИ age, и есть height - считаем профиль заполненным
-                const hasAnyDate = !!(userData.dateOfBirth || userData.age);
-                const hasAnyHeight = !!userData.height;
-                const isProfileComplete = hasAnyDate && hasAnyHeight;
-                
-                if (!isProfileComplete) {
-                    addDebugLog('warn', '⚠️ Профиль не заполнен, показываем onboarding/auth', null, {
-                        missingDateOfBirth: !hasDateOfBirth,
-                        missingHeight: !hasHeight,
-                        hasAnyDate: hasAnyDate,
-                        hasAnyHeight: hasAnyHeight,
-                        dateOfBirth: userData.dateOfBirth,
-                        age: userData.age,
-                        height: userData.height,
-                        fullUserData: userData
-                    });
-                    // НЕ переключаем экран, если он уже показан - просто убеждаемся что он виден
-                    const currentScreen = document.querySelector('.screen.active');
-                    if (!currentScreen || (currentScreen.id !== 'onboarding-screen' && currentScreen.id !== 'auth-screen')) {
-                        if (window.Telegram && window.Telegram.WebApp) {
-                            showOnboardingScreen();
-                        } else {
-                            showAuthScreen();
-                        }
-                    } else {
-                        addDebugLog('info', 'Экран onboarding/auth уже показан, не переключаем');
-                    }
-                    return;
-                }
-                
-                if (hasProfileData) {
-                    addDebugLog('info', 'Профиль заполнен, показываем главный экран');
-                    lastUserDataHash = getDataHash(userData);
-                    if (typeof getDiary === 'function') {
-                        const diary = getDiary();
-                        if (diary && Object.keys(diary).length > 0) {
-                            lastDiaryHash = getDataHash(diary);
-                        }
-                    }
-                    showProfileScreen();
-                    if (typeof updateUsernameDisplay === 'function') {
-                        updateUsernameDisplay();
-                    }
-                    if (typeof loadDiaryFromCloud === 'function') {
-                        loadDiaryFromCloud();
-                    }
-                    return;
-                }
-            } catch (e) {
-                console.error('[AUTH] Parse error:', e);
-                localStorage.removeItem('klyro_user_data');
-            }
-        }
-
+        // Обновляем данные Telegram пользователя если доступны
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
             const initData = window.Telegram.WebApp.initDataUnsafe;
             if (initData.user) {
@@ -766,31 +664,15 @@ async function checkUserAuth() {
                     updateUsernameDisplay();
                 }
                 
-                const hasExistingProfile = userData && (userData.dateOfBirth || userData.age) && userData.height;
-                if (hasExistingProfile) {
-                    lastUserDataHash = getDataHash(userData);
+                // Сохраняем обновленные данные Telegram только если профиль уже заполнен
+                if (userData.dateOfBirth && userData.height) {
                     await saveUserData();
-                    showProfileScreen();
-                    if (typeof loadDiaryFromCloud === 'function') {
-                        loadDiaryFromCloud();
-                    }
-                    return;
                 }
             }
         }
-        
-        if (window.Telegram && window.Telegram.WebApp) {
-            showOnboardingScreen();
-        } else {
-            showAuthScreen();
-        }
     } catch (e) {
-        console.error('[AUTH] Error:', e);
-        if (window.Telegram && window.Telegram.WebApp) {
-            showOnboardingScreen();
-        } else {
-            showAuthScreen();
-        }
+        addDebugLog('error', 'Ошибка в checkUserAuth', e);
+        // Не переключаем экран при ошибке - оставляем текущий
     }
 }
 
