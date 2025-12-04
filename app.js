@@ -42,95 +42,79 @@ if (document.readyState === 'loading') {
 // ============================================
 
 async function saveToStorage(key, value) {
-    try {
-        // Сначала сохраняем в localStorage для быстрого доступа
-        localStorage.setItem(key, value);
-        
-        // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
-        // Проверяем готовность более тщательно
-        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            try {
-                // Используем Promise с таймаутом для CloudStorage (может зависнуть)
-                const savePromise = tg.CloudStorage.setItem(key, value);
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('CloudStorage timeout')), 5000)
-                );
-                
-                await Promise.race([savePromise, timeoutPromise]);
-                
-                // Обновляем хэш после успешного сохранения
+    // ВСЕГДА сохраняем в localStorage первым делом
+    localStorage.setItem(key, value);
+    
+    // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+        // Выполняем асинхронно, не ждем результата
+        tg.CloudStorage.setItem(key, value).catch(() => {
+            // Игнорируем ошибки - данные уже в localStorage
+        });
+    }
+    
+    // Обновляем хэш
+    if (key === 'klyro_diary') {
+        try {
+            const diary = JSON.parse(value);
+            lastDiaryHash = getDataHash(diary);
+        } catch (e) {
+            // Игнорируем ошибку парсинга
+        }
+    } else if (key === 'klyro_user_data') {
+        try {
+            const data = JSON.parse(value);
+            lastUserDataHash = getDataHash(data);
+        } catch (e) {
+            // Игнорируем ошибку парсинга
+        }
+    }
+    
+    return true;
+}
+
+async function loadFromStorage(key) {
+    // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
+    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function') {
+        try {
+            const value = await tg.CloudStorage.getItem(key);
+            if (value !== null && value !== undefined && value !== '') {
+                // Обновляем localStorage для быстрого доступа
+                localStorage.setItem(key, value);
+                // Обновляем хэш
                 if (key === 'klyro_diary') {
                     try {
                         const diary = JSON.parse(value);
                         lastDiaryHash = getDataHash(diary);
                     } catch (e) {
-                        // Игнорируем ошибку парсинга для хэша
+                        // Игнорируем ошибку парсинга
                     }
                 } else if (key === 'klyro_user_data') {
                     try {
                         const data = JSON.parse(value);
                         lastUserDataHash = getDataHash(data);
                     } catch (e) {
-                        // Игнорируем ошибку парсинга для хэша
+                        // Игнорируем ошибку парсинга
                     }
                 }
-            } catch (e) {
-                // Если CloudStorage не работает, данные все равно сохранены в localStorage
-                // Не пробрасываем ошибку дальше - localStorage достаточно
+                return value;
             }
-        }
-        return true;
-    } catch (error) {
-        // Критическая ошибка - пытаемся сохранить хотя бы в localStorage
-        try {
-            localStorage.setItem(key, value);
-            return true;
         } catch (e) {
-            return false;
+            // Fallback to localStorage
         }
     }
-}
-
-async function loadFromStorage(key) {
-    try {
-        // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
-        if (tgReady && tg && tg.CloudStorage) {
-            try {
-                const value = await tg.CloudStorage.getItem(key);
-                if (value !== null && value !== undefined && value !== '') {
-                    // Обновляем localStorage для быстрого доступа
-                    localStorage.setItem(key, value);
-                    // Обновляем хэш
-                    if (key === 'klyro_diary') {
-                        const diary = JSON.parse(value);
-                        lastDiaryHash = getDataHash(diary);
-                    } else if (key === 'klyro_user_data') {
-                        const data = JSON.parse(value);
-                        lastUserDataHash = getDataHash(data);
-                    }
-                    return value;
-                }
-            } catch (e) {
-                // Fallback to localStorage
-            }
+    
+    // Fallback на localStorage
+    const value = localStorage.getItem(key);
+    if (value !== null && value !== '') {
+        // Синхронизируем в CloudStorage в фоне (если данных нет в CloudStorage)
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            tg.CloudStorage.setItem(key, value).catch(() => {});
         }
-        // Fallback на localStorage
-        const value = localStorage.getItem(key);
-        if (value !== null && value !== '') {
-            // Синхронизируем в CloudStorage в фоне (если данных нет в CloudStorage)
-            if (tgReady && tg && tg.CloudStorage) {
-                tg.CloudStorage.setItem(key, value).catch(() => {});
-            }
-            return value;
-        }
-        return null;
-    } catch (error) {
-        try {
-            return localStorage.getItem(key);
-        } catch (e) {
-            return null;
-        }
+        return value;
     }
+    
+    return null;
 }
 
 function loadFromStorageSync(key) {
@@ -977,7 +961,7 @@ async function saveUserData() {
     
     const userDataStr = JSON.stringify(userData);
     
-    // НЕМЕДЛЕННО синхронизируем в CloudStorage для синхронизации между устройствами
+    // Сохраняем через saveToStorage (он сохранит в localStorage и синхронизирует в CloudStorage)
     await saveToStorage('klyro_user_data', userDataStr);
     lastUserDataHash = getDataHash(userData);
 }
@@ -1325,67 +1309,36 @@ function setQuickAmount(grams) {
 }
 
 function addFoodToDiary() {
-    try {
-        if (!selectedProduct) {
-            showNotification('Выберите продукт');
-            return;
-        }
-        
-        // Проверяем, что у продукта есть все необходимые поля
-        if (!selectedProduct.name || selectedProduct.kcal === undefined) {
-            console.error('[DIARY] Invalid product data:', selectedProduct);
-            showNotification('Ошибка: неверные данные продукта');
-            return;
-        }
-        
-        const gramsEl = document.getElementById('product-grams');
-        if (!gramsEl) {
-            console.error('[DIARY] product-grams element not found');
-            return;
-        }
-        
-        const grams = parseFloat(gramsEl.value) || 100;
-        if (isNaN(grams) || grams <= 0) {
-            showNotification('Введите корректное количество');
-            return;
-        }
-        
-        const multiplier = grams / 100;
-        
-        const entry = {
-            id: Date.now().toString(),
-            name: selectedProduct.name || 'Неизвестный продукт',
-            grams: grams,
-            kcal: (selectedProduct.kcal || 0) * multiplier,
-            protein: (selectedProduct.protein || 0) * multiplier,
-            fat: (selectedProduct.fat || 0) * multiplier,
-            carbs: (selectedProduct.carbs || 0) * multiplier,
-            timestamp: new Date().toISOString()
-        };
-        
-        // Проверяем, что entry валиден перед сохранением
-        if (!entry.id || !entry.name || entry.kcal === undefined) {
-            console.error('[DIARY] Invalid entry:', entry);
-            showNotification('Ошибка: неверные данные записи');
-            return;
-        }
-        
-        addDiaryEntry(currentDiaryDate, entry).then(() => {
-            showNotification('Продукт добавлен в дневник!');
-            showDiaryScreen();
-        }).catch(e => {
-            console.error('[DIARY] Error adding entry:', e);
-            console.error('[DIARY] Error details:', {
-                name: e?.name,
-                message: e?.message,
-                stack: e?.stack
-            });
-            showNotification('Ошибка при добавлении продукта');
-        });
-    } catch (e) {
-        console.error('[DIARY] Unexpected error in addFoodToDiary:', e);
-        showNotification('Ошибка при добавлении продукта');
+    if (!selectedProduct) {
+        showNotification('Выберите продукт');
+        return;
     }
+    
+    const gramsEl = document.getElementById('product-grams');
+    if (!gramsEl) return;
+    
+    const grams = parseFloat(gramsEl.value) || 100;
+    const multiplier = grams / 100;
+    
+    const entry = {
+        id: Date.now().toString(),
+        name: selectedProduct.name || 'Продукт',
+        grams: grams,
+        kcal: (selectedProduct.kcal || 0) * multiplier,
+        protein: (selectedProduct.protein || 0) * multiplier,
+        fat: (selectedProduct.fat || 0) * multiplier,
+        carbs: (selectedProduct.carbs || 0) * multiplier,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Добавляем запись (сохранение происходит внутри)
+    addDiaryEntry(currentDiaryDate, entry).then(() => {
+        showNotification('Продукт добавлен в дневник!');
+        showDiaryScreen();
+    }).catch(e => {
+        console.error('[DIARY] Error:', e);
+        showNotification('Ошибка при добавлении продукта');
+    });
 }
 
 function showCustomProductForm() {
@@ -1444,36 +1397,18 @@ function getDiary() {
 }
 
 async function saveDiary(diary) {
-    try {
-        const diaryStr = JSON.stringify(diary);
-        
-        // Сохраняем в localStorage сразу
-        localStorage.setItem('klyro_diary', diaryStr);
-        lastDiaryHash = getDataHash(diary);
-        
-        // Затем синхронизируем в CloudStorage (не блокируем, если не работает)
-        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            try {
-                const savePromise = tg.CloudStorage.setItem('klyro_diary', diaryStr);
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), 3000)
-                );
-                await Promise.race([savePromise, timeoutPromise]);
-            } catch (e) {
-                // Игнорируем ошибки CloudStorage - данные уже в localStorage
-            }
-        }
-    } catch (e) {
-        console.error('[DIARY] Save error:', e);
-        // Пытаемся сохранить хотя бы в localStorage
-        try {
-            const diaryStr = JSON.stringify(diary);
-            localStorage.setItem('klyro_diary', diaryStr);
-            lastDiaryHash = getDataHash(diary);
-        } catch (e2) {
-            console.error('[DIARY] localStorage save also failed:', e2);
-            throw e; // Пробрасываем исходную ошибку только если localStorage тоже не работает
-        }
+    const diaryStr = JSON.stringify(diary);
+    
+    // ВСЕГДА сохраняем в localStorage первым делом
+    localStorage.setItem('klyro_diary', diaryStr);
+    lastDiaryHash = getDataHash(diary);
+    
+    // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+        // Выполняем асинхронно, не ждем результата
+        tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {
+            // Игнорируем ошибки - данные уже в localStorage
+        });
     }
 }
 
@@ -1483,22 +1418,13 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    try {
-        // Проверяем, что entry содержит все необходимые поля
-        if (!entry || !entry.id || !entry.name || entry.kcal === undefined) {
-            throw new Error('Invalid entry data');
-        }
-        
-        const diary = getDiary();
-        if (!diary[date]) {
-            diary[date] = [];
-        }
-        diary[date].push(entry);
-        await saveDiary(diary);
-    } catch (e) {
-        console.error('[DIARY] Add entry error:', e);
-        throw e; // Пробрасываем ошибку для обработки в addFoodToDiary
+    // Простое добавление без сложных проверок
+    const diary = getDiary();
+    if (!diary[date]) {
+        diary[date] = [];
     }
+    diary[date].push(entry);
+    await saveDiary(diary);
 }
 
 async function removeDiaryEntry(date, entryId) {
