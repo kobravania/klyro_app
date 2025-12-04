@@ -1607,67 +1607,53 @@ function setQuickAmount(grams) {
 }
 
 function addFoodToDiary() {
+    if (!selectedProduct) {
+        showNotification('Выберите продукт');
+        return;
+    }
+    
+    const gramsEl = document.getElementById('product-grams');
+    if (!gramsEl) {
+        addDebugLog('error', 'Элемент product-grams не найден');
+        return;
+    }
+    
+    const grams = parseFloat(gramsEl.value) || 100;
+    const multiplier = grams / 100;
+    
+    const entry = {
+        id: Date.now().toString(),
+        name: selectedProduct.name || 'Продукт',
+        grams: grams,
+        kcal: (selectedProduct.kcal || 0) * multiplier,
+        protein: (selectedProduct.protein || 0) * multiplier,
+        fat: (selectedProduct.fat || 0) * multiplier,
+        carbs: (selectedProduct.carbs || 0) * multiplier,
+        timestamp: new Date().toISOString()
+    };
+    
+    // ПРОСТОЕ добавление - без сложных проверок
     try {
-        addDebugLog('info', 'Начало добавления продукта в дневник', null, {
-            selectedProduct: selectedProduct ? {
-                id: selectedProduct.id,
-                name: selectedProduct.name,
-                hasKcal: selectedProduct.kcal !== undefined
-            } : null,
-            currentDiaryDate: currentDiaryDate
-        });
+        const diary = getDiary();
+        if (!diary[currentDiaryDate]) {
+            diary[currentDiaryDate] = [];
+        }
+        diary[currentDiaryDate].push(entry);
         
-        if (!selectedProduct) {
-            addDebugLog('warn', 'Продукт не выбран');
-            showNotification('Выберите продукт');
-            return;
+        // Сохраняем СРАЗУ в localStorage
+        const diaryStr = JSON.stringify(diary);
+        localStorage.setItem('klyro_diary', diaryStr);
+        lastDiaryHash = getDataHash(diary);
+        
+        // Синхронизируем в CloudStorage в фоне
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {});
         }
         
-        const gramsEl = document.getElementById('product-grams');
-        if (!gramsEl) {
-            addDebugLog('error', 'Элемент product-grams не найден');
-            return;
-        }
-        
-        const grams = parseFloat(gramsEl.value) || 100;
-        const multiplier = grams / 100;
-        
-        addDebugLog('info', 'Создание записи', null, {
-            grams: grams,
-            multiplier: multiplier,
-            productKcal: selectedProduct.kcal,
-            productProtein: selectedProduct.protein,
-            productFat: selectedProduct.fat,
-            productCarbs: selectedProduct.carbs
-        });
-        
-        const entry = {
-            id: Date.now().toString(),
-            name: selectedProduct.name || 'Продукт',
-            grams: grams,
-            kcal: (selectedProduct.kcal || 0) * multiplier,
-            protein: (selectedProduct.protein || 0) * multiplier,
-            fat: (selectedProduct.fat || 0) * multiplier,
-            carbs: (selectedProduct.carbs || 0) * multiplier,
-            timestamp: new Date().toISOString()
-        };
-        
-        addDebugLog('info', 'Запись создана', null, entry);
-        
-        // Добавляем запись (сохранение происходит внутри)
-        addDiaryEntry(currentDiaryDate, entry).then(() => {
-            addDebugLog('info', 'Продукт успешно добавлен в дневник');
-            showNotification('Продукт добавлен в дневник!');
-            showDiaryScreen();
-        }).catch(e => {
-            addDebugLog('error', 'Ошибка при добавлении продукта в дневник', e, {
-                entry: entry,
-                date: currentDiaryDate
-            });
-            showNotification('Ошибка при добавлении продукта');
-        });
+        showNotification('Продукт добавлен в дневник!');
+        showDiaryScreen();
     } catch (e) {
-        addDebugLog('error', 'Критическая ошибка в addFoodToDiary', e);
+        addDebugLog('error', 'Ошибка при добавлении продукта', e);
         showNotification('Ошибка при добавлении продукта');
     }
 }
@@ -1753,17 +1739,12 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    try {
-        const diary = getDiary();
-        if (!diary[date]) {
-            diary[date] = [];
-        }
-        diary[date].push(entry);
-        await saveDiary(diary);
-    } catch (e) {
-        addDebugLog('error', 'Ошибка в addDiaryEntry', e, { date, entry });
-        throw e;
+    const diary = getDiary();
+    if (!diary[date]) {
+        diary[date] = [];
     }
+    diary[date].push(entry);
+    await saveDiary(diary);
 }
 
 async function removeDiaryEntry(date, entryId) {
