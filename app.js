@@ -496,155 +496,67 @@ let userData = null;
 function initApp() {
     addDebugLog('info', 'Инициализация приложения');
     
-    // КРИТИЧНО: Сразу показываем экран по умолчанию, чтобы пользователь не видел темный экран
-    let defaultScreenShown = false;
+    // Скрываем все экраны сначала
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(screen => {
+        screen.classList.remove('active');
+        screen.style.display = 'none';
+        screen.style.visibility = 'hidden';
+        screen.style.opacity = '0';
+    });
     
-    function showDefaultScreen() {
-        if (defaultScreenShown) return;
-        defaultScreenShown = true;
-        
-        if (window.Telegram && window.Telegram.WebApp) {
-            addDebugLog('info', 'Telegram WebApp обнаружен, показываем onboarding');
-            const screen = document.getElementById('onboarding-screen');
-            if (screen) {
-                screen.classList.add('active');
-                screen.style.display = 'block';
-                screen.style.visibility = 'visible';
-                screen.style.opacity = '1';
-            }
-        } else {
-            addDebugLog('warn', 'Telegram WebApp не обнаружен, показываем auth screen');
-            const screen = document.getElementById('auth-screen');
-            if (screen) {
-                screen.classList.add('active');
-                screen.style.display = 'block';
-                screen.style.visibility = 'visible';
-                screen.style.opacity = '1';
-            }
+    // Функция для показа нужного экрана
+    function showScreen(screenId) {
+        addDebugLog('info', `Показываем экран: ${screenId}`);
+        const screen = document.getElementById(screenId);
+        if (screen) {
+            screen.classList.add('active');
+            screen.style.display = 'block';
+            screen.style.visibility = 'visible';
+            screen.style.opacity = '1';
         }
     }
     
-    // Показываем экран по умолчанию СРАЗУ
-    showDefaultScreen();
-    
-    try {
-        addDebugLog('info', 'Скрытие всех экранов кроме нужного');
-        const screens = document.querySelectorAll('.screen');
-        screens.forEach(screen => {
-            if (!screen.classList.contains('active')) {
-                screen.style.display = 'none';
-                screen.style.visibility = 'hidden';
-                screen.style.opacity = '0';
+    // Сначала быстро проверяем localStorage (синхронно)
+    const localData = loadFromStorageSync('klyro_user_data');
+    if (localData) {
+        try {
+            const parsed = JSON.parse(localData);
+            const hasDate = !!(parsed.dateOfBirth || parsed.age);
+            const hasHeight = !!parsed.height && parsed.height > 0;
+            if (hasDate && hasHeight) {
+                addDebugLog('info', 'Данные найдены в localStorage, показываем профиль');
+                userData = parsed;
+                showScreen('profile-screen');
+                // Запускаем асинхронную проверку в фоне
+                setTimeout(() => checkUserAuth(), 100);
+                return;
             }
+        } catch (e) {
+            addDebugLog('warn', 'Ошибка парсинга данных из localStorage', e);
+        }
+    }
+    
+    // Если данных нет, показываем onboarding/auth
+    if (window.Telegram && window.Telegram.WebApp) {
+        addDebugLog('info', 'Данных нет, показываем onboarding');
+        showScreen('onboarding-screen');
+    } else {
+        addDebugLog('info', 'Данных нет, показываем auth');
+        showScreen('auth-screen');
+    }
+    
+    // Запускаем полную проверку в фоне
+    setTimeout(() => {
+        if (tgReady) {
+            if (tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+                startDataSync();
+            }
+        }
+        checkUserAuth().catch(e => {
+            addDebugLog('error', 'Ошибка в checkUserAuth', e);
         });
-        
-        // Ждем инициализации CloudStorage перед запуском синхронизации
-        let waitAttempts = 0;
-        const maxWaitAttempts = 50; // Максимум 5 секунд ожидания
-        
-        function waitForCloudStorageAndStart() {
-            waitAttempts++;
-            
-            if (tgReady) {
-                addDebugLog('info', '✅ CloudStorage готов, запускаем синхронизацию и проверку авторизации', null, {
-                    waitAttempts: waitAttempts,
-                    tgReady: tgReady
-                });
-                
-                if (tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-                    addDebugLog('info', '✅ Запуск синхронизации данных', null, {
-                        tgReady: tgReady,
-                        hasCloudStorage: !!tg.CloudStorage,
-                        hasSetItem: typeof tg.CloudStorage.setItem === 'function',
-                        hasGetItem: typeof tg.CloudStorage.getItem === 'function'
-                    });
-                    startDataSync();
-                } else {
-                    addDebugLog('warn', '⚠️ Синхронизация данных не запущена - CloudStorage недоступен', null, {
-                        tgReady: tgReady,
-                        hasTg: !!tg,
-                        hasCloudStorage: tg ? !!tg.CloudStorage : false,
-                        hasSetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false,
-                        hasGetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.getItem === 'function' : false
-                    });
-                }
-                
-                addDebugLog('info', 'Запуск проверки авторизации');
-                checkUserAuth().catch(e => {
-                    addDebugLog('error', 'Ошибка в checkUserAuth', e);
-                });
-            } else if (waitAttempts < maxWaitAttempts) {
-                // Ждем еще 100ms и проверяем снова
-                if (waitAttempts % 10 === 0) { // Логируем каждые 10 попыток
-                    addDebugLog('info', `Ожидание инициализации CloudStorage... (попытка ${waitAttempts}/${maxWaitAttempts})`, null, {
-                        tgReady: tgReady,
-                        hasTg: !!tg,
-                        hasCloudStorage: tg ? !!tg.CloudStorage : false
-                    });
-                }
-                setTimeout(waitForCloudStorageAndStart, 100);
-            } else {
-                // Таймаут - запускаем без CloudStorage
-                addDebugLog('warn', '⚠️ Таймаут ожидания CloudStorage, запускаем без синхронизации', null, {
-                    waitAttempts: waitAttempts,
-                    tgReady: tgReady
-                });
-                addDebugLog('info', 'Запуск проверки авторизации (без CloudStorage)');
-                checkUserAuth().catch(e => {
-                    addDebugLog('error', 'Ошибка в checkUserAuth', e);
-                    // КРИТИЧНО: При ошибке показываем экран по умолчанию
-                    showDefaultScreen();
-                });
-            }
-        }
-        
-        // Начинаем ожидание инициализации
-        waitForCloudStorageAndStart();
-    } catch (e) {
-        addDebugLog('error', 'Критическая ошибка при инициализации приложения', e);
-        // КРИТИЧНО: При ошибке показываем экран по умолчанию
-        showDefaultScreen();
-    }
-    
-        // КРИТИЧНО: Дополнительная проверка через 1 секунду - если ничего не показалось, показываем экран по умолчанию
-        setTimeout(() => {
-            const activeScreen = document.querySelector('.screen.active');
-            const isVisible = activeScreen && 
-                             activeScreen.style.display !== 'none' && 
-                             activeScreen.style.visibility !== 'hidden' &&
-                             activeScreen.style.opacity !== '0';
-            if (!isVisible) {
-                addDebugLog('warn', '⚠️ Ни один экран не виден через 1 секунду, показываем экран по умолчанию', null, {
-                    hasActiveScreen: !!activeScreen,
-                    display: activeScreen?.style.display,
-                    visibility: activeScreen?.style.visibility,
-                    opacity: activeScreen?.style.opacity
-                });
-                showDefaultScreen();
-            }
-        }, 1000);
-        
-        // Еще одна проверка через 3 секунды для надежности
-        setTimeout(() => {
-            const activeScreen = document.querySelector('.screen.active');
-            const isVisible = activeScreen && 
-                             activeScreen.style.display !== 'none' && 
-                             activeScreen.style.visibility !== 'hidden' &&
-                             activeScreen.style.opacity !== '0';
-            if (!isVisible) {
-                addDebugLog('error', '❌ КРИТИЧНО: Ни один экран не виден через 3 секунды!', null, {
-                    hasActiveScreen: !!activeScreen,
-                    allScreens: Array.from(document.querySelectorAll('.screen')).map(s => ({
-                        id: s.id,
-                        hasActive: s.classList.contains('active'),
-                        display: s.style.display,
-                        visibility: s.style.visibility,
-                        opacity: s.style.opacity
-                    }))
-                });
-                showDefaultScreen();
-            }
-        }, 3000);
+    }, 500);
 }
 
 function startApp() {
@@ -682,20 +594,21 @@ async function checkUserAuth() {
             loadingScreen.style.display = 'none';
             loadingScreen.style.visibility = 'hidden';
             loadingScreen.style.opacity = '0';
-            addDebugLog('info', 'Экран загрузки скрыт');
         }
         
-        // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
+        // Загружаем данные из CloudStorage (если доступен) или localStorage
         let savedData = null;
-        if (tgReady && tg && tg.CloudStorage) {
+        
+        // Сначала пробуем CloudStorage
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function') {
             addDebugLog('info', 'Попытка загрузки данных из CloudStorage');
             try {
-                const cloudPromise = loadFromStorage('klyro_user_data');
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
+                const cloudPromise = tg.CloudStorage.getItem('klyro_user_data');
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
                 if (savedData) {
                     localStorage.setItem('klyro_user_data', savedData);
-                    addDebugLog('info', 'Данные загружены из CloudStorage', null, {
+                    addDebugLog('info', '✅ Данные загружены из CloudStorage', null, {
                         dataLength: savedData.length
                     });
                 } else {
@@ -704,24 +617,17 @@ async function checkUserAuth() {
             } catch (e) {
                 addDebugLog('warn', 'Ошибка при загрузке из CloudStorage', e);
             }
-        } else {
-            addDebugLog('warn', 'CloudStorage недоступен для загрузки', null, {
-                tgReady: tgReady,
-                hasTg: !!tg,
-                hasCloudStorage: tg ? !!tg.CloudStorage : false
-            });
         }
         
-        // Fallback на localStorage если CloudStorage не дал результатов
+        // Fallback на localStorage
         if (!savedData) {
-            addDebugLog('info', 'Загрузка данных из localStorage');
             savedData = loadFromStorageSync('klyro_user_data');
             if (savedData) {
-                addDebugLog('info', 'Данные загружены из localStorage', null, {
+                addDebugLog('info', '✅ Данные загружены из localStorage', null, {
                     dataLength: savedData.length
                 });
             } else {
-                addDebugLog('info', 'Данных в localStorage нет');
+                addDebugLog('info', 'Данных нет ни в CloudStorage, ни в localStorage');
             }
         }
         
@@ -755,48 +661,44 @@ async function checkUserAuth() {
                 const isProfileComplete = hasAnyDate && hasAnyHeight;
                 
                 if (!isProfileComplete) {
-                    addDebugLog('warn', '⚠️ Профиль не заполнен, показываем onboarding/auth', null, {
+                    addDebugLog('warn', '⚠️ Профиль не заполнен', null, {
                         missingDateOfBirth: !hasDateOfBirth,
                         missingHeight: !hasHeight,
                         hasAnyDate: hasAnyDate,
                         hasAnyHeight: hasAnyHeight,
                         dateOfBirth: userData.dateOfBirth,
                         age: userData.age,
-                        height: userData.height,
-                        fullUserData: userData
+                        height: userData.height
                     });
-                    // НЕ переключаем экран, если он уже показан - просто убеждаемся что он виден
+                    // Переключаем на onboarding/auth только если сейчас показан профиль
                     const currentScreen = document.querySelector('.screen.active');
-                    if (!currentScreen || (currentScreen.id !== 'onboarding-screen' && currentScreen.id !== 'auth-screen')) {
+                    if (currentScreen && currentScreen.id === 'profile-screen') {
                         if (window.Telegram && window.Telegram.WebApp) {
                             showOnboardingScreen();
                         } else {
                             showAuthScreen();
                         }
-                    } else {
-                        addDebugLog('info', 'Экран onboarding/auth уже показан, не переключаем');
                     }
                     return;
                 }
                 
-                if (hasProfileData) {
-                    addDebugLog('info', 'Профиль заполнен, показываем главный экран');
-                    lastUserDataHash = getDataHash(userData);
-                    if (typeof getDiary === 'function') {
-                        const diary = getDiary();
-                        if (diary && Object.keys(diary).length > 0) {
-                            lastDiaryHash = getDataHash(diary);
-                        }
+                // Профиль заполнен - показываем профиль
+                addDebugLog('info', '✅ Профиль заполнен, показываем главный экран');
+                lastUserDataHash = getDataHash(userData);
+                if (typeof getDiary === 'function') {
+                    const diary = getDiary();
+                    if (diary && Object.keys(diary).length > 0) {
+                        lastDiaryHash = getDataHash(diary);
                     }
-                    showProfileScreen();
-                    if (typeof updateUsernameDisplay === 'function') {
-                        updateUsernameDisplay();
-                    }
-                    if (typeof loadDiaryFromCloud === 'function') {
-                        loadDiaryFromCloud();
-                    }
-                    return;
                 }
+                showProfileScreen();
+                if (typeof updateUsernameDisplay === 'function') {
+                    updateUsernameDisplay();
+                }
+                if (typeof loadDiaryFromCloud === 'function') {
+                    loadDiaryFromCloud();
+                }
+                return;
             } catch (e) {
                 console.error('[AUTH] Parse error:', e);
                 localStorage.removeItem('klyro_user_data');
@@ -1378,35 +1280,35 @@ async function completeOnboarding() {
     
     addDebugLog('info', 'Сохранение данных пользователя');
     
-    // КРИТИЧНО: Сохраняем в localStorage СРАЗУ и ПРЯМО, без await
+    // КРИТИЧНО: Сохраняем в localStorage СРАЗУ
     const userDataStr = JSON.stringify(userData);
     try {
         localStorage.setItem('klyro_user_data', userDataStr);
-        addDebugLog('info', '✅ Данные сохранены в localStorage напрямую');
-    } catch (e) {
-        addDebugLog('error', '❌ Ошибка сохранения в localStorage', e);
-    }
-    
-    // Затем сохраняем через saveToStorage для синхронизации
-    await saveUserData();
-    
-    // Проверяем, что данные сохранились
-    const savedCheck = loadFromStorageSync('klyro_user_data');
-    if (savedCheck) {
-        try {
-            const savedData = JSON.parse(savedCheck);
-            addDebugLog('info', '✅ Данные успешно сохранены и проверены', null, {
-                hasDateOfBirth: !!(savedData.dateOfBirth || savedData.age),
-                hasHeight: !!savedData.height,
-                savedHeight: savedData.height,
-                savedDateOfBirth: savedData.dateOfBirth
-            });
-        } catch (e) {
-            addDebugLog('error', 'Ошибка проверки сохраненных данных', e);
+        addDebugLog('info', '✅ Данные сохранены в localStorage');
+        
+        // Проверяем сохранение
+        const check = localStorage.getItem('klyro_user_data');
+        if (check === userDataStr) {
+            addDebugLog('info', '✅ Сохранение подтверждено');
+        } else {
+            addDebugLog('error', '❌ ОШИБКА: Данные не совпадают после сохранения!');
         }
-    } else {
-        addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА: Данные НЕ сохранились в localStorage!');
+    } catch (e) {
+        addDebugLog('error', '❌ КРИТИЧЕСКАЯ ОШИБКА сохранения в localStorage', e);
+        showNotification('Ошибка сохранения данных. Попробуйте еще раз.');
+        return;
     }
+    
+    // Синхронизируем в CloudStorage в фоне
+    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+        tg.CloudStorage.setItem('klyro_user_data', userDataStr).then(() => {
+            addDebugLog('info', '✅ Данные синхронизированы в CloudStorage');
+        }).catch((e) => {
+            addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
+        });
+    }
+    
+    lastUserDataHash = getDataHash(userData);
     
     addDebugLog('info', '✅ Завершение onboarding успешно, показываем профиль');
     showProfileScreen();
