@@ -453,7 +453,10 @@ let userData = null;
 
 // Инициализация приложения
 function initApp() {
+    addDebugLog('info', 'Инициализация приложения');
+    
     try {
+        addDebugLog('info', 'Скрытие всех экранов');
         const screens = document.querySelectorAll('.screen');
         screens.forEach(screen => {
             screen.classList.remove('active');
@@ -463,6 +466,7 @@ function initApp() {
         });
         
         if (window.Telegram && window.Telegram.WebApp) {
+            addDebugLog('info', 'Telegram WebApp обнаружен, показываем onboarding');
             const screen = document.getElementById('onboarding-screen');
             if (screen) {
                 screen.classList.add('active');
@@ -471,6 +475,7 @@ function initApp() {
                 screen.style.opacity = '1';
             }
         } else {
+            addDebugLog('warn', 'Telegram WebApp не обнаружен, показываем auth screen');
             const screen = document.getElementById('auth-screen');
             if (screen) {
                 screen.classList.add('active');
@@ -481,14 +486,18 @@ function initApp() {
         }
         
         if (tg && tgReady && tg.CloudStorage) {
+            addDebugLog('info', 'Запуск синхронизации данных');
             startDataSync();
+        } else {
+            addDebugLog('warn', 'Синхронизация данных не запущена - CloudStorage недоступен');
         }
         
+        addDebugLog('info', 'Запуск проверки авторизации');
         checkUserAuth().catch(e => {
-            console.error('[INIT] Error:', e);
+            addDebugLog('error', 'Ошибка в checkUserAuth', e);
         });
     } catch (e) {
-        console.error('[INIT] Critical error:', e);
+        addDebugLog('error', 'Критическая ошибка при инициализации приложения', e);
         const screen = document.getElementById('auth-screen') || document.getElementById('onboarding-screen');
         if (screen) {
             screen.style.display = 'block';
