@@ -534,42 +534,73 @@ if (document.readyState === 'complete') {
 }
 
 async function checkUserAuth() {
+    addDebugLog('info', 'Начало проверки авторизации пользователя');
+    
     try {
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.style.display = 'none';
             loadingScreen.style.visibility = 'hidden';
             loadingScreen.style.opacity = '0';
+            addDebugLog('info', 'Экран загрузки скрыт');
         }
         
         // ВСЕГДА сначала пробуем загрузить из CloudStorage (для синхронизации между устройствами)
         let savedData = null;
         if (tgReady && tg && tg.CloudStorage) {
+            addDebugLog('info', 'Попытка загрузки данных из CloudStorage');
             try {
                 const cloudPromise = loadFromStorage('klyro_user_data');
                 const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 5000));
                 savedData = await Promise.race([cloudPromise, timeoutPromise]);
                 if (savedData) {
                     localStorage.setItem('klyro_user_data', savedData);
+                    addDebugLog('info', 'Данные загружены из CloudStorage', null, {
+                        dataLength: savedData.length
+                    });
+                } else {
+                    addDebugLog('warn', 'CloudStorage вернул null или таймаут');
                 }
             } catch (e) {
-                // Fallback to localStorage
+                addDebugLog('warn', 'Ошибка при загрузке из CloudStorage', e);
             }
+        } else {
+            addDebugLog('warn', 'CloudStorage недоступен для загрузки', null, {
+                tgReady: tgReady,
+                hasTg: !!tg,
+                hasCloudStorage: tg ? !!tg.CloudStorage : false
+            });
         }
         
         // Fallback на localStorage если CloudStorage не дал результатов
         if (!savedData) {
+            addDebugLog('info', 'Загрузка данных из localStorage');
             savedData = loadFromStorageSync('klyro_user_data');
+            if (savedData) {
+                addDebugLog('info', 'Данные загружены из localStorage', null, {
+                    dataLength: savedData.length
+                });
+            } else {
+                addDebugLog('info', 'Данных в localStorage нет');
+            }
         }
         
         if (savedData) {
             try {
+                addDebugLog('info', 'Парсинг данных пользователя');
                 userData = JSON.parse(savedData);
                 const hasDateOfBirth = !!(userData.dateOfBirth || userData.age);
                 const hasHeight = !!userData.height;
                 const hasProfileData = hasDateOfBirth && hasHeight;
                 
+                addDebugLog('info', 'Проверка данных профиля', null, {
+                    hasDateOfBirth: hasDateOfBirth,
+                    hasHeight: hasHeight,
+                    hasProfileData: hasProfileData
+                });
+                
                 if (!hasProfileData) {
+                    addDebugLog('info', 'Профиль не заполнен, показываем onboarding/auth');
                     if (window.Telegram && window.Telegram.WebApp) {
                         showOnboardingScreen();
                     } else {
@@ -579,6 +610,7 @@ async function checkUserAuth() {
                 }
                 
                 if (hasProfileData) {
+                    addDebugLog('info', 'Профиль заполнен, показываем главный экран');
                     lastUserDataHash = getDataHash(userData);
                     if (typeof getDiary === 'function') {
                         const diary = getDiary();
