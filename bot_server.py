@@ -2,10 +2,15 @@
 """
 Простой Flask сервер для раздачи статических файлов Telegram Web App
 """
-from flask import Flask, send_from_directory, send_file, Response
+from flask import Flask, send_from_directory, send_file, Response, request, jsonify
 import os
+import json
+from datetime import datetime
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+
+# Хранилище логов (в памяти, для простоты)
+logs_storage = []
 
 def add_no_cache_headers(response):
     """Добавляет заголовки для предотвращения кэширования"""
@@ -39,6 +44,31 @@ def serve_static(path):
 @app.route('/health')
 def health():
     return {'status': 'ok'}, 200
+
+# Endpoint для получения логов
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    return jsonify(logs_storage[-100:]), 200  # Последние 100 логов
+
+# Endpoint для отправки логов
+@app.route('/api/log', methods=['POST'])
+def add_log():
+    try:
+        data = request.json
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'level': data.get('level', 'info'),
+            'message': data.get('message', ''),
+            'error': data.get('error'),
+            'context': data.get('context', {})
+        }
+        logs_storage.append(log_entry)
+        # Храним только последние 1000 логов
+        if len(logs_storage) > 1000:
+            logs_storage.pop(0)
+        return {'status': 'ok'}, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

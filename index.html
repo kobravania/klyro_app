@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Klyro - Персональный помощник по питанию</title>
-        <link rel="stylesheet" href="styles.css?v=70">
+        <link rel="stylesheet" href="styles.css?v=71">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
@@ -689,6 +689,63 @@
                         <p>Klyro v1.0</p>
                         <p>Персональный помощник по питанию и фитнесу</p>
                     </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Отладка</h3>
+                    <button class="btn btn-secondary" onclick="showDebugScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                        Показать логи и ошибки
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearDebugLogs()">
+                        Очистить логи
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран отладки -->
+        <div id="debug-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showSettingsScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Логи и ошибки</h2>
+                    <button class="btn-icon-small" onclick="exportDebugLogs()" title="Экспорт">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="debug-controls">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-auto-scroll" checked>
+                        <span>Автопрокрутка</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-show-info">
+                        <span>Показывать INFO</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-show-warn" checked>
+                        <span>Показывать WARN</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-show-error" checked>
+                        <span>Показывать ERROR</span>
+                    </label>
+                </div>
+
+                <div id="debug-logs" class="debug-logs">
+                    <div class="debug-log-entry info">Логи загрузятся здесь...</div>
                 </div>
             </div>
         </div>

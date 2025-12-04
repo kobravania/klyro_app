@@ -2,6 +2,175 @@
 let tg;
 let tgReady = false;
 
+// ============================================
+// СИСТЕМА ЛОГИРОВАНИЯ И ОТЛАДКИ
+// ============================================
+
+const debugLogs = [];
+const MAX_DEBUG_LOGS = 500;
+
+function addDebugLog(level, message, error = null, context = {}) {
+    const logEntry = {
+        timestamp: new Date().toISOString(),
+        level: level, // 'info', 'warn', 'error'
+        message: message,
+        error: error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        } : null,
+        context: context
+    };
+    
+    debugLogs.push(logEntry);
+    
+    // Ограничиваем количество логов
+    if (debugLogs.length > MAX_DEBUG_LOGS) {
+        debugLogs.shift();
+    }
+    
+    // Обновляем экран отладки, если он открыт
+    if (document.getElementById('debug-screen')?.classList.contains('active')) {
+        renderDebugLogs();
+    }
+    
+    // Отправляем критические ошибки на сервер
+    if (level === 'error') {
+        sendLogToServer(logEntry).catch(() => {
+            // Игнорируем ошибки отправки
+        });
+    }
+    
+    // Также выводим в консоль
+    if (level === 'error') {
+        console.error(`[${level.toUpperCase()}] ${message}`, error || context);
+    } else if (level === 'warn') {
+        console.warn(`[${level.toUpperCase()}] ${message}`, context);
+    } else {
+        console.log(`[${level.toUpperCase()}] ${message}`, context);
+    }
+}
+
+async function sendLogToServer(logEntry) {
+    try {
+        const currentUrl = window.location.origin;
+        await fetch(`${currentUrl}/api/log`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(logEntry)
+        });
+    } catch (e) {
+        // Игнорируем ошибки отправки
+    }
+}
+
+function renderDebugLogs() {
+    const logsContainer = document.getElementById('debug-logs');
+    if (!logsContainer) return;
+    
+    const showInfo = document.getElementById('debug-show-info')?.checked || false;
+    const showWarn = document.getElementById('debug-show-warn')?.checked !== false;
+    const showError = document.getElementById('debug-show-error')?.checked !== false;
+    
+    const filteredLogs = debugLogs.filter(log => {
+        if (log.level === 'info' && !showInfo) return false;
+        if (log.level === 'warn' && !showWarn) return false;
+        if (log.level === 'error' && !showError) return false;
+        return true;
+    });
+    
+    logsContainer.innerHTML = filteredLogs.map(log => {
+        const time = new Date(log.timestamp).toLocaleTimeString('ru-RU');
+        const errorInfo = log.error ? `
+            <div class="debug-error-details">
+                <strong>Ошибка:</strong> ${log.error.name || 'Unknown'}<br>
+                <strong>Сообщение:</strong> ${log.error.message || 'No message'}<br>
+                ${log.error.stack ? `<strong>Stack:</strong><pre>${log.error.stack}</pre>` : ''}
+            </div>
+        ` : '';
+        
+        const contextInfo = Object.keys(log.context).length > 0 ? `
+            <div class="debug-context">
+                <strong>Контекст:</strong><pre>${JSON.stringify(log.context, null, 2)}</pre>
+            </div>
+        ` : '';
+        
+        return `
+            <div class="debug-log-entry ${log.level}">
+                <div class="debug-log-header">
+                    <span class="debug-log-time">${time}</span>
+                    <span class="debug-log-level">${log.level.toUpperCase()}</span>
+                </div>
+                <div class="debug-log-message">${log.message}</div>
+                ${errorInfo}
+                ${contextInfo}
+            </div>
+        `;
+    }).join('');
+    
+    // Автопрокрутка
+    if (document.getElementById('debug-auto-scroll')?.checked) {
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+}
+
+function showDebugScreen() {
+    hideAllScreens();
+    const screen = document.getElementById('debug-screen');
+    if (screen) {
+        screen.classList.add('active');
+        screen.style.display = 'block';
+        screen.style.visibility = 'visible';
+        screen.style.opacity = '1';
+    }
+    renderDebugLogs();
+}
+
+function clearDebugLogs() {
+    debugLogs.length = 0;
+    renderDebugLogs();
+}
+
+function exportDebugLogs() {
+    const logsText = debugLogs.map(log => {
+        return `[${log.timestamp}] [${log.level.toUpperCase()}] ${log.message}${log.error ? '\n' + JSON.stringify(log.error, null, 2) : ''}${Object.keys(log.context).length > 0 ? '\n' + JSON.stringify(log.context, null, 2) : ''}`;
+    }).join('\n\n');
+    
+    const blob = new Blob([logsText], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `klyro_debug_${new Date().toISOString().split('T')[0]}.txt`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Перехватываем все ошибки
+window.addEventListener('error', (event) => {
+    addDebugLog('error', `Uncaught Error: ${event.message}`, {
+        name: 'Error',
+        message: event.message,
+        stack: event.error?.stack,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+    });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    addDebugLog('error', `Unhandled Promise Rejection: ${event.reason}`, event.reason instanceof Error ? event.reason : {
+        name: 'PromiseRejection',
+        message: String(event.reason)
+    });
+});
+
+// Экспортируем функции
+window.showDebugScreen = showDebugScreen;
+window.clearDebugLogs = clearDebugLogs;
+window.exportDebugLogs = exportDebugLogs;
+
 // Инициализация Telegram WebApp
 function initTelegramWebApp() {
     if (window.Telegram && window.Telegram.WebApp) {
@@ -42,35 +211,54 @@ if (document.readyState === 'loading') {
 // ============================================
 
 async function saveToStorage(key, value) {
-    // ВСЕГДА сохраняем в localStorage первым делом
-    localStorage.setItem(key, value);
-    
-    // Затем синхронизируем в CloudStorage в фоне (не блокируем)
-    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-        // Выполняем асинхронно, не ждем результата
-        tg.CloudStorage.setItem(key, value).catch(() => {
-            // Игнорируем ошибки - данные уже в localStorage
+    try {
+        addDebugLog('info', `Сохранение в хранилище: ${key}`, null, {
+            valueLength: value ? value.length : 0
         });
-    }
-    
-    // Обновляем хэш
-    if (key === 'klyro_diary') {
-        try {
-            const diary = JSON.parse(value);
-            lastDiaryHash = getDataHash(diary);
-        } catch (e) {
-            // Игнорируем ошибку парсинга
+        
+        // ВСЕГДА сохраняем в localStorage первым делом
+        localStorage.setItem(key, value);
+        addDebugLog('info', `Сохранено в localStorage: ${key}`);
+        
+        // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            addDebugLog('info', `Синхронизация в CloudStorage: ${key}`);
+            // Выполняем асинхронно, не ждем результата
+            tg.CloudStorage.setItem(key, value).then(() => {
+                addDebugLog('info', `Синхронизировано в CloudStorage: ${key}`);
+            }).catch((e) => {
+                addDebugLog('warn', `Ошибка синхронизации в CloudStorage: ${key}`, e);
+            });
+        } else {
+            addDebugLog('warn', `CloudStorage недоступен для ${key}`, null, {
+                tgReady: tgReady,
+                hasTg: !!tg,
+                hasCloudStorage: tg ? !!tg.CloudStorage : false
+            });
         }
-    } else if (key === 'klyro_user_data') {
-        try {
-            const data = JSON.parse(value);
-            lastUserDataHash = getDataHash(data);
-        } catch (e) {
-            // Игнорируем ошибку парсинга
+        
+        // Обновляем хэш
+        if (key === 'klyro_diary') {
+            try {
+                const diary = JSON.parse(value);
+                lastDiaryHash = getDataHash(diary);
+            } catch (e) {
+                addDebugLog('warn', 'Ошибка парсинга дневника для хэша', e);
+            }
+        } else if (key === 'klyro_user_data') {
+            try {
+                const data = JSON.parse(value);
+                lastUserDataHash = getDataHash(data);
+            } catch (e) {
+                addDebugLog('warn', 'Ошибка парсинга userData для хэша', e);
+            }
         }
+        
+        return true;
+    } catch (e) {
+        addDebugLog('error', `Критическая ошибка в saveToStorage для ${key}`, e);
+        throw e;
     }
-    
-    return true;
 }
 
 async function loadFromStorage(key) {
@@ -1309,36 +1497,69 @@ function setQuickAmount(grams) {
 }
 
 function addFoodToDiary() {
-    if (!selectedProduct) {
-        showNotification('Выберите продукт');
-        return;
-    }
-    
-    const gramsEl = document.getElementById('product-grams');
-    if (!gramsEl) return;
-    
-    const grams = parseFloat(gramsEl.value) || 100;
-    const multiplier = grams / 100;
-    
-    const entry = {
-        id: Date.now().toString(),
-        name: selectedProduct.name || 'Продукт',
-        grams: grams,
-        kcal: (selectedProduct.kcal || 0) * multiplier,
-        protein: (selectedProduct.protein || 0) * multiplier,
-        fat: (selectedProduct.fat || 0) * multiplier,
-        carbs: (selectedProduct.carbs || 0) * multiplier,
-        timestamp: new Date().toISOString()
-    };
-    
-    // Добавляем запись (сохранение происходит внутри)
-    addDiaryEntry(currentDiaryDate, entry).then(() => {
-        showNotification('Продукт добавлен в дневник!');
-        showDiaryScreen();
-    }).catch(e => {
-        console.error('[DIARY] Error:', e);
+    try {
+        addDebugLog('info', 'Начало добавления продукта в дневник', null, {
+            selectedProduct: selectedProduct ? {
+                id: selectedProduct.id,
+                name: selectedProduct.name,
+                hasKcal: selectedProduct.kcal !== undefined
+            } : null,
+            currentDiaryDate: currentDiaryDate
+        });
+        
+        if (!selectedProduct) {
+            addDebugLog('warn', 'Продукт не выбран');
+            showNotification('Выберите продукт');
+            return;
+        }
+        
+        const gramsEl = document.getElementById('product-grams');
+        if (!gramsEl) {
+            addDebugLog('error', 'Элемент product-grams не найден');
+            return;
+        }
+        
+        const grams = parseFloat(gramsEl.value) || 100;
+        const multiplier = grams / 100;
+        
+        addDebugLog('info', 'Создание записи', null, {
+            grams: grams,
+            multiplier: multiplier,
+            productKcal: selectedProduct.kcal,
+            productProtein: selectedProduct.protein,
+            productFat: selectedProduct.fat,
+            productCarbs: selectedProduct.carbs
+        });
+        
+        const entry = {
+            id: Date.now().toString(),
+            name: selectedProduct.name || 'Продукт',
+            grams: grams,
+            kcal: (selectedProduct.kcal || 0) * multiplier,
+            protein: (selectedProduct.protein || 0) * multiplier,
+            fat: (selectedProduct.fat || 0) * multiplier,
+            carbs: (selectedProduct.carbs || 0) * multiplier,
+            timestamp: new Date().toISOString()
+        };
+        
+        addDebugLog('info', 'Запись создана', null, entry);
+        
+        // Добавляем запись (сохранение происходит внутри)
+        addDiaryEntry(currentDiaryDate, entry).then(() => {
+            addDebugLog('info', 'Продукт успешно добавлен в дневник');
+            showNotification('Продукт добавлен в дневник!');
+            showDiaryScreen();
+        }).catch(e => {
+            addDebugLog('error', 'Ошибка при добавлении продукта в дневник', e, {
+                entry: entry,
+                date: currentDiaryDate
+            });
+            showNotification('Ошибка при добавлении продукта');
+        });
+    } catch (e) {
+        addDebugLog('error', 'Критическая ошибка в addFoodToDiary', e);
         showNotification('Ошибка при добавлении продукта');
-    });
+    }
 }
 
 function showCustomProductForm() {
@@ -1397,18 +1618,43 @@ function getDiary() {
 }
 
 async function saveDiary(diary) {
-    const diaryStr = JSON.stringify(diary);
-    
-    // ВСЕГДА сохраняем в localStorage первым делом
-    localStorage.setItem('klyro_diary', diaryStr);
-    lastDiaryHash = getDataHash(diary);
-    
-    // Затем синхронизируем в CloudStorage в фоне (не блокируем)
-    if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-        // Выполняем асинхронно, не ждем результата
-        tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {
-            // Игнорируем ошибки - данные уже в localStorage
+    try {
+        addDebugLog('info', 'Начало сохранения дневника', null, {
+            datesCount: Object.keys(diary).length,
+            totalEntries: Object.values(diary).reduce((sum, entries) => sum + entries.length, 0)
         });
+        
+        const diaryStr = JSON.stringify(diary);
+        
+        // ВСЕГДА сохраняем в localStorage первым делом
+        localStorage.setItem('klyro_diary', diaryStr);
+        lastDiaryHash = getDataHash(diary);
+        
+        addDebugLog('info', 'Дневник сохранен в localStorage', null, {
+            dataLength: diaryStr.length,
+            hash: lastDiaryHash
+        });
+        
+        // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+        if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
+            addDebugLog('info', 'Начало синхронизации в CloudStorage');
+            // Выполняем асинхронно, не ждем результата
+            tg.CloudStorage.setItem('klyro_diary', diaryStr).then(() => {
+                addDebugLog('info', 'Дневник синхронизирован в CloudStorage');
+            }).catch((e) => {
+                addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
+            });
+        } else {
+            addDebugLog('warn', 'CloudStorage недоступен для синхронизации', null, {
+                tgReady: tgReady,
+                hasTg: !!tg,
+                hasCloudStorage: tg ? !!tg.CloudStorage : false,
+                hasSetItem: tg && tg.CloudStorage ? typeof tg.CloudStorage.setItem === 'function' : false
+            });
+        }
+    } catch (e) {
+        addDebugLog('error', 'Критическая ошибка при сохранении дневника', e);
+        throw e;
     }
 }
 
@@ -1418,13 +1664,34 @@ function getDiaryForDate(date) {
 }
 
 async function addDiaryEntry(date, entry) {
-    // Простое добавление без сложных проверок
-    const diary = getDiary();
-    if (!diary[date]) {
-        diary[date] = [];
+    try {
+        addDebugLog('info', 'Добавление записи в дневник', null, {
+            date: date,
+            entryId: entry.id,
+            entryName: entry.name
+        });
+        
+        const diary = getDiary();
+        if (!diary[date]) {
+            diary[date] = [];
+        }
+        diary[date].push(entry);
+        
+        addDebugLog('info', 'Запись добавлена в объект дневника', null, {
+            entriesCount: diary[date].length,
+            totalDates: Object.keys(diary).length
+        });
+        
+        await saveDiary(diary);
+        
+        addDebugLog('info', 'Дневник сохранен после добавления записи');
+    } catch (e) {
+        addDebugLog('error', 'Ошибка в addDiaryEntry', e, {
+            date: date,
+            entry: entry
+        });
+        throw e;
     }
-    diary[date].push(entry);
-    await saveDiary(diary);
 }
 
 async function removeDiaryEntry(date, entryId) {
