@@ -1607,54 +1607,103 @@ function setQuickAmount(grams) {
 }
 
 function addFoodToDiary() {
-    if (!selectedProduct) {
-        showNotification('Выберите продукт');
-        return;
-    }
-    
-    const gramsEl = document.getElementById('product-grams');
-    if (!gramsEl) {
-        addDebugLog('error', 'Элемент product-grams не найден');
-        return;
-    }
-    
-    const grams = parseFloat(gramsEl.value) || 100;
-    const multiplier = grams / 100;
-    
-    const entry = {
-        id: Date.now().toString(),
-        name: selectedProduct.name || 'Продукт',
-        grams: grams,
-        kcal: (selectedProduct.kcal || 0) * multiplier,
-        protein: (selectedProduct.protein || 0) * multiplier,
-        fat: (selectedProduct.fat || 0) * multiplier,
-        carbs: (selectedProduct.carbs || 0) * multiplier,
-        timestamp: new Date().toISOString()
-    };
-    
-    // ПРОСТОЕ добавление - без сложных проверок
     try {
-        const diary = getDiary();
+        addDebugLog('info', 'addFoodToDiary вызвана', null, {
+            hasSelectedProduct: !!selectedProduct,
+            currentDiaryDate: currentDiaryDate
+        });
+        
+        if (!selectedProduct) {
+            addDebugLog('warn', 'Продукт не выбран');
+            showNotification('Выберите продукт');
+            return;
+        }
+        
+        if (!currentDiaryDate) {
+            currentDiaryDate = new Date().toISOString().split('T')[0];
+            addDebugLog('info', 'currentDiaryDate установлен', null, { date: currentDiaryDate });
+        }
+        
+        const gramsEl = document.getElementById('product-grams');
+        if (!gramsEl) {
+            addDebugLog('error', 'Элемент product-grams не найден');
+            showNotification('Ошибка: элемент формы не найден');
+            return;
+        }
+        
+        const grams = parseFloat(gramsEl.value) || 100;
+        const multiplier = grams / 100;
+        
+        const entry = {
+            id: Date.now().toString(),
+            name: selectedProduct.name || 'Продукт',
+            grams: grams,
+            kcal: (selectedProduct.kcal || 0) * multiplier,
+            protein: (selectedProduct.protein || 0) * multiplier,
+            fat: (selectedProduct.fat || 0) * multiplier,
+            carbs: (selectedProduct.carbs || 0) * multiplier,
+            timestamp: new Date().toISOString()
+        };
+        
+        addDebugLog('info', 'Запись создана', null, entry);
+        
+        // Получаем дневник
+        let diary;
+        try {
+            diary = getDiary();
+            if (!diary || typeof diary !== 'object') {
+                diary = {};
+            }
+        } catch (e) {
+            addDebugLog('error', 'Ошибка при получении дневника', e);
+            diary = {};
+        }
+        
+        // Добавляем запись
         if (!diary[currentDiaryDate]) {
             diary[currentDiaryDate] = [];
         }
         diary[currentDiaryDate].push(entry);
         
+        addDebugLog('info', 'Запись добавлена в объект дневника', null, {
+            date: currentDiaryDate,
+            entriesCount: diary[currentDiaryDate].length
+        });
+        
         // Сохраняем СРАЗУ в localStorage
-        const diaryStr = JSON.stringify(diary);
-        localStorage.setItem('klyro_diary', diaryStr);
-        lastDiaryHash = getDataHash(diary);
+        try {
+            const diaryStr = JSON.stringify(diary);
+            localStorage.setItem('klyro_diary', diaryStr);
+            
+            if (typeof getDataHash === 'function') {
+                lastDiaryHash = getDataHash(diary);
+            }
+            
+            addDebugLog('info', 'Дневник сохранен в localStorage', null, {
+                diaryStrLength: diaryStr.length
+            });
+        } catch (e) {
+            addDebugLog('error', 'Ошибка при сохранении в localStorage', e);
+            throw e;
+        }
         
         // Синхронизируем в CloudStorage в фоне
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {});
+            const diaryStr = JSON.stringify(diary);
+            tg.CloudStorage.setItem('klyro_diary', diaryStr).catch((e) => {
+                addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
+            });
         }
         
         showNotification('Продукт добавлен в дневник!');
         showDiaryScreen();
     } catch (e) {
-        addDebugLog('error', 'Ошибка при добавлении продукта', e);
-        showNotification('Ошибка при добавлении продукта');
+        addDebugLog('error', 'КРИТИЧЕСКАЯ ошибка в addFoodToDiary', e, {
+            errorName: e?.name,
+            errorMessage: e?.message,
+            errorStack: e?.stack
+        });
+        showNotification('Ошибка при добавлении продукта: ' + (e?.message || 'неизвестная ошибка'));
     }
 }
 
