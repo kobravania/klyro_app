@@ -218,7 +218,7 @@
                     </div>
                     <div class="button-group">
                         <button class="btn btn-secondary" onclick="prevStep()">Назад</button>
-                        <button class="btn btn-primary btn-next" onclick="completeOnboarding()">Завершить</button>
+                        <button class="btn btn-primary btn-next" onclick="if(typeof completeOnboardingNew !== 'undefined') { completeOnboardingNew(); } else if(typeof completeOnboarding !== 'undefined') { completeOnboarding(); }">Завершить</button>
                     </div>
                 </div>
             </div>

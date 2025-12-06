@@ -65,12 +65,92 @@ class OnboardingScreen {
         await appContext.setUserData(userData);
         
         // Показываем главный экран
-        hideAllScreens();
+        if (typeof hideAllScreens === 'function') {
+            hideAllScreens();
+        }
         dashboardScreen.show();
         fab.show();
         
         Helpers.showNotification('Профиль сохранен!', 'success');
     }
+}
+
+// Адаптер для старой функции completeOnboarding из app.js
+// Создаем глобальную функцию, которая будет работать со старой формой
+window.completeOnboardingNew = async function() {
+    try {
+        // Собираем данные из формы
+        const genderInput = document.querySelector('input[name="gender"]:checked');
+        const heightSlider = document.getElementById('height');
+        const weightSlider = document.getElementById('weight');
+        const activityInput = document.querySelector('input[name="activity"]:checked');
+        const goalInput = document.querySelector('input[name="goal"]:checked');
+        const dateOfBirthValue = document.getElementById('dateOfBirthValue');
+        const dateInput = document.getElementById('dateOfBirth');
+        
+        let userData = appContext.getUserData() || {};
+        
+        // Дата рождения
+        if (dateOfBirthValue && dateOfBirthValue.value) {
+            userData.dateOfBirth = dateOfBirthValue.value;
+            userData.age = Helpers.getAge(dateOfBirthValue.value);
+        } else if (dateInput && dateInput.value) {
+            const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+            if (dateMatch) {
+                const day = parseInt(dateMatch[1]);
+                const month = parseInt(dateMatch[2]) - 1;
+                const year = parseInt(dateMatch[3]);
+                const date = new Date(year, month, day);
+                if (!isNaN(date.getTime())) {
+                    userData.dateOfBirth = date.toISOString().split('T')[0];
+                    userData.age = Helpers.getAge(userData.dateOfBirth);
+                }
+            }
+        }
+        
+        // Остальные данные
+        if (genderInput) userData.gender = genderInput.value;
+        if (heightSlider) userData.height = parseInt(heightSlider.value);
+        if (weightSlider) userData.weight = parseFloat(weightSlider.value);
+        if (activityInput) userData.activity = activityInput.value;
+        if (goalInput) userData.goal = goalInput.value;
+        
+        // Рассчитываем калории
+        userData.calories = Calculations.calculateCalories(userData);
+        
+        // Сохраняем через новый контекст
+        await appContext.setUserData(userData);
+        
+        // Показываем главный экран
+        if (typeof hideAllScreens === 'function') {
+            hideAllScreens();
+        }
+        dashboardScreen.show();
+        fab.show();
+        
+        Helpers.showNotification('Профиль сохранен!', 'success');
+    } catch (e) {
+        console.error('[ONBOARDING] Error:', e);
+        Helpers.showNotification('Ошибка при сохранении данных', 'error');
+    }
+};
+
+// Если старая функция completeOnboarding существует, переопределяем её
+if (typeof window.completeOnboarding === 'function') {
+    const oldCompleteOnboarding = window.completeOnboarding;
+    window.completeOnboarding = async function() {
+        // Пробуем использовать новую функцию
+        if (typeof window.completeOnboardingNew === 'function') {
+            await window.completeOnboardingNew();
+        } else {
+            // Fallback на старую
+            await oldCompleteOnboarding();
+        }
+    };
+} else {
+    // Если старой функции нет, создаем новую
+    window.completeOnboarding = window.completeOnboardingNew;
+}
 }
 
 const onboardingScreen = new OnboardingScreen();
