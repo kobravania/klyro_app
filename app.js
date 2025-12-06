@@ -273,28 +273,18 @@ async function saveToStorage(key, value) {
         addDebugLog('info', `Сохранено в localStorage: ${key}`);
         
         // Затем синхронизируем в CloudStorage в фоне (не блокируем)
+        // ВАЖНО: НЕ используем .then() или .catch() - просто вызываем setItem
+        // Данные уже сохранены в localStorage, CloudStorage - это только синхронизация
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
             // Выполняем асинхронно через setTimeout, чтобы не блокировать
             setTimeout(() => {
                 try {
-                    const result = tg.CloudStorage.setItem(key, value);
-                    // Проверяем, что результат существует и является Promise
-                    if (result !== null && result !== undefined) {
-                        if (typeof result === 'object' && typeof result.then === 'function') {
-                            result.then(() => {
-                                addDebugLog('info', `Синхронизировано в CloudStorage: ${key}`);
-                            }).catch((e) => {
-                                addDebugLog('warn', `Ошибка синхронизации в CloudStorage: ${key}`, e);
-                            });
-                        } else {
-                            // Если не Promise, просто игнорируем
-                            addDebugLog('info', `CloudStorage.setItem для ${key} не вернул Promise`);
-                        }
-                    } else {
-                        // Результат undefined/null - это нормально для некоторых версий API
-                        addDebugLog('info', `CloudStorage.setItem для ${key} вернул ${result}`);
-                    }
+                    // Просто вызываем setItem без ожидания результата
+                    // Некоторые версии API не возвращают Promise
+                    tg.CloudStorage.setItem(key, value);
+                    // Не логируем успех, чтобы не засорять логи
                 } catch (e) {
+                    // Логируем только реальные ошибки
                     addDebugLog('warn', `Ошибка при вызове CloudStorage.setItem для ${key}`, e);
                 }
             }, 0);
@@ -1733,16 +1723,14 @@ function addFoodToDiary() {
         // Синхронизируем в CloudStorage в фоне
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
             const diaryStr = JSON.stringify(diary);
-            try {
-                const result = tg.CloudStorage.setItem('klyro_diary', diaryStr);
-                if (result && typeof result.catch === 'function') {
-                    result.catch((e) => {
-                        addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
-                    });
+            setTimeout(() => {
+                try {
+                    // Просто вызываем setItem без ожидания результата
+                    tg.CloudStorage.setItem('klyro_diary', diaryStr);
+                } catch (e) {
+                    addDebugLog('warn', 'Ошибка при вызове CloudStorage.setItem', e);
                 }
-            } catch (e) {
-                addDebugLog('warn', 'Ошибка при вызове CloudStorage.setItem', e);
-            }
+            }, 0);
         }
         
         showNotification('Продукт добавлен в дневник!');
