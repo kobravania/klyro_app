@@ -1727,9 +1727,16 @@ function addFoodToDiary() {
         // Синхронизируем в CloudStorage в фоне
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
             const diaryStr = JSON.stringify(diary);
-            tg.CloudStorage.setItem('klyro_diary', diaryStr).catch((e) => {
-                addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
-            });
+            try {
+                const result = tg.CloudStorage.setItem('klyro_diary', diaryStr);
+                if (result && typeof result.catch === 'function') {
+                    result.catch((e) => {
+                        addDebugLog('warn', 'Ошибка синхронизации в CloudStorage', e);
+                    });
+                }
+            } catch (e) {
+                addDebugLog('warn', 'Ошибка при вызове CloudStorage.setItem', e);
+            }
         }
         
         showNotification('Продукт добавлен в дневник!');
