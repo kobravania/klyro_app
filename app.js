@@ -370,7 +370,16 @@ let lastUserDataHash = null;
 let pendingSync = false;
 
 function getDataHash(data) {
-    return btoa(JSON.stringify(data)).substring(0, 16);
+    try {
+        const str = JSON.stringify(data);
+        // Правильная обработка Unicode для btoa
+        const utf8Str = unescape(encodeURIComponent(str));
+        return btoa(utf8Str).substring(0, 16);
+    } catch (e) {
+        // Если ошибка, возвращаем простой хеш на основе длины
+        const str = JSON.stringify(data);
+        return String(str.length) + String(Date.now()).slice(-8);
+    }
 }
 
 // Функция для синхронизации данных в CloudStorage
