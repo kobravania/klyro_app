@@ -88,28 +88,28 @@ function setupNavigation() {
                 fab.show();
                 break;
             case 'diary':
-                // TODO: Показать экран дневника
+                diaryScreen.show();
                 fab.show();
                 break;
             case 'products':
-                // TODO: Показать экран продуктов
+                productsScreen.show();
                 fab.hide();
                 break;
             case 'activity':
-                // TODO: Показать экран активности
+                activityScreen.show();
                 fab.hide();
                 break;
             case 'profile':
-                // TODO: Показать экран профиля
+                profileScreen.show();
                 fab.hide();
                 break;
         }
     });
     
     // Обработчик FAB кнопки
-    window.addEventListener('showAddFood', () => {
-        // TODO: Показать экран добавления продукта
-        console.log('[APP] Show add food screen');
+    window.addEventListener('showAddFood', (e) => {
+        addFoodScreen.selectedProduct = e.detail?.product || null;
+        addFoodScreen.show();
     });
 }
 
