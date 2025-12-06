@@ -1684,8 +1684,18 @@ function addFoodToDiary() {
             const diaryStr = JSON.stringify(diary);
             localStorage.setItem('klyro_diary', diaryStr);
             
-            if (typeof getDataHash === 'function') {
-                lastDiaryHash = getDataHash(diary);
+            // Обновляем хеш (с защитой от ошибок)
+            try {
+                if (typeof getDataHash === 'function') {
+                    lastDiaryHash = getDataHash(diary);
+                } else {
+                    // Fallback если функция не определена
+                    lastDiaryHash = String(diaryStr.length) + String(Date.now()).slice(-8);
+                }
+            } catch (hashError) {
+                // Если ошибка в getDataHash, используем простой хеш
+                addDebugLog('warn', 'Ошибка при вычислении хеша, используется fallback', hashError);
+                lastDiaryHash = String(diaryStr.length) + String(Date.now()).slice(-8);
             }
             
             addDebugLog('info', 'Дневник сохранен в localStorage', null, {
