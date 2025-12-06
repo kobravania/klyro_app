@@ -20,58 +20,72 @@ class ProfileScreen {
                         <h1 class="screen-title">Профиль</h1>
                     </div>
                     
-                    <div class="profile-card">
+                    <div class="profile-info-card">
                         <div class="profile-avatar">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                 <circle cx="12" cy="7" r="4"/>
                             </svg>
                         </div>
-                        <div class="profile-info" id="profile-info">
-                            <div class="profile-name">Загрузка...</div>
-                            <div class="profile-details">Загрузка...</div>
+                        <div class="profile-name" id="profile-name">Пользователь</div>
+                        <div class="profile-stats">
+                            <div class="stat-item">
+                                <div class="stat-value" id="profile-calories">0</div>
+                                <div class="stat-label">Целевые ккал</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="profile-bmr">0</div>
+                                <div class="stat-label">BMR</div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="profile-stats">
-                        <div class="stat-item">
-                            <div class="stat-value" id="profile-goal-calories">0</div>
-                            <div class="stat-label">Целевые калории</div>
+                    <div class="profile-sections">
+                        <div class="section-card">
+                            <h3 class="section-title">Физические параметры</h3>
+                            <div class="info-row">
+                                <span class="info-label">Рост:</span>
+                                <span class="info-value" id="profile-height">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Вес:</span>
+                                <span class="info-value" id="profile-weight">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Возраст:</span>
+                                <span class="info-value" id="profile-age">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Пол:</span>
+                                <span class="info-value" id="profile-gender">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Активность:</span>
+                                <span class="info-value" id="profile-activity">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Цель:</span>
+                                <span class="info-value" id="profile-goal">-</span>
+                            </div>
+                            <button class="btn btn-secondary btn-block" id="edit-profile-btn">
+                                Редактировать профиль
+                            </button>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="profile-weight">-</div>
-                            <div class="stat-label">Вес</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value" id="profile-height">-</div>
-                            <div class="stat-label">Рост</div>
-                        </div>
-                    </div>
-                    
-                    <div class="profile-actions">
-                        <button class="btn btn-secondary btn-full" id="edit-profile-btn">
-                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                            Редактировать профиль
-                        </button>
-                    </div>
-                    
-                    <div class="settings-section">
-                        <h2 class="section-title">Настройки</h2>
                         
-                        <div class="settings-group">
-                            <div class="setting-item">
-                                <div class="setting-info">
-                                    <div class="setting-label">Единицы измерения</div>
-                                    <div class="setting-description">Метрическая система</div>
-                                </div>
-                                <div class="setting-value">кг, см</div>
+                        <div class="section-card">
+                            <h3 class="section-title">Настройки</h3>
+                            <div class="settings-item">
+                                <label class="settings-label">Единицы измерения</label>
+                                <select id="units-select" class="select-input">
+                                    <option value="metric">Метрические (кг, см)</option>
+                                    <option value="imperial">Имперские (фунты, дюймы)</option>
+                                </select>
                             </div>
                         </div>
                         
-                        <div id="export-import-container" class="export-import-container"></div>
+                        <div class="section-card" id="export-import-section">
+                            <!-- Экспорт/импорт будет добавлен через компонент -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -84,22 +98,42 @@ class ProfileScreen {
             app.appendChild(tempDiv.firstElementChild);
         }
 
-        // Добавляем экспорт/импорт
-        const container = document.getElementById('export-import-container');
-        if (container) {
-            container.innerHTML = exportImport.createUI();
-            exportImport.attachHandlers(container);
-        }
-
         this.attachHandlers();
-        this.update();
+        this.initExportImport();
     }
 
     attachHandlers() {
         const editBtn = document.getElementById('edit-profile-btn');
+        const unitsSelect = document.getElementById('units-select');
+
         if (editBtn) {
-            editBtn.addEventListener('click', () => this.showEditProfile());
+            editBtn.addEventListener('click', () => {
+                this.showOnboarding();
+            });
         }
+
+        if (unitsSelect) {
+            unitsSelect.value = appContext.settings.units || 'metric';
+            unitsSelect.addEventListener('change', async (e) => {
+                appContext.settings.units = e.target.value;
+                await storage.setItem('klyro_units', e.target.value);
+                Helpers.showNotification('Настройки сохранены', 'success');
+            });
+        }
+    }
+
+    initExportImport() {
+        const section = document.getElementById('export-import-section');
+        if (section) {
+            section.innerHTML = exportImport.createUI();
+            exportImport.attachHandlers(section);
+        }
+    }
+
+    showOnboarding() {
+        // Показываем форму онбординга для редактирования
+        hideAllScreens();
+        showOnboardingScreen();
     }
 
     show() {
@@ -121,36 +155,69 @@ class ProfileScreen {
 
     update() {
         const userData = appContext.getUserData();
-        if (!userData) {
-            return;
-        }
-        
-        // Обновляем информацию профиля
-        const infoEl = document.getElementById('profile-info');
-        if (infoEl) {
-            const name = userData.firstName || 'Пользователь';
-            const age = userData.dateOfBirth ? Helpers.getAge(userData.dateOfBirth) : userData.age || '-';
-            infoEl.innerHTML = `
-                <div class="profile-name">${name}</div>
-                <div class="profile-details">${age} лет</div>
-            `;
-        }
-        
-        // Обновляем статистику
-        const goalCalories = appContext.getGoalCalories();
-        const goalCaloriesEl = document.getElementById('profile-goal-calories');
-        const weightEl = document.getElementById('profile-weight');
-        const heightEl = document.getElementById('profile-height');
-        
-        if (goalCaloriesEl) goalCaloriesEl.textContent = Math.round(goalCalories);
-        if (weightEl) weightEl.textContent = userData.weight ? userData.weight + ' кг' : '-';
-        if (heightEl) heightEl.textContent = userData.height ? userData.height + ' см' : '-';
-    }
+        if (!userData) return;
 
-    showEditProfile() {
-        // Показываем форму редактирования профиля (будет создана отдельно)
-        Helpers.showNotification('Функция редактирования профиля в разработке', 'info');
-        // TODO: Показать модальное окно или экран редактирования профиля
+        // Имя
+        const nameEl = document.getElementById('profile-name');
+        if (nameEl) {
+            const firstName = userData.firstName || 'Пользователь';
+            const lastName = userData.lastName || '';
+            nameEl.textContent = `${firstName} ${lastName}`.trim();
+        }
+
+        // Калории и BMR
+        const calories = appContext.getGoalCalories();
+        const caloriesEl = document.getElementById('profile-calories');
+        if (caloriesEl) caloriesEl.textContent = Math.round(calories);
+
+        // BMR
+        let age = null;
+        if (userData.dateOfBirth) {
+            age = Helpers.getAge(userData.dateOfBirth);
+        } else if (userData.age) {
+            age = userData.age;
+        }
+
+        if (age && userData.height && userData.weight && userData.gender) {
+            const bmr = Calculations.calculateBMR(userData.weight, userData.height, age, userData.gender);
+            const bmrEl = document.getElementById('profile-bmr');
+            if (bmrEl) bmrEl.textContent = Math.round(bmr);
+        }
+
+        // Физические параметры
+        const heightEl = document.getElementById('profile-height');
+        const weightEl = document.getElementById('profile-weight');
+        const ageEl = document.getElementById('profile-age');
+        const genderEl = document.getElementById('profile-gender');
+        const activityEl = document.getElementById('profile-activity');
+        const goalEl = document.getElementById('profile-goal');
+
+        if (heightEl) heightEl.textContent = userData.height ? `${userData.height} см` : '-';
+        if (weightEl) weightEl.textContent = userData.weight ? `${userData.weight} кг` : '-';
+        if (ageEl) ageEl.textContent = age ? `${age} лет` : '-';
+        
+        if (genderEl) {
+            const genderMap = { 'male': 'Мужской', 'female': 'Женский' };
+            genderEl.textContent = genderMap[userData.gender] || '-';
+        }
+        
+        if (activityEl) {
+            const activityMap = {
+                'low': 'Низкая',
+                'moderate': 'Умеренная',
+                'high': 'Высокая'
+            };
+            activityEl.textContent = activityMap[userData.activity] || '-';
+        }
+        
+        if (goalEl) {
+            const goalMap = {
+                'lose': 'Похудение',
+                'maintain': 'Поддержание',
+                'gain': 'Набор веса'
+            };
+            goalEl.textContent = goalMap[userData.goal] || '-';
+        }
     }
 }
 
@@ -159,4 +226,3 @@ const profileScreen = new ProfileScreen();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ProfileScreen;
 }
-

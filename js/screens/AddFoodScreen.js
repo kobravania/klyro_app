@@ -5,25 +5,20 @@
 class AddFoodScreen {
     constructor() {
         this.selectedProduct = null;
-        this.grams = 100;
+        this.searchQuery = '';
         this.init();
     }
 
     init() {
         this.createHTML();
-        
-        // Слушаем событие выбора продукта
-        window.addEventListener('showAddFood', (e) => {
-            this.selectedProduct = e.detail?.product || null;
-            this.show();
-        });
+        this.attachHandlers();
     }
 
     createHTML() {
         const screenHTML = `
             <div id="add-food-screen" class="screen">
                 <div class="screen-content">
-                    <div class="add-food-header">
+                    <div class="screen-header">
                         <button class="btn-back" id="add-food-back">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="15 18 9 12 15 6"/>
@@ -32,43 +27,33 @@ class AddFoodScreen {
                         <h1 class="screen-title">Добавить продукт</h1>
                     </div>
                     
-                    <div id="add-food-product-info" class="product-info-card">
-                        <p class="empty-state">Выберите продукт</p>
+                    <div class="search-section">
+                        <input type="text" 
+                               id="product-search" 
+                               class="search-input" 
+                               placeholder="Поиск продукта...">
                     </div>
                     
-                    <div class="add-food-form">
-                        <div class="form-group">
-                            <label class="form-label">Количество (граммы)</label>
-                            <input 
-                                type="number" 
-                                id="add-food-grams" 
-                                class="form-input" 
-                                value="100" 
-                                min="1" 
-                                step="1"
-                            >
+                    <div id="products-list" class="products-list">
+                        <p class="empty-state">Загрузка продуктов...</p>
+                    </div>
+                    
+                    <div id="product-amount-section" class="product-amount-section" style="display: none;">
+                        <div class="selected-product-info">
+                            <div class="product-name" id="selected-product-name"></div>
+                            <div class="product-macros" id="selected-product-macros"></div>
                         </div>
-                        
-                        <div class="add-food-preview" id="add-food-preview">
-                            <div class="preview-item">
-                                <span class="preview-label">Калории</span>
-                                <span class="preview-value" id="preview-kcal">0</span>
-                            </div>
-                            <div class="preview-item">
-                                <span class="preview-label">Белки</span>
-                                <span class="preview-value" id="preview-protein">0 г</span>
-                            </div>
-                            <div class="preview-item">
-                                <span class="preview-label">Жиры</span>
-                                <span class="preview-value" id="preview-fat">0 г</span>
-                            </div>
-                            <div class="preview-item">
-                                <span class="preview-label">Углеводы</span>
-                                <span class="preview-value" id="preview-carbs">0 г</span>
-                            </div>
+                        <div class="amount-input-group">
+                            <label class="input-label">Количество (граммы)</label>
+                            <input type="number" 
+                                   id="product-grams" 
+                                   class="number-input" 
+                                   value="100" 
+                                   min="1" 
+                                   step="1">
                         </div>
-                        
-                        <button class="btn btn-primary btn-large" id="add-food-submit">
+                        <div class="calculated-macros" id="calculated-macros"></div>
+                        <button class="btn btn-primary btn-block" id="add-to-diary-btn">
                             Добавить в дневник
                         </button>
                     </div>
@@ -82,46 +67,54 @@ class AddFoodScreen {
             tempDiv.innerHTML = screenHTML;
             app.appendChild(tempDiv.firstElementChild);
         }
-
-        this.attachHandlers();
     }
 
     attachHandlers() {
         const backBtn = document.getElementById('add-food-back');
-        const gramsInput = document.getElementById('add-food-grams');
-        const submitBtn = document.getElementById('add-food-submit');
+        const searchInput = document.getElementById('product-search');
+        const gramsInput = document.getElementById('product-grams');
+        const addBtn = document.getElementById('add-to-diary-btn');
 
         if (backBtn) {
             backBtn.addEventListener('click', () => this.hide());
         }
 
-        if (gramsInput) {
-            gramsInput.addEventListener('input', () => {
-                this.grams = parseFloat(gramsInput.value) || 100;
-                this.updatePreview();
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.searchQuery = e.target.value;
+                this.updateProductsList();
             });
         }
 
-        if (submitBtn) {
-            submitBtn.addEventListener('click', () => this.addToDiary());
+        if (gramsInput) {
+            gramsInput.addEventListener('input', () => {
+                this.updateCalculatedMacros();
+            });
+        }
+
+        if (addBtn) {
+            addBtn.addEventListener('click', () => this.addToDiary());
         }
     }
 
-    show() {
+    async show() {
         const screen = document.getElementById('add-food-screen');
         if (screen) {
             screen.classList.add('active');
             screen.style.display = 'block';
             
-            if (!this.selectedProduct) {
-                // Если продукт не выбран, показываем экран продуктов
-                productsScreen.show();
-                this.hide();
-                return;
-            }
+            // Загружаем продукты если еще не загружены
+            await appContext.loadProducts();
             
-            this.updateProductInfo();
-            this.updatePreview();
+            // Сбрасываем состояние
+            this.selectedProduct = null;
+            this.searchQuery = '';
+            const searchInput = document.getElementById('product-search');
+            const amountSection = document.getElementById('product-amount-section');
+            if (searchInput) searchInput.value = '';
+            if (amountSection) amountSection.style.display = 'none';
+            
+            this.updateProductsList();
         }
     }
 
@@ -133,36 +126,107 @@ class AddFoodScreen {
         }
     }
 
-    updateProductInfo() {
-        const infoEl = document.getElementById('add-food-product-info');
-        if (!infoEl || !this.selectedProduct) return;
+    updateProductsList() {
+        const listEl = document.getElementById('products-list');
+        if (!listEl) return;
+
+        let products = appContext.productsDatabase;
         
-        infoEl.innerHTML = `
-            <div class="product-name-large">${this.selectedProduct.name || 'Продукт'}</div>
-            <div class="product-macros-large">
-                <span>${Math.round(this.selectedProduct.kcal || 0)} ккал на 100г</span>
+        if (this.searchQuery) {
+            products = appContext.searchProducts(this.searchQuery);
+        }
+
+        if (products.length === 0) {
+            listEl.innerHTML = '<p class="empty-state">Продукты не найдены</p>';
+            return;
+        }
+
+        listEl.innerHTML = products.slice(0, 50).map(product => `
+            <div class="product-card" data-product-id="${product.id}">
+                <div class="product-info">
+                    <div class="product-name">${product.name || 'Продукт'}</div>
+                    <div class="product-kcal">${Math.round(product.kcal || 0)} ккал / 100г</div>
+                </div>
+                <button class="btn-select-product">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </button>
             </div>
-        `;
+        `).join('');
+
+        // Добавляем обработчики выбора продукта
+        listEl.querySelectorAll('.product-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const productId = card.dataset.productId;
+                this.selectProduct(productId);
+            });
+        });
     }
 
-    updatePreview() {
+    selectProduct(productId) {
+        const product = appContext.findProduct(productId);
+        if (!product) return;
+
+        this.selectedProduct = product;
+        
+        const amountSection = document.getElementById('product-amount-section');
+        const nameEl = document.getElementById('selected-product-name');
+        const macrosEl = document.getElementById('selected-product-macros');
+        
+        if (amountSection) amountSection.style.display = 'block';
+        if (nameEl) nameEl.textContent = product.name || 'Продукт';
+        if (macrosEl) {
+            macrosEl.innerHTML = `
+                <span>${Math.round(product.kcal || 0)} ккал</span>
+                <span>Б: ${Math.round(product.protein || 0)}г</span>
+                <span>Ж: ${Math.round(product.fat || 0)}г</span>
+                <span>У: ${Math.round(product.carbs || 0)}г</span>
+            `;
+        }
+
+        this.updateCalculatedMacros();
+        
+        // Прокручиваем к секции количества
+        if (amountSection) {
+            amountSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    updateCalculatedMacros() {
         if (!this.selectedProduct) return;
+
+        const gramsInput = document.getElementById('product-grams');
+        const calculatedEl = document.getElementById('calculated-macros');
         
-        const multiplier = this.grams / 100;
-        const kcal = Math.round((this.selectedProduct.kcal || 0) * multiplier);
-        const protein = Math.round((this.selectedProduct.protein || 0) * multiplier);
-        const fat = Math.round((this.selectedProduct.fat || 0) * multiplier);
-        const carbs = Math.round((this.selectedProduct.carbs || 0) * multiplier);
-        
-        const kcalEl = document.getElementById('preview-kcal');
-        const proteinEl = document.getElementById('preview-protein');
-        const fatEl = document.getElementById('preview-fat');
-        const carbsEl = document.getElementById('preview-carbs');
-        
-        if (kcalEl) kcalEl.textContent = kcal;
-        if (proteinEl) proteinEl.textContent = protein + ' г';
-        if (fatEl) fatEl.textContent = fat + ' г';
-        if (carbsEl) carbsEl.textContent = carbs + ' г';
+        if (!gramsInput || !calculatedEl) return;
+
+        const grams = parseFloat(gramsInput.value) || 100;
+        const multiplier = grams / 100;
+
+        const kcal = (this.selectedProduct.kcal || 0) * multiplier;
+        const protein = (this.selectedProduct.protein || 0) * multiplier;
+        const fat = (this.selectedProduct.fat || 0) * multiplier;
+        const carbs = (this.selectedProduct.carbs || 0) * multiplier;
+
+        calculatedEl.innerHTML = `
+            <div class="calculated-macro-item">
+                <span class="macro-label">Калории:</span>
+                <span class="macro-value">${Math.round(kcal)} ккал</span>
+            </div>
+            <div class="calculated-macro-item">
+                <span class="macro-label">Белки:</span>
+                <span class="macro-value">${Math.round(protein)}г</span>
+            </div>
+            <div class="calculated-macro-item">
+                <span class="macro-label">Жиры:</span>
+                <span class="macro-value">${Math.round(fat)}г</span>
+            </div>
+            <div class="calculated-macro-item">
+                <span class="macro-label">Углеводы:</span>
+                <span class="macro-value">${Math.round(carbs)}г</span>
+            </div>
+        `;
     }
 
     async addToDiary() {
@@ -170,10 +234,13 @@ class AddFoodScreen {
             Helpers.showNotification('Выберите продукт', 'error');
             return;
         }
-        
-        const grams = parseFloat(document.getElementById('add-food-grams')?.value) || 100;
+
+        const gramsInput = document.getElementById('product-grams');
+        if (!gramsInput) return;
+
+        const grams = parseFloat(gramsInput.value) || 100;
         const multiplier = grams / 100;
-        
+
         const entry = {
             id: Date.now().toString(),
             name: this.selectedProduct.name || 'Продукт',
@@ -184,15 +251,17 @@ class AddFoodScreen {
             carbs: (this.selectedProduct.carbs || 0) * multiplier,
             timestamp: new Date().toISOString()
         };
-        
+
         const today = Helpers.getToday();
         await appContext.addDiaryEntry(today, entry);
-        
+
         Helpers.showNotification('Продукт добавлен в дневник!', 'success');
-        
-        // Возвращаемся на главный экран
         this.hide();
-        navigation.switchTab('home');
+        
+        // Обновляем dashboard если он открыт
+        if (document.getElementById('dashboard-screen')?.classList.contains('active')) {
+            dashboardScreen.update();
+        }
     }
 }
 
@@ -201,4 +270,3 @@ const addFoodScreen = new AddFoodScreen();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AddFoodScreen;
 }
-

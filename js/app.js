@@ -55,25 +55,18 @@ function hideAllScreens() {
     });
 }
 
-// Показать экран онбординга (временная функция, будет заменена компонентом)
+// Показать экран онбординга
 function showOnboardingScreen() {
-    // Ищем существующий экран онбординга или создаем временный
-    let onboardingScreen = document.getElementById('onboarding-screen');
-    if (!onboardingScreen) {
-        onboardingScreen = document.createElement('div');
-        onboardingScreen.id = 'onboarding-screen';
-        onboardingScreen.className = 'screen';
-        onboardingScreen.innerHTML = `
-            <div class="screen-content">
-                <h1>Добро пожаловать в Klyro</h1>
-                <p>Заполните профиль для начала работы</p>
-                <button onclick="window.location.reload()">Начать</button>
-            </div>
-        `;
-        document.getElementById('app').appendChild(onboardingScreen);
+    if (typeof onboardingScreen !== 'undefined') {
+        onboardingScreen.show();
+    } else {
+        // Fallback если компонент еще не загружен
+        const screen = document.getElementById('onboarding-screen');
+        if (screen) {
+            screen.classList.add('active');
+            screen.style.display = 'block';
+        }
     }
-    onboardingScreen.classList.add('active');
-    onboardingScreen.style.display = 'block';
 }
 
 // Настройка навигации
@@ -92,11 +85,14 @@ function setupNavigation() {
                 fab.show();
                 break;
             case 'products':
-                productsScreen.show();
+                // Показываем экран добавления продукта
+                addFoodScreen.show();
                 fab.hide();
                 break;
             case 'activity':
-                activityScreen.show();
+                // TODO: Создать экран активности
+                // Пока показываем dashboard
+                dashboardScreen.show();
                 fab.hide();
                 break;
             case 'profile':
@@ -107,8 +103,8 @@ function setupNavigation() {
     });
     
     // Обработчик FAB кнопки
-    window.addEventListener('showAddFood', (e) => {
-        addFoodScreen.selectedProduct = e.detail?.product || null;
+    window.addEventListener('showAddFood', () => {
+        hideAllScreens();
         addFoodScreen.show();
     });
 }
