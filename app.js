@@ -274,24 +274,30 @@ async function saveToStorage(key, value) {
         
         // Затем синхронизируем в CloudStorage в фоне (не блокируем)
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            addDebugLog('info', `Синхронизация в CloudStorage: ${key}`);
-            // Выполняем асинхронно, не ждем результата
-            try {
-                const result = tg.CloudStorage.setItem(key, value);
-                // Проверяем, что результат - Promise или thenable
-                if (result && typeof result.then === 'function') {
-                    result.then(() => {
-                        addDebugLog('info', `Синхронизировано в CloudStorage: ${key}`);
-                    }).catch((e) => {
-                        addDebugLog('warn', `Ошибка синхронизации в CloudStorage: ${key}`, e);
-                    });
-                } else {
-                    // Если не Promise, просто логируем
-                    addDebugLog('info', `CloudStorage.setItem вызван для ${key} (не Promise)`);
+            // Выполняем асинхронно через setTimeout, чтобы не блокировать
+            setTimeout(() => {
+                try {
+                    const result = tg.CloudStorage.setItem(key, value);
+                    // Проверяем, что результат существует и является Promise
+                    if (result !== null && result !== undefined) {
+                        if (typeof result === 'object' && typeof result.then === 'function') {
+                            result.then(() => {
+                                addDebugLog('info', `Синхронизировано в CloudStorage: ${key}`);
+                            }).catch((e) => {
+                                addDebugLog('warn', `Ошибка синхронизации в CloudStorage: ${key}`, e);
+                            });
+                        } else {
+                            // Если не Promise, просто игнорируем
+                            addDebugLog('info', `CloudStorage.setItem для ${key} не вернул Promise`);
+                        }
+                    } else {
+                        // Результат undefined/null - это нормально для некоторых версий API
+                        addDebugLog('info', `CloudStorage.setItem для ${key} вернул ${result}`);
+                    }
+                } catch (e) {
+                    addDebugLog('warn', `Ошибка при вызове CloudStorage.setItem для ${key}`, e);
                 }
-            } catch (e) {
-                addDebugLog('warn', `Ошибка при вызове CloudStorage.setItem для ${key}`, e);
-            }
+            }, 0);
         } else {
             addDebugLog('warn', `CloudStorage недоступен для ${key}`, null, {
                 tgReady: tgReady,
