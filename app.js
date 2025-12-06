@@ -276,11 +276,22 @@ async function saveToStorage(key, value) {
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
             addDebugLog('info', `Синхронизация в CloudStorage: ${key}`);
             // Выполняем асинхронно, не ждем результата
-            tg.CloudStorage.setItem(key, value).then(() => {
-                addDebugLog('info', `Синхронизировано в CloudStorage: ${key}`);
-            }).catch((e) => {
-                addDebugLog('warn', `Ошибка синхронизации в CloudStorage: ${key}`, e);
-            });
+            try {
+                const result = tg.CloudStorage.setItem(key, value);
+                // Проверяем, что результат - Promise или thenable
+                if (result && typeof result.then === 'function') {
+                    result.then(() => {
+                        addDebugLog('info', `Синхронизировано в CloudStorage: ${key}`);
+                    }).catch((e) => {
+                        addDebugLog('warn', `Ошибка синхронизации в CloudStorage: ${key}`, e);
+                    });
+                } else {
+                    // Если не Promise, просто логируем
+                    addDebugLog('info', `CloudStorage.setItem вызван для ${key} (не Promise)`);
+                }
+            } catch (e) {
+                addDebugLog('warn', `Ошибка при вызове CloudStorage.setItem для ${key}`, e);
+            }
         } else {
             addDebugLog('warn', `CloudStorage недоступен для ${key}`, null, {
                 tgReady: tgReady,
@@ -349,7 +360,14 @@ async function loadFromStorage(key) {
     if (value !== null && value !== '') {
         // Синхронизируем в CloudStorage в фоне (если данных нет в CloudStorage)
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            tg.CloudStorage.setItem(key, value).catch(() => {});
+            try {
+                const result = tg.CloudStorage.setItem(key, value);
+                if (result && typeof result.catch === 'function') {
+                    result.catch(() => {});
+                }
+            } catch (e) {
+                // Игнорируем ошибки CloudStorage
+            }
         }
         return value;
     }
@@ -1791,9 +1809,16 @@ async function saveDiary(diary) {
         
         // Затем синхронизируем в CloudStorage в фоне (не блокируем)
         if (tgReady && tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function') {
-            tg.CloudStorage.setItem('klyro_diary', diaryStr).catch(() => {
+            try {
+                const result = tg.CloudStorage.setItem('klyro_diary', diaryStr);
+                if (result && typeof result.catch === 'function') {
+                    result.catch(() => {
+                        // Игнорируем ошибки - данные уже в localStorage
+                    });
+                }
+            } catch (e) {
                 // Игнорируем ошибки - данные уже в localStorage
-            });
+            }
         }
     } catch (e) {
         addDebugLog('error', 'Ошибка в saveDiary', e);
