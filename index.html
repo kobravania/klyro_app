@@ -752,6 +752,20 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Новая модульная архитектура -->
+    <!-- Порядок загрузки важен! -->
+    <script src="js/storage/storage.js"></script>
+    <script src="js/utils/helpers.js"></script>
+    <script src="js/utils/calculations.js"></script>
+    <script src="js/utils/AppContext.js"></script>
+    <script src="js/components/Navigation.js"></script>
+    <script src="js/components/FAB.js"></script>
+    <script src="js/screens/DashboardScreen.js"></script>
+    <script src="js/app.js"></script>
+    
+    <!-- Старый app.js для обратной совместимости (можно удалить после полной миграции) -->
+    <!--
     <script>
         // Принудительная загрузка app.js с timestamp для обхода кэша
         (function() {
@@ -761,6 +775,7 @@
             document.head.appendChild(script);
         })();
     </script>
+    -->
 
     <script>
         // КРИТИЧНО: Скрываем loading screen СРАЗУ при загрузке HTML
