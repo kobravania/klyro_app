@@ -160,3 +160,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = Helpers;
 }
 
+// Экспортируем в глобальную область
+window.Helpers = Helpers;
+

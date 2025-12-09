@@ -256,3 +256,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = StorageManager;
 }
 
+// Экспортируем в глобальную область
+window.storage = storage;
+

@@ -252,3 +252,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = AppContext;
 }
 
+// Экспортируем в глобальную область
+window.appContext = appContext;
+

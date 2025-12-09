@@ -134,3 +134,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = Calculations;
 }
 
+// Экспортируем в глобальную область
+window.Calculations = Calculations;
+
