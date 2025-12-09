@@ -1,5 +1,5 @@
 /**
- * Экран профиля и настроек
+ * Экран профиля и настроек в стиле Apple
  */
 
 class ProfileScreen {
@@ -16,76 +16,76 @@ class ProfileScreen {
         const screenHTML = `
             <div id="profile-screen" class="screen">
                 <div class="screen-content">
-                    <div class="profile-header">
+                    <div class="dashboard-header">
                         <h1 class="screen-title">Профиль</h1>
                     </div>
                     
-                    <div class="profile-info-card">
-                        <div class="profile-avatar">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                <circle cx="12" cy="7" r="4"/>
-                            </svg>
-                        </div>
-                        <div class="profile-name" id="profile-name">Пользователь</div>
-                        <div class="profile-stats">
-                            <div class="stat-item">
-                                <div class="stat-value" id="profile-calories">0</div>
-                                <div class="stat-label">Целевые ккал</div>
+                    <div class="card">
+                        <div style="text-align: center; margin-bottom: var(--spacing-lg);">
+                            <div class="profile-avatar" style="width: 80px; height: 80px; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--spacing-md); color: var(--text-secondary);">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px;">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
                             </div>
-                            <div class="stat-item">
-                                <div class="stat-value" id="profile-bmr">0</div>
-                                <div class="stat-label">BMR</div>
+                            <div class="profile-name" id="profile-name" style="font-size: 24px; font-weight: 600; margin-bottom: var(--spacing-lg);">Пользователь</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md);">
+                                <div>
+                                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">Целевые ккал</div>
+                                    <div class="number-medium" id="profile-calories">0</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">BMR</div>
+                                    <div class="number-medium" id="profile-bmr">0</div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="profile-sections">
-                        <div class="section-card">
-                            <h3 class="section-title">Физические параметры</h3>
-                            <div class="info-row">
-                                <span class="info-label">Рост:</span>
-                                <span class="info-value" id="profile-height">-</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Вес:</span>
-                                <span class="info-value" id="profile-weight">-</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Возраст:</span>
-                                <span class="info-value" id="profile-age">-</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Пол:</span>
-                                <span class="info-value" id="profile-gender">-</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Активность:</span>
-                                <span class="info-value" id="profile-activity">-</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Цель:</span>
-                                <span class="info-value" id="profile-goal">-</span>
-                            </div>
-                            <button class="btn btn-secondary btn-block" id="edit-profile-btn">
-                                Редактировать профиль
-                            </button>
+                    <div class="card">
+                        <h3 class="section-title">Физические параметры</h3>
+                        <div class="profile-row">
+                            <span class="profile-label">Рост</span>
+                            <span class="profile-value" id="profile-height">-</span>
                         </div>
-                        
-                        <div class="section-card">
-                            <h3 class="section-title">Настройки</h3>
-                            <div class="settings-item">
-                                <label class="settings-label">Единицы измерения</label>
-                                <select id="units-select" class="select-input">
-                                    <option value="metric">Метрические (кг, см)</option>
-                                    <option value="imperial">Имперские (фунты, дюймы)</option>
-                                </select>
-                            </div>
+                        <div class="profile-row">
+                            <span class="profile-label">Вес</span>
+                            <span class="profile-value" id="profile-weight">-</span>
                         </div>
-                        
-                        <div class="section-card" id="export-import-section">
-                            <!-- Экспорт/импорт будет добавлен через компонент -->
+                        <div class="profile-row">
+                            <span class="profile-label">Возраст</span>
+                            <span class="profile-value" id="profile-age">-</span>
                         </div>
+                        <div class="profile-row">
+                            <span class="profile-label">Пол</span>
+                            <span class="profile-value" id="profile-gender">-</span>
+                        </div>
+                        <div class="profile-row">
+                            <span class="profile-label">Активность</span>
+                            <span class="profile-value" id="profile-activity">-</span>
+                        </div>
+                        <div class="profile-row">
+                            <span class="profile-label">Цель</span>
+                            <span class="profile-value" id="profile-goal">-</span>
+                        </div>
+                        <button class="btn btn-secondary btn-block" id="edit-profile-btn" style="margin-top: var(--spacing-md);">
+                            Редактировать профиль
+                        </button>
+                    </div>
+                    
+                    <div class="card">
+                        <h3 class="section-title">Настройки</h3>
+                        <div class="profile-row">
+                            <span class="profile-label">Единицы измерения</span>
+                            <select id="units-select" class="select-input" style="max-width: 200px;">
+                                <option value="metric">Метрические</option>
+                                <option value="imperial">Имперские</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="card" id="export-import-section">
+                        <!-- Экспорт/импорт будет добавлен через компонент -->
                     </div>
                 </div>
             </div>
@@ -108,13 +108,16 @@ class ProfileScreen {
 
         if (editBtn) {
             editBtn.addEventListener('click', () => {
+                this.hapticFeedback('light');
                 this.showOnboarding();
             });
         }
 
         if (unitsSelect) {
-            unitsSelect.value = appContext.settings.units || 'metric';
+            unitsSelect.value = appContext.settings?.units || 'metric';
             unitsSelect.addEventListener('change', async (e) => {
+                this.hapticFeedback('light');
+                if (!appContext.settings) appContext.settings = {};
                 appContext.settings.units = e.target.value;
                 await storage.setItem('klyro_units', e.target.value);
                 Helpers.showNotification('Настройки сохранены', 'success');
@@ -124,23 +127,36 @@ class ProfileScreen {
 
     initExportImport() {
         const section = document.getElementById('export-import-section');
-        if (section) {
+        if (section && typeof exportImport !== 'undefined') {
             section.innerHTML = exportImport.createUI();
             exportImport.attachHandlers(section);
         }
     }
 
+    hapticFeedback(type = 'light') {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+            try {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred(type);
+            } catch (e) {}
+        }
+    }
+
     showOnboarding() {
-        // Показываем форму онбординга для редактирования
-        hideAllScreens();
-        showOnboardingScreen();
+        if (typeof hideAllScreens === 'function') {
+            hideAllScreens();
+        }
+        if (typeof showOnboardingScreen === 'function') {
+            showOnboardingScreen();
+        } else if (typeof onboardingScreen !== 'undefined') {
+            onboardingScreen.show();
+        }
     }
 
     show() {
         const screen = document.getElementById('profile-screen');
         if (screen) {
             screen.classList.add('active');
-            screen.style.display = 'block';
+            screen.style.display = 'flex';
             this.update();
         }
     }

@@ -1,6 +1,5 @@
 /**
- * Экран дневника
- * Показывает записи за выбранную дату
+ * Экран дневника в стиле Apple
  */
 
 class DiaryScreen {
@@ -18,15 +17,13 @@ class DiaryScreen {
         const screenHTML = `
             <div id="diary-screen" class="screen">
                 <div class="screen-content">
-                    <div class="diary-header">
+                    <div class="diary-date-header">
                         <button class="btn-icon" id="diary-prev-date">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="15 18 9 12 15 6"/>
                             </svg>
                         </button>
-                        <div class="diary-date-selector">
-                            <input type="date" id="diary-date-input" class="date-input">
-                        </div>
+                        <div class="diary-date-display" id="diary-date-display"></div>
                         <button class="btn-icon" id="diary-next-date">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="9 18 15 12 9 6"/>
@@ -35,26 +32,26 @@ class DiaryScreen {
                     </div>
                     
                     <div class="diary-summary">
-                        <div class="summary-item">
-                            <div class="summary-label">Калории</div>
-                            <div class="summary-value" id="diary-total-kcal">0</div>
+                        <div class="diary-summary-item">
+                            <div class="stat-label">Калории</div>
+                            <div class="stat-value" id="diary-total-kcal" style="font-size: 24px;">0</div>
                         </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Белки</div>
-                            <div class="summary-value" id="diary-total-protein">0 г</div>
+                        <div class="diary-summary-item">
+                            <div class="stat-label">Белки</div>
+                            <div class="stat-value" id="diary-total-protein" style="font-size: 20px;">0 г</div>
                         </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Жиры</div>
-                            <div class="summary-value" id="diary-total-fat">0 г</div>
+                        <div class="diary-summary-item">
+                            <div class="stat-label">Жиры</div>
+                            <div class="stat-value" id="diary-total-fat" style="font-size: 20px;">0 г</div>
                         </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Углеводы</div>
-                            <div class="summary-value" id="diary-total-carbs">0 г</div>
+                        <div class="diary-summary-item">
+                            <div class="stat-label">Углеводы</div>
+                            <div class="stat-value" id="diary-total-carbs" style="font-size: 20px;">0 г</div>
                         </div>
                     </div>
                     
-                    <div class="diary-entries">
-                        <h2 class="section-title">Записи</h2>
+                    <div class="card">
+                        <h3 class="section-title">Записи</h3>
                         <div id="diary-entries-list" class="diary-entries-list">
                             <p class="empty-state">Нет записей за этот день</p>
                         </div>
@@ -74,29 +71,29 @@ class DiaryScreen {
     }
 
     attachHandlers() {
-        const dateInput = document.getElementById('diary-date-input');
         const prevBtn = document.getElementById('diary-prev-date');
         const nextBtn = document.getElementById('diary-next-date');
 
-        if (dateInput) {
-            dateInput.value = this.currentDate;
-            dateInput.max = Helpers.getToday();
-            dateInput.addEventListener('change', (e) => {
-                this.currentDate = e.target.value;
-                this.update();
-            });
-        }
-
         if (prevBtn) {
             prevBtn.addEventListener('click', () => {
+                this.hapticFeedback('light');
                 this.changeDate(-1);
             });
         }
 
         if (nextBtn) {
             nextBtn.addEventListener('click', () => {
+                this.hapticFeedback('light');
                 this.changeDate(1);
             });
+        }
+    }
+
+    hapticFeedback(type = 'light') {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+            try {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred(type);
+            } catch (e) {}
         }
     }
 
@@ -108,10 +105,6 @@ class DiaryScreen {
         
         if (newDate <= today) {
             this.currentDate = newDate;
-            const dateInput = document.getElementById('diary-date-input');
-            if (dateInput) {
-                dateInput.value = this.currentDate;
-            }
             this.update();
         }
     }
@@ -120,12 +113,8 @@ class DiaryScreen {
         const screen = document.getElementById('diary-screen');
         if (screen) {
             screen.classList.add('active');
-            screen.style.display = 'block';
+            screen.style.display = 'flex';
             this.currentDate = Helpers.getToday();
-            const dateInput = document.getElementById('diary-date-input');
-            if (dateInput) {
-                dateInput.value = this.currentDate;
-            }
             this.update();
         }
     }
@@ -141,6 +130,24 @@ class DiaryScreen {
     update() {
         const entries = appContext.getDiaryForDate(this.currentDate);
         const progress = Calculations.calculateDayProgress(entries);
+
+        // Обновляем дату
+        const dateDisplay = document.getElementById('diary-date-display');
+        if (dateDisplay) {
+            const date = new Date(this.currentDate);
+            const today = new Date(Helpers.getToday());
+            const isToday = this.currentDate === Helpers.getToday();
+            
+            if (isToday) {
+                dateDisplay.textContent = 'Сегодня';
+            } else {
+                dateDisplay.textContent = date.toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                });
+            }
+        }
 
         // Обновляем сводку
         const kcalEl = document.getElementById('diary-total-kcal');
@@ -167,36 +174,53 @@ class DiaryScreen {
         }
 
         listEl.innerHTML = entries.map(entry => `
-            <div class="diary-entry-card" data-entry-id="${entry.id}">
-                <div class="entry-main">
-                    <div class="entry-name">${entry.name || 'Продукт'}</div>
-                    <div class="entry-grams">${Math.round(entry.grams || 0)}г</div>
+            <div class="diary-entry" data-entry-id="${entry.id}">
+                <div class="diary-entry-info">
+                    <div class="diary-entry-name">${entry.name || 'Продукт'}</div>
+                    <div class="diary-entry-macros">
+                        <span>${Math.round(entry.protein || 0)}г Б</span>
+                        <span>${Math.round(entry.fat || 0)}г Ж</span>
+                        <span>${Math.round(entry.carbs || 0)}г У</span>
+                    </div>
                 </div>
-                <div class="entry-macros">
-                    <span class="macro-badge protein">${Math.round(entry.protein || 0)}г Б</span>
-                    <span class="macro-badge fat">${Math.round(entry.fat || 0)}г Ж</span>
-                    <span class="macro-badge carbs">${Math.round(entry.carbs || 0)}г У</span>
-                    <span class="macro-badge kcal">${Math.round(entry.kcal || 0)} ккал</span>
-                </div>
-                <button class="entry-delete" data-entry-id="${entry.id}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                </button>
+                <div class="diary-entry-amount">${Math.round(entry.kcal || 0)} ккал</div>
             </div>
         `).join('');
 
-        // Добавляем обработчики удаления
-        listEl.querySelectorAll('.entry-delete').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const entryId = e.currentTarget.dataset.entryId;
-                if (confirm('Удалить эту запись?')) {
-                    await appContext.removeDiaryEntry(this.currentDate, entryId);
-                    Helpers.showNotification('Запись удалена', 'success');
-                }
+        // Добавляем обработчики удаления (долгое нажатие)
+        listEl.querySelectorAll('.diary-entry').forEach(entry => {
+            let longPressTimer;
+            const entryId = entry.dataset.entryId;
+
+            entry.addEventListener('touchstart', (e) => {
+                longPressTimer = setTimeout(() => {
+                    this.deleteEntry(entryId);
+                }, 500);
+            });
+
+            entry.addEventListener('touchend', () => {
+                clearTimeout(longPressTimer);
+            });
+
+            entry.addEventListener('touchmove', () => {
+                clearTimeout(longPressTimer);
+            });
+
+            // Для десктопа - правый клик или двойной клик
+            entry.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.deleteEntry(entryId);
             });
         });
+    }
+
+    async deleteEntry(entryId) {
+        if (confirm('Удалить эту запись?')) {
+            this.hapticFeedback('medium');
+            await appContext.removeDiaryEntry(this.currentDate, entryId);
+            Helpers.showNotification('Запись удалена', 'success');
+            this.update();
+        }
     }
 }
 

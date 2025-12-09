@@ -90,9 +90,7 @@ function setupNavigation() {
                 fab.hide();
                 break;
             case 'activity':
-                // TODO: Создать экран активности
-                // Пока показываем dashboard
-                dashboardScreen.show();
+                activityScreen.show();
                 fab.hide();
                 break;
             case 'profile':
@@ -102,9 +100,8 @@ function setupNavigation() {
         }
     });
     
-    // Обработчик FAB кнопки
+    // Обработчик FAB кнопки (из навигации)
     window.addEventListener('showAddFood', () => {
-        hideAllScreens();
         addFoodScreen.show();
     });
 }

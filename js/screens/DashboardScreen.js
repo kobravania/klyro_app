@@ -1,19 +1,15 @@
 /**
- * Экран главной страницы (Dashboard)
- * Показывает текущие калории, макросы, прогресс
+ * Dashboard - главный экран в стиле Apple
+ * Минимум информации, только главное
  */
 
 class DashboardScreen {
     constructor() {
-        this.chart = null;
         this.init();
     }
 
     init() {
-        // Создаем HTML экрана
         this.createHTML();
-        
-        // Подписываемся на изменения данных
         appContext.subscribe('diary', () => this.update());
         appContext.subscribe('userData', () => this.update());
     }
@@ -24,57 +20,92 @@ class DashboardScreen {
                 <div class="screen-content">
                     <div class="dashboard-header">
                         <h1 class="screen-title">Сегодня</h1>
-                        <p class="screen-subtitle" id="dashboard-date"></p>
                     </div>
                     
                     <div class="dashboard-stats">
-                        <div class="stat-card calories-card">
-                            <div class="stat-value" id="calories-current">0</div>
-                            <div class="stat-label">из <span id="calories-goal">0</span> ккал</div>
-                            <div class="stat-progress">
-                                <div class="progress-bar" id="calories-progress"></div>
-                            </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Цель</div>
+                            <div class="stat-value" id="calories-goal">0</div>
+                            <div class="stat-goal">ккал</div>
                         </div>
-                        
-                        <div class="macros-container">
-                            <div class="macro-card">
-                                <div class="macro-value" id="protein-value">0</div>
-                                <div class="macro-label">Белки</div>
-                                <div class="macro-unit">г</div>
-                            </div>
-                            <div class="macro-card">
-                                <div class="macro-value" id="fat-value">0</div>
-                                <div class="macro-label">Жиры</div>
-                                <div class="macro-unit">г</div>
-                            </div>
-                            <div class="macro-card">
-                                <div class="macro-value" id="carbs-value">0</div>
-                                <div class="macro-label">Углеводы</div>
-                                <div class="macro-unit">г</div>
-                            </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Съедено</div>
+                            <div class="stat-value" id="calories-current">0</div>
+                            <div class="stat-goal" id="calories-remaining">Осталось: 0</div>
                         </div>
                     </div>
                     
                     <div class="chart-container">
-                        <canvas id="macros-chart"></canvas>
+                        <div class="donut-chart" id="macros-donut">
+                            <svg viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="var(--divider)" stroke-width="8"/>
+                                <circle id="donut-protein" cx="50" cy="50" r="45" fill="none" stroke="#3498db" stroke-width="8" stroke-dasharray="0 283" transform="rotate(-90 50 50)"/>
+                                <circle id="donut-fat" cx="50" cy="50" r="45" fill="none" stroke="#e74c3c" stroke-width="8" stroke-dasharray="0 283" transform="rotate(-90 50 50)"/>
+                                <circle id="donut-carbs" cx="50" cy="50" r="45" fill="none" stroke="#27ae60" stroke-width="8" stroke-dasharray="0 283" transform="rotate(-90 50 50)"/>
+                            </svg>
+                            <div class="donut-chart-center">
+                                <div class="donut-chart-value" id="donut-total">0</div>
+                                <div class="donut-chart-label">ккал</div>
+                            </div>
+                        </div>
+                        
+                        <div class="macros-grid">
+                            <div class="macro-item">
+                                <div class="macro-value" id="macro-protein">0</div>
+                                <div class="macro-label">Белки</div>
+                                <div class="macro-goal" id="macro-protein-goal">/ 0г</div>
+                            </div>
+                            <div class="macro-item">
+                                <div class="macro-value" id="macro-fat">0</div>
+                                <div class="macro-label">Жиры</div>
+                                <div class="macro-goal" id="macro-fat-goal">/ 0г</div>
+                            </div>
+                            <div class="macro-item">
+                                <div class="macro-value" id="macro-carbs">0</div>
+                                <div class="macro-label">Углеводы</div>
+                                <div class="macro-goal" id="macro-carbs-goal">/ 0г</div>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="diary-preview">
-                        <h2 class="section-title">Приёмы пищи</h2>
-                        <div id="diary-entries-list" class="diary-entries-list">
+                    <div class="card">
+                        <h3 class="section-title">Дневник</h3>
+                        <div id="diary-preview-list" class="diary-preview-list">
                             <p class="empty-state">Нет записей за сегодня</p>
                         </div>
+                        <button class="btn btn-secondary btn-block" id="view-diary-btn" style="margin-top: var(--spacing-md);">
+                            Посмотреть дневник
+                        </button>
                     </div>
                 </div>
             </div>
         `;
 
-        // Добавляем в app
         const app = document.getElementById('app');
         if (app) {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = screenHTML;
             app.appendChild(tempDiv.firstElementChild);
+        }
+
+        this.attachHandlers();
+    }
+
+    attachHandlers() {
+        const viewDiaryBtn = document.getElementById('view-diary-btn');
+        if (viewDiaryBtn) {
+            viewDiaryBtn.addEventListener('click', () => {
+                this.hapticFeedback('light');
+                navigation.switchTab('diary');
+            });
+        }
+    }
+
+    hapticFeedback(type = 'light') {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+            try {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred(type);
+            } catch (e) {}
         }
     }
 
@@ -82,7 +113,7 @@ class DashboardScreen {
         const screen = document.getElementById('dashboard-screen');
         if (screen) {
             screen.classList.add('active');
-            screen.style.display = 'block';
+            screen.style.display = 'flex';
             this.update();
         }
     }
@@ -98,141 +129,122 @@ class DashboardScreen {
     update() {
         const today = Helpers.getToday();
         const progress = appContext.getDayProgress(today);
-        const goalCalories = appContext.getGoalCalories();
+        const userData = appContext.getUserData();
         
-        // Обновляем дату
-        const dateEl = document.getElementById('dashboard-date');
-        if (dateEl) {
-            dateEl.textContent = Helpers.formatDateDisplay(new Date());
-        }
-        
+        const goal = appContext.getGoalCalories();
+        const current = Math.round(progress.kcal);
+        const remaining = Math.max(0, goal - current);
+
         // Обновляем калории
-        const caloriesCurrent = Math.round(progress.kcal);
-        const caloriesGoal = Math.round(goalCalories);
-        const caloriesPercent = goalCalories > 0 ? Math.min((caloriesCurrent / goalCalories) * 100, 100) : 0;
-        
-        const caloriesCurrentEl = document.getElementById('calories-current');
-        const caloriesGoalEl = document.getElementById('calories-goal');
-        const caloriesProgressEl = document.getElementById('calories-progress');
-        
-        if (caloriesCurrentEl) caloriesCurrentEl.textContent = caloriesCurrent;
-        if (caloriesGoalEl) caloriesGoalEl.textContent = caloriesGoal;
-        if (caloriesProgressEl) {
-            caloriesProgressEl.style.width = `${caloriesPercent}%`;
+        const goalEl = document.getElementById('calories-goal');
+        const currentEl = document.getElementById('calories-current');
+        const remainingEl = document.getElementById('calories-remaining');
+
+        if (goalEl) goalEl.textContent = goal;
+        if (currentEl) currentEl.textContent = current;
+        if (remainingEl) {
+            remainingEl.textContent = `Осталось: ${remaining}`;
+            remainingEl.style.color = remaining > 0 ? 'var(--accent-soft)' : 'var(--text-secondary)';
         }
-        
+
         // Обновляем макросы
-        const proteinEl = document.getElementById('protein-value');
-        const fatEl = document.getElementById('fat-value');
-        const carbsEl = document.getElementById('carbs-value');
-        
+        const proteinEl = document.getElementById('macro-protein');
+        const fatEl = document.getElementById('macro-fat');
+        const carbsEl = document.getElementById('macro-carbs');
+        const proteinGoalEl = document.getElementById('macro-protein-goal');
+        const fatGoalEl = document.getElementById('macro-fat-goal');
+        const carbsGoalEl = document.getElementById('macro-carbs-goal');
+
         if (proteinEl) proteinEl.textContent = Math.round(progress.protein);
         if (fatEl) fatEl.textContent = Math.round(progress.fat);
         if (carbsEl) carbsEl.textContent = Math.round(progress.carbs);
-        
-        // Обновляем график
-        this.updateChart(progress, goalCalories);
-        
-        // Обновляем список записей
-        this.updateDiaryEntries(today);
+
+        // Рассчитываем цели макросов (примерно 30% белки, 30% жиры, 40% углеводы)
+        const proteinGoal = Math.round((goal * 0.3) / 4);
+        const fatGoal = Math.round((goal * 0.3) / 9);
+        const carbsGoal = Math.round((goal * 0.4) / 4);
+
+        if (proteinGoalEl) proteinGoalEl.textContent = `/ ${proteinGoal}г`;
+        if (fatGoalEl) fatGoalEl.textContent = `/ ${fatGoal}г`;
+        if (carbsGoalEl) carbsGoalEl.textContent = `/ ${carbsGoal}г`;
+
+        // Обновляем donut chart
+        this.updateDonutChart(progress, goal);
+
+        // Обновляем превью дневника
+        this.updateDiaryPreview(today);
     }
 
-    updateChart(progress, goalCalories) {
-        const canvas = document.getElementById('macros-chart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        
-        // Рассчитываем целевые макросы
-        const goalMacros = Calculations.calculateMacros(goalCalories);
-        
-        // Данные для графика
-        const data = {
-            labels: ['Белки', 'Жиры', 'Углеводы'],
-            datasets: [{
-                data: [
-                    Math.round(progress.protein),
-                    Math.round(progress.fat),
-                    Math.round(progress.carbs)
-                ],
-                backgroundColor: [
-                    'rgba(52, 152, 219, 0.8)',
-                    'rgba(231, 76, 60, 0.8)',
-                    'rgba(46, 204, 113, 0.8)'
-                ],
-                borderColor: [
-                    'rgba(52, 152, 219, 1)',
-                    'rgba(231, 76, 60, 1)',
-                    'rgba(46, 204, 113, 1)'
-                ],
-                borderWidth: 2
-            }]
-        };
-        
-        const options = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const goal = goalMacros[label === 'Белки' ? 'protein' : label === 'Жиры' ? 'fat' : 'carbs'];
-                            return `${label}: ${value}г / ${goal}г`;
-                        }
-                    }
-                }
+    updateDonutChart(progress, goal) {
+        const totalEl = document.getElementById('donut-total');
+        if (totalEl) totalEl.textContent = Math.round(progress.kcal);
+
+        const circumference = 2 * Math.PI * 45; // радиус 45
+        const totalProgress = Math.min(progress.kcal / goal, 1);
+
+        // Распределение по макросам
+        const proteinKcal = progress.protein * 4;
+        const fatKcal = progress.fat * 9;
+        const carbsKcal = progress.carbs * 4;
+        const totalKcal = proteinKcal + fatKcal + carbsKcal;
+
+        if (totalKcal > 0) {
+            const proteinPercent = proteinKcal / totalKcal;
+            const fatPercent = fatKcal / totalKcal;
+            const carbsPercent = carbsKcal / totalKcal;
+
+            const proteinDash = circumference * totalProgress * proteinPercent;
+            const fatDash = circumference * totalProgress * fatPercent;
+            const carbsDash = circumference * totalProgress * carbsPercent;
+
+            const proteinEl = document.getElementById('donut-protein');
+            const fatEl = document.getElementById('donut-fat');
+            const carbsEl = document.getElementById('donut-carbs');
+
+            if (proteinEl) {
+                proteinEl.setAttribute('stroke-dasharray', `${proteinDash} ${circumference}`);
             }
-        };
-        
-        // Уничтожаем старый график если есть
-        if (this.chart) {
-            this.chart.destroy();
-        }
-        
-        // Создаем новый график
-        if (typeof Chart !== 'undefined') {
-            this.chart = new Chart(ctx, {
-                type: 'doughnut',
-                data: data,
-                options: options
-            });
+            if (fatEl) {
+                fatEl.setAttribute('stroke-dasharray', `${fatDash} ${circumference}`);
+                fatEl.setAttribute('stroke-dashoffset', -proteinDash);
+            }
+            if (carbsEl) {
+                carbsEl.setAttribute('stroke-dasharray', `${carbsDash} ${circumference}`);
+                carbsEl.setAttribute('stroke-dashoffset', -(proteinDash + fatDash));
+            }
         }
     }
 
-    updateDiaryEntries(date) {
+    updateDiaryPreview(date) {
         const entries = appContext.getDiaryForDate(date);
-        const listEl = document.getElementById('diary-entries-list');
-        
+        const listEl = document.getElementById('diary-preview-list');
         if (!listEl) return;
-        
+
         if (entries.length === 0) {
             listEl.innerHTML = '<p class="empty-state">Нет записей за сегодня</p>';
             return;
         }
-        
-        listEl.innerHTML = entries.map(entry => `
-            <div class="diary-entry-item">
-                <div class="entry-name">${entry.name || 'Продукт'}</div>
-                <div class="entry-details">
-                    <span class="entry-grams">${Math.round(entry.grams || 0)}г</span>
-                    <span class="entry-kcal">${Math.round(entry.kcal || 0)} ккал</span>
+
+        // Показываем только последние 3 записи
+        const recentEntries = entries.slice(-3).reverse();
+        listEl.innerHTML = recentEntries.map(entry => `
+            <div class="diary-entry">
+                <div class="diary-entry-info">
+                    <div class="diary-entry-name">${entry.name || 'Продукт'}</div>
+                    <div class="diary-entry-macros">
+                        <span>${Math.round(entry.protein || 0)}г Б</span>
+                        <span>${Math.round(entry.fat || 0)}г Ж</span>
+                        <span>${Math.round(entry.carbs || 0)}г У</span>
+                    </div>
                 </div>
+                <div class="diary-entry-amount">${Math.round(entry.kcal || 0)} ккал</div>
             </div>
         `).join('');
     }
 }
 
-// Создаем глобальный экземпляр
 const dashboardScreen = new DashboardScreen();
 
-// Экспортируем
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = DashboardScreen;
 }
-
