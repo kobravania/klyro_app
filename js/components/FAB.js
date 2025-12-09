@@ -38,16 +38,18 @@ class FAB {
     }
 
     show() {
+        // FAB теперь в навигации, скрываем старый
         const fab = document.getElementById('fab-add-food');
         if (fab) {
-            fab.style.display = 'flex';
+            fab.classList.add('hidden');
         }
     }
 
     hide() {
+        // FAB теперь в навигации, скрываем старый
         const fab = document.getElementById('fab-add-food');
         if (fab) {
-            fab.style.display = 'none';
+            fab.classList.add('hidden');
         }
     }
 }

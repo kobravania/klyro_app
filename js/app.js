@@ -24,12 +24,11 @@ async function initApp() {
             // Профиль есть - показываем главный экран
             hideAllScreens();
             dashboardScreen.show();
-            fab.show();
+            // FAB теперь в навигации, не нужно показывать старый
         } else {
             // Профиля нет - показываем форму онбординга
             hideAllScreens();
             showOnboardingScreen();
-            fab.hide();
         }
         
         // Настраиваем навигацию
@@ -78,24 +77,19 @@ function setupNavigation() {
         switch(tab) {
             case 'home':
                 dashboardScreen.show();
-                fab.show();
                 break;
             case 'diary':
                 diaryScreen.show();
-                fab.show();
                 break;
             case 'products':
                 // Показываем экран добавления продукта
                 addFoodScreen.show();
-                fab.hide();
                 break;
             case 'activity':
                 activityScreen.show();
-                fab.hide();
                 break;
             case 'profile':
                 profileScreen.show();
-                fab.hide();
                 break;
         }
     });
