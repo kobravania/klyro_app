@@ -87,6 +87,26 @@ async function initApp() {
         });
         
         console.log('[APP] Инициализация завершена');
+
+        // Защита от "пустого" экрана: если по какой‑то причине ни один экран не активен,
+        // через небольшой таймаут принудительно показываем онбординг или дэшборд.
+        setTimeout(() => {
+            const activeScreen = document.querySelector('.screen.active');
+            if (!activeScreen) {
+                console.warn('[APP] Ни один экран не активен, включаем fallback');
+                const onboardingEl = document.getElementById('onboarding-screen');
+                const dashboardEl = document.getElementById('dashboard-screen');
+                
+                if (onboardingEl) {
+                    onboardingEl.classList.add('active');
+                    onboardingEl.style.display = 'block';
+                } else if (dashboardEl) {
+                    dashboardEl.classList.add('active');
+                    dashboardEl.style.display = 'flex';
+                    dashboardEl.style.flexDirection = 'column';
+                }
+            }
+        }, 300);
         
     } catch (e) {
         console.error('[APP] Initialization error:', e);
