@@ -36,14 +36,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     
     # Создаем кнопку с WebApp
-    keyboard = [[
-        {
-            "text": "ОТКРЫТЬ",
-            "web_app": WebAppInfo(url=WEB_APP_URL)
-        }
-    ]]
-    
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = [[
+        InlineKeyboardButton(
+            text="🚀 ОТКРЫТЬ KLYRO",
+            web_app=WebAppInfo(url=WEB_APP_URL)
+        )
+    ]]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     

@@ -116,9 +116,17 @@ class DashboardScreen {
             screen.classList.add('active');
             screen.style.display = 'flex';
             screen.style.flexDirection = 'column';
-            this.update();
+            // Обновляем сразу, но с небольшой задержкой для гарантии, что DOM готов
+            setTimeout(() => {
+                this.update();
+            }, 50);
         } else {
             console.error('[DASHBOARD] Screen element not found!');
+            // Пробуем пересоздать
+            this.createHTML();
+            setTimeout(() => {
+                this.show();
+            }, 100);
         }
     }
 
