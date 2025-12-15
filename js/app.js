@@ -53,20 +53,28 @@ async function initApp() {
         // Скрываем все старые экраны
         hideAllScreens();
         
-        // Ждем немного, чтобы все компоненты загрузились
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Ждем, чтобы все компоненты точно загрузились
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Проверяем, что все экраны созданы
+        const screensReady = typeof dashboardScreen !== 'undefined' && 
+                             typeof onboardingScreen !== 'undefined' &&
+                             typeof navigation !== 'undefined';
+        
+        if (!screensReady) {
+            console.warn('[APP] Не все компоненты загружены, ждем еще...');
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
         
         if (hasProfile) {
             // Профиль есть - показываем главный экран
             console.log('[APP] Показываем Dashboard');
             if (typeof dashboardScreen !== 'undefined') {
                 dashboardScreen.show();
-                // Показываем навигацию и FAB
+                // Показываем навигацию
                 if (typeof navigation !== 'undefined') {
-                    navigation.show();
-                }
-                if (typeof fab !== 'undefined') {
-                    fab.show();
+                    // Навигация уже создана в init(), просто активируем таб
+                    navigation.switchTab('home');
                 }
             } else {
                 console.error('[APP] dashboardScreen не загружен!');

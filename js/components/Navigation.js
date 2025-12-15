@@ -112,6 +112,12 @@ class Navigation {
 // Создаем глобальный экземпляр
 const navigation = new Navigation();
 
+// Метод show для совместимости
+navigation.show = function() {
+    // Навигация всегда видна, просто активируем нужный таб
+    this.switchTab(this.currentTab || 'home');
+};
+
 // Экспортируем
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = Navigation;
