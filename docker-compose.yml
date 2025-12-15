@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: klyro_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-klyro}
+      POSTGRES_USER: ${POSTGRES_USER:-klyro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - klyro_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-klyro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (Flask)
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: klyro_backend
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - PORT=5000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-klyro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-klyro}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - klyro_network
+    volumes:
+      - ./data:/app/data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Telegram Bot (отдельный сервис)
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    container_name: klyro_bot
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - WEBHOOK_URL=${WEBHOOK_URL:-https://klyro.app/webhook}
+      - BACKEND_URL=http://backend:5000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-klyro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-klyro}
+    depends_on:
+      - postgres
+      - backend
+    networks:
+      - klyro_network
+
+  # Frontend (Nginx для статики)
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: klyro_frontend
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certbot/conf:/etc/letsencrypt:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    networks:
+      - klyro_network
+
+  # Certbot для HTTPS (запускается только по необходимости через docker-compose run)
+  # Используется для первоначального получения и обновления сертификатов
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  klyro_network:
+    driver: bridge
+

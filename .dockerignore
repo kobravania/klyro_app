@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README.md
+BITLAUNCH_DEPLOY.md
+DEPLOYMENT.md
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+
+# Node (если будет использоваться)
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Deploy scripts (не нужны в контейнере)
+deploy/
+
+# Backups
+backups/
+*.sql
+*.dump
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+

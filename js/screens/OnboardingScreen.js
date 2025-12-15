@@ -151,8 +151,6 @@ if (typeof window.completeOnboarding === 'function') {
     // Если старой функции нет, создаем новую
     window.completeOnboarding = window.completeOnboardingNew;
 }
-}
-
 const onboardingScreen = new OnboardingScreen();
 
 // Обновляем функцию showOnboardingScreen в app.js
