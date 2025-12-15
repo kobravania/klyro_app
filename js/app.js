@@ -262,9 +262,9 @@ function startApp() {
     }
     
     console.log('[APP] Все компоненты загружены, запускаем initApp');
-    try {
-        initApp();
-    } catch (e) {
+    // initApp - async функция, но мы не можем использовать await здесь,
+    // так как startApp не async. Обрабатываем промис через .catch()
+    initApp().catch(e => {
         console.error('[APP] Ошибка при запуске initApp:', e);
         console.error('[APP] Stack:', e.stack);
         // Показываем онбординг в случае ошибки
@@ -273,7 +273,7 @@ function startApp() {
             onboardingEl.classList.add('active');
             onboardingEl.style.display = 'block';
         }
-    }
+    });
 }
 
 // Запускаем после полной загрузки страницы
@@ -287,9 +287,13 @@ if (document.readyState === 'loading') {
     setTimeout(startApp, 100);
 }
 
-// Экспортируем для глобального доступа
-window.appContext = appContext;
-window.storage = storage;
+// Экспортируем для глобального доступа (только если они уже определены)
+if (typeof appContext !== 'undefined') {
+    window.appContext = appContext;
+}
+if (typeof storage !== 'undefined') {
+    window.storage = storage;
+}
 window.initApp = initApp;
 window.hideAllScreens = hideAllScreens;
 window.showOnboardingScreen = showOnboardingScreen;
