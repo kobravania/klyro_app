@@ -212,15 +212,40 @@ function setupNavigation() {
     });
 }
 
-// Запускаем приложение после загрузки DOM
+// Запускаем приложение после загрузки ВСЕХ скриптов
+// Ждем, чтобы все экраны точно создались
+function startApp() {
+    // Проверяем, что все необходимые компоненты загружены
+    const requiredComponents = [
+        'appContext',
+        'storage', 
+        'dashboardScreen',
+        'onboardingScreen',
+        'navigation'
+    ];
+    
+    const missing = requiredComponents.filter(name => typeof window[name] === 'undefined');
+    
+    if (missing.length > 0) {
+        console.warn('[APP] Не все компоненты загружены:', missing);
+        // Пробуем еще раз через 200ms
+        setTimeout(startApp, 200);
+        return;
+    }
+    
+    console.log('[APP] Все компоненты загружены, запускаем initApp');
+    initApp();
+}
+
+// Запускаем после полной загрузки страницы
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('[APP] DOM загружен, запускаем initApp');
-        initApp();
+        console.log('[APP] DOM загружен, ждем компоненты...');
+        setTimeout(startApp, 100);
     });
 } else {
-    console.log('[APP] DOM уже загружен, запускаем initApp');
-    initApp();
+    console.log('[APP] DOM уже загружен, ждем компоненты...');
+    setTimeout(startApp, 100);
 }
 
 // Экспортируем для глобального доступа
