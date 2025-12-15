@@ -147,13 +147,39 @@ docker-compose ps
 echo -e "${YELLOW}🔄 Настройка автообновления SSL сертификата...${NC}"
 (crontab -l 2>/dev/null; echo "0 3 * * * cd $PROJECT_DIR && docker run --rm -v \$(pwd)/nginx/certbot/conf:/etc/letsencrypt -v \$(pwd)/nginx/certbot/www:/var/www/certbot certbot/certbot renew && docker-compose restart frontend") | crontab -
 
-# Настройка автоматического обновления кода из GitHub
+# АВТОМАТИЧЕСКАЯ настройка автообновления кода из GitHub
 echo -e "${YELLOW}🔄 Настройка автоматического обновления кода...${NC}"
-if [ -f "$PROJECT_DIR/deploy/setup-auto-update.sh" ]; then
-    bash "$PROJECT_DIR/deploy/setup-auto-update.sh"
+if [ -f "$PROJECT_DIR/deploy/auto-update.sh" ]; then
+    # Делаем скрипт исполняемым
+    chmod +x "$PROJECT_DIR/deploy/auto-update.sh"
+    # Запускаем его один раз - он сам себя настроит через systemd timer
+    bash "$PROJECT_DIR/deploy/auto-update.sh" || echo -e "${YELLOW}⚠️  Автообновление настроится при следующем запуске${NC}"
 else
-    echo -e "${YELLOW}⚠️  Скрипт setup-auto-update.sh не найден, пропускаем${NC}"
+    echo -e "${YELLOW}⚠️  Скрипт auto-update.sh не найден${NC}"
 fi
+
+# Создаем systemd service для автоматической настройки при загрузке системы
+echo -e "${YELLOW}🔧 Настройка автоматической проверки при загрузке...${NC}"
+cat > /etc/systemd/system/klyro-init.service << EOF
+[Unit]
+Description=Klyro Auto-Update Initialization
+After=network.target docker.service
+Before=klyro-update.timer
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=$PROJECT_DIR/deploy/init-auto-update.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+chmod +x "$PROJECT_DIR/deploy/init-auto-update.sh" 2>/dev/null || true
+systemctl daemon-reload
+systemctl enable klyro-init.service
+systemctl start klyro-init.service || true
 
 echo -e "${GREEN}✅ Установка завершена!${NC}"
 echo -e "${GREEN}🌐 Приложение доступно по адресу: https://${DOMAIN}${NC}"
