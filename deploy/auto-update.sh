@@ -93,11 +93,20 @@ if [ "$LOCAL" != "$REMOTE" ] && [ "$REMOTE" != "unknown" ]; then
     docker-compose build --no-cache 2>&1 | tail -20
     docker-compose up -d 2>&1 | tail -10
     
-    # Проверяем и перезапускаем бота, если нужно
+    # Принудительно пересобираем и перезапускаем бота
+    echo "$(date): Пересобираю и перезапускаю бота..."
+    docker-compose stop bot 2>&1 || true
+    docker-compose rm -f bot 2>&1 || true
+    docker-compose build --no-cache bot 2>&1 | tail -20
+    docker-compose up -d bot 2>&1
     sleep 5
-    if ! docker-compose ps bot | grep -q "Up"; then
-        echo "$(date): Бот не запущен, запускаю..."
-        docker-compose up -d bot
+    
+    # Проверяем, что бот запустился
+    if docker-compose ps bot | grep -q "Up"; then
+        echo "$(date): Бот успешно запущен"
+    else
+        echo "$(date): ОШИБКА: Бот не запустился, проверь логи!"
+        docker-compose logs --tail=20 bot
     fi
     
     echo "$(date): Обновление завершено"

@@ -26,5 +26,13 @@ if [ -f "$PROJECT_DIR/deploy/auto-update.sh" ]; then
     bash "$PROJECT_DIR/deploy/auto-update.sh" > /dev/null 2>&1 &
 fi
 
+# Также проверяем и запускаем бота, если он не запущен
+if command -v docker-compose &> /dev/null; then
+    if ! docker-compose ps bot 2>/dev/null | grep -q "Up"; then
+        echo "$(date): Бот не запущен, запускаю..."
+        docker-compose up -d bot 2>&1 || true
+    fi
+fi
+
 exit 0
 
