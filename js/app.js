@@ -94,6 +94,8 @@ async function initApp() {
                 if (!dashboardEl) {
                     console.warn('[APP] Dashboard screen не найден в DOM, пересоздаем...');
                     dashboardScreen.createHTML();
+                    // Ждем, пока элемент появится
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
                 dashboardScreen.show();
                 // Показываем навигацию
@@ -101,6 +103,12 @@ async function initApp() {
                     // Навигация уже создана в init(), просто активируем таб
                     navigation.switchTab('home');
                 }
+                // Принудительно обновляем еще раз через небольшую задержку
+                setTimeout(() => {
+                    if (dashboardScreen && typeof dashboardScreen.update === 'function') {
+                        dashboardScreen.update();
+                    }
+                }, 500);
             } else {
                 console.error('[APP] dashboardScreen не загружен!');
                 showOnboardingScreen();
