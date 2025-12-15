@@ -1,6 +1,7 @@
 #!/bin/bash
 # Автоматическое обновление - проверяет GitHub каждые 2 минуты
 # Работает с Docker Compose
+# АВТОМАТИЧЕСКИ настраивает себя при первом запуске
 
 # Пробуем найти директорию проекта
 PROJECT_DIR=""
@@ -17,6 +18,54 @@ cd "$PROJECT_DIR" || {
     echo "$(date): Не удалось перейти в директорию $PROJECT_DIR"
     exit 1
 }
+
+# АВТОМАТИЧЕСКАЯ НАСТРОЙКА: если systemd timer не настроен, настраиваем его автоматически
+if ! systemctl is-enabled klyro-update.timer &>/dev/null; then
+    echo "$(date): Автообновление не настроено, настраиваю автоматически..."
+    
+    # Делаем скрипт исполняемым
+    chmod +x "$PROJECT_DIR/deploy/auto-update.sh" 2>/dev/null || true
+    
+    # Создаем systemd service
+    cat > /etc/systemd/system/klyro-update.service << EOF
+[Unit]
+Description=Klyro Auto Update (Docker)
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=$PROJECT_DIR
+ExecStart=$PROJECT_DIR/deploy/auto-update.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Создаем systemd timer
+    cat > /etc/systemd/system/klyro-update.timer << EOF
+[Unit]
+Description=Klyro Auto Update Timer
+Requires=klyro-update.service
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+Unit=klyro-update.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    # Активируем timer
+    systemctl daemon-reload
+    systemctl enable klyro-update.timer
+    systemctl start klyro-update.timer
+    
+    echo "$(date): Автообновление настроено автоматически!"
+fi
 
 # Проверяем наличие git
 if ! command -v git &> /dev/null; then
