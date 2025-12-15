@@ -155,9 +155,13 @@ class ProfileScreen {
     show() {
         const screen = document.getElementById('profile-screen');
         if (screen) {
+            hideAllScreens();
             screen.classList.add('active');
             screen.style.display = 'flex';
+            screen.style.flexDirection = 'column';
             this.update();
+        } else {
+            console.error('[PROFILE] Screen element not found!');
         }
     }
 

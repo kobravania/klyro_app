@@ -112,9 +112,13 @@ class DashboardScreen {
     show() {
         const screen = document.getElementById('dashboard-screen');
         if (screen) {
+            hideAllScreens();
             screen.classList.add('active');
             screen.style.display = 'flex';
+            screen.style.flexDirection = 'column';
             this.update();
+        } else {
+            console.error('[DASHBOARD] Screen element not found!');
         }
     }
 

@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   # PostgreSQL база данных
+  # Используем другой порт для БД, чтобы не конфликтовать с существующей БД
   postgres:
     image: postgres:15-alpine
     container_name: klyro_postgres
@@ -12,9 +13,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - klyro_postgres_data:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"  # Используем порт 5433 вместо 5432
     networks:
       - klyro_network
     healthcheck:
@@ -66,6 +67,8 @@ services:
       - klyro_network
 
   # Frontend (Nginx для статики)
+  # Используем порты 8080/8443 чтобы не конфликтовать с существующим проектом
+  # Основной Nginx на сервере будет проксировать поддомен на эти порты
   frontend:
     build:
       context: .
@@ -78,8 +81,8 @@ services:
       - ./nginx/certbot/conf:/etc/letsencrypt:ro
       - ./nginx/certbot/www:/var/www/certbot:ro
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     depends_on:
       - backend
     networks:
@@ -89,7 +92,7 @@ services:
   # Используется для первоначального получения и обновления сертификатов
 
 volumes:
-  postgres_data:
+  klyro_postgres_data:  # Отдельный volume для Klyro, чтобы не конфликтовать
     driver: local
 
 networks:

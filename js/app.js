@@ -61,13 +61,20 @@ async function initApp() {
             console.log('[APP] Показываем Dashboard');
             if (typeof dashboardScreen !== 'undefined') {
                 dashboardScreen.show();
+                // Показываем навигацию и FAB
+                if (typeof navigation !== 'undefined') {
+                    navigation.show();
+                }
+                if (typeof fab !== 'undefined') {
+                    fab.show();
+                }
             } else {
                 console.error('[APP] dashboardScreen не загружен!');
                 showOnboardingScreen();
             }
         } else {
             // Профиля нет - показываем форму онбординга
-            console.log('[APP] Показываем Onboarding');
+            console.log('[APP] Показываем Onboarding - профиль не заполнен');
             showOnboardingScreen();
         }
         
@@ -103,6 +110,15 @@ function hideAllScreens() {
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.remove('active');
         screen.style.display = 'none';
+    });
+    // Также скрываем экраны, созданные динамически
+    const dynamicScreens = ['dashboard-screen', 'diary-screen', 'add-food-screen', 'activity-screen', 'profile-screen', 'onboarding-screen'];
+    dynamicScreens.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        }
     });
 }
 

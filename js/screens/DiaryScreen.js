@@ -112,10 +112,14 @@ class DiaryScreen {
     show() {
         const screen = document.getElementById('diary-screen');
         if (screen) {
+            hideAllScreens();
             screen.classList.add('active');
             screen.style.display = 'flex';
+            screen.style.flexDirection = 'column';
             this.currentDate = Helpers.getToday();
             this.update();
+        } else {
+            console.error('[DIARY] Screen element not found!');
         }
     }
 

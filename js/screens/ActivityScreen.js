@@ -52,8 +52,12 @@ class ActivityScreen {
     show() {
         const screen = document.getElementById('activity-screen');
         if (screen) {
+            hideAllScreens();
             screen.classList.add('active');
             screen.style.display = 'flex';
+            screen.style.flexDirection = 'column';
+        } else {
+            console.error('[ACTIVITY] Screen element not found!');
         }
     }
 

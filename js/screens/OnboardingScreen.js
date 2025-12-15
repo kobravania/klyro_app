@@ -16,10 +16,12 @@ class OnboardingScreen {
     show() {
         const screen = document.getElementById('onboarding-screen');
         if (screen) {
+            hideAllScreens();
             screen.classList.add('active');
             screen.style.display = 'block';
             this.initForm();
         } else {
+            console.error('[ONBOARDING] Screen element not found!');
             // Если экрана нет, создаем временный
             this.createTemporaryScreen();
         }
