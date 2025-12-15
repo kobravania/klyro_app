@@ -43,9 +43,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         }
     ]]
     
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
         welcome_text,
-        reply_markup={"inline_keyboard": keyboard}
+        reply_markup=reply_markup
     )
 
 def main() -> None:
