@@ -102,14 +102,19 @@ if [ "$LOCAL" != "$REMOTE" ] && [ "$REMOTE" != "unknown" ]; then
     sleep 5
     
     # Проверяем, что бот запустился
+    sleep 10  # Даем больше времени на запуск
     if docker-compose ps bot | grep -q "Up"; then
         echo "$(date): Бот успешно запущен"
+        # Показываем последние логи для проверки
+        docker-compose logs --tail=10 bot
     else
-        echo "$(date): ОШИБКА: Бот не запустился, запускаю fix-bot.sh..."
-        if [ -f "$PROJECT_DIR/deploy/fix-bot.sh" ]; then
+        echo "$(date): ОШИБКА: Бот не запустился, запускаю полную диагностику..."
+        if [ -f "$PROJECT_DIR/deploy/diagnose-and-fix.sh" ]; then
+            bash "$PROJECT_DIR/deploy/diagnose-and-fix.sh" 2>&1 | tail -50
+        elif [ -f "$PROJECT_DIR/deploy/fix-bot.sh" ]; then
             bash "$PROJECT_DIR/deploy/fix-bot.sh" 2>&1 | tail -30
         else
-            docker-compose logs --tail=20 bot
+            docker-compose logs --tail=30 bot
         fi
     fi
     
