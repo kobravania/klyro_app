@@ -233,6 +233,9 @@ function setupNavigation() {
 
 // Запускаем приложение после загрузки ВСЕХ скриптов
 // Ждем, чтобы все экраны точно создались
+let startAppAttempts = 0;
+const MAX_START_ATTEMPTS = 5;
+
 function startApp() {
     // Проверяем, что все необходимые компоненты загружены
     const requiredComponents = [
@@ -248,13 +251,12 @@ function startApp() {
     if (missing.length > 0) {
         console.warn('[APP] Не все компоненты загружены:', missing);
         // Пробуем еще раз через 200ms, максимум 5 раз
-        if (startApp.attempts === undefined) startApp.attempts = 0;
-        startApp.attempts++;
-        if (startApp.attempts < 5) {
+        startAppAttempts++;
+        if (startAppAttempts < MAX_START_ATTEMPTS) {
             setTimeout(startApp, 200);
             return;
         } else {
-            console.error('[APP] Не удалось загрузить все компоненты после 5 попыток, продолжаем с тем что есть');
+            console.error('[APP] Не удалось загрузить все компоненты после', MAX_START_ATTEMPTS, 'попыток, продолжаем с тем что есть');
             // Все равно пытаемся запустить
         }
     }
@@ -264,6 +266,7 @@ function startApp() {
         initApp();
     } catch (e) {
         console.error('[APP] Ошибка при запуске initApp:', e);
+        console.error('[APP] Stack:', e.stack);
         // Показываем онбординг в случае ошибки
         const onboardingEl = document.getElementById('onboarding-screen');
         if (onboardingEl) {
