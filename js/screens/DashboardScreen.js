@@ -111,23 +111,29 @@ class DashboardScreen {
 
     show() {
         const screen = document.getElementById('dashboard-screen');
-        if (screen) {
-            hideAllScreens();
-            screen.classList.add('active');
-            screen.style.display = 'flex';
-            screen.style.flexDirection = 'column';
-            // Обновляем сразу, но с небольшой задержкой для гарантии, что DOM готов
-            setTimeout(() => {
-                this.update();
-            }, 50);
-        } else {
-            console.error('[DASHBOARD] Screen element not found!');
-            // Пробуем пересоздать
+        if (!screen) {
+            console.warn('[DASHBOARD] Screen element not found, creating...');
             this.createHTML();
+            // Ждем, пока элемент появится в DOM
             setTimeout(() => {
                 this.show();
             }, 100);
+            return;
         }
+        
+        hideAllScreens();
+        screen.classList.add('active');
+        screen.style.display = 'flex';
+        screen.style.flexDirection = 'column';
+        
+        // Принудительно обновляем несколько раз для гарантии
+        this.update();
+        setTimeout(() => {
+            this.update();
+        }, 100);
+        setTimeout(() => {
+            this.update();
+        }, 300);
     }
 
     hide() {

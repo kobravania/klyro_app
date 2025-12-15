@@ -24,33 +24,41 @@ if not BOT_TOKEN:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start"""
-    user = update.effective_user
-    
-    welcome_text = (
-        "👋 Добро пожаловать в Klyro!\n\n"
-        "Ваш персональный помощник по питанию и фитнесу.\n\n"
-        "📊 Рассчитывайте калории\n"
-        "🎯 Отслеживайте прогресс\n"
-        "💪 Достигайте целей\n\n"
-        "Нажмите кнопку ниже, чтобы начать:"
-    )
-    
-    # Создаем кнопку с WebApp
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-    
-    keyboard = [[
-        InlineKeyboardButton(
-            text="🚀 ОТКРЫТЬ KLYRO",
-            web_app=WebAppInfo(url=WEB_APP_URL)
+    try:
+        user = update.effective_user
+        logger.info(f"Received /start from user {user.id if user else 'unknown'}")
+        
+        welcome_text = (
+            "👋 Добро пожаловать в Klyro!\n\n"
+            "Ваш персональный помощник по питанию и фитнесу.\n\n"
+            "📊 Рассчитывайте калории\n"
+            "🎯 Отслеживайте прогресс\n"
+            "💪 Достигайте целей\n\n"
+            "Нажмите кнопку ниже, чтобы начать:"
         )
-    ]]
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        welcome_text,
-        reply_markup=reply_markup
-    )
+        
+        # Создаем кнопку с WebApp
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = [[
+            InlineKeyboardButton(
+                text="🚀 ОТКРЫТЬ KLYRO",
+                web_app=WebAppInfo(url=WEB_APP_URL)
+            )
+        ]]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.message:
+            await update.message.reply_text(
+                welcome_text,
+                reply_markup=reply_markup
+            )
+            logger.info(f"Sent welcome message to user {user.id if user else 'unknown'}")
+        else:
+            logger.error("update.message is None!")
+    except Exception as e:
+        logger.error(f"Error in start handler: {e}", exc_info=True)
 
 def main() -> None:
     """Запуск бота"""
