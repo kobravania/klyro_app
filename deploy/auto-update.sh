@@ -93,8 +93,33 @@ if [ "$LOCAL" != "$REMOTE" ] && [ "$REMOTE" != "unknown" ]; then
     docker-compose build --no-cache 2>&1 | tail -20
     docker-compose up -d 2>&1 | tail -10
     
+    # Проверяем и перезапускаем бота, если нужно
+    sleep 5
+    if ! docker-compose ps bot | grep -q "Up"; then
+        echo "$(date): Бот не запущен, запускаю..."
+        docker-compose up -d bot
+    fi
+    
     echo "$(date): Обновление завершено"
 else
     echo "$(date): Изменений нет (LOCAL: $LOCAL, REMOTE: $REMOTE)"
+    
+    # Периодически проверяем, что бот работает (каждые 10 проверок = ~20 минут)
+    CHECK_COUNT_FILE="$PROJECT_DIR/.bot_check_count"
+    if [ -f "$CHECK_COUNT_FILE" ]; then
+        COUNT=$(cat "$CHECK_COUNT_FILE")
+        COUNT=$((COUNT + 1))
+    else
+        COUNT=1
+    fi
+    echo "$COUNT" > "$CHECK_COUNT_FILE"
+    
+    if [ $((COUNT % 10)) -eq 0 ]; then
+        echo "$(date): Периодическая проверка бота..."
+        if ! docker-compose ps bot | grep -q "Up"; then
+            echo "$(date): Бот не запущен, запускаю..."
+            docker-compose up -d bot
+        fi
+    fi
 fi
 
