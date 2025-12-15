@@ -247,13 +247,30 @@ function startApp() {
     
     if (missing.length > 0) {
         console.warn('[APP] Не все компоненты загружены:', missing);
-        // Пробуем еще раз через 200ms
-        setTimeout(startApp, 200);
-        return;
+        // Пробуем еще раз через 200ms, максимум 5 раз
+        if (startApp.attempts === undefined) startApp.attempts = 0;
+        startApp.attempts++;
+        if (startApp.attempts < 5) {
+            setTimeout(startApp, 200);
+            return;
+        } else {
+            console.error('[APP] Не удалось загрузить все компоненты после 5 попыток, продолжаем с тем что есть');
+            // Все равно пытаемся запустить
+        }
     }
     
     console.log('[APP] Все компоненты загружены, запускаем initApp');
-    initApp();
+    try {
+        initApp();
+    } catch (e) {
+        console.error('[APP] Ошибка при запуске initApp:', e);
+        // Показываем онбординг в случае ошибки
+        const onboardingEl = document.getElementById('onboarding-screen');
+        if (onboardingEl) {
+            onboardingEl.classList.add('active');
+            onboardingEl.style.display = 'block';
+        }
+    }
 }
 
 // Запускаем после полной загрузки страницы
