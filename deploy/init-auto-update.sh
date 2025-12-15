@@ -28,9 +28,14 @@ fi
 
 # Также проверяем и запускаем бота, если он не запущен
 if command -v docker-compose &> /dev/null; then
+    # Запускаем полную диагностику, если бот не работает
     if ! docker-compose ps bot 2>/dev/null | grep -q "Up"; then
-        echo "$(date): Бот не запущен, запускаю..."
-        docker-compose up -d bot 2>&1 || true
+        echo "$(date): Бот не запущен, запускаю полную диагностику..."
+        if [ -f "$PROJECT_DIR/deploy/diagnose-and-fix.sh" ]; then
+            bash "$PROJECT_DIR/deploy/diagnose-and-fix.sh" > /tmp/klyro-diagnose.log 2>&1 || true
+        else
+            docker-compose up -d bot 2>&1 || true
+        fi
     fi
     
     # Настраиваем systemd service для бота, если его нет
