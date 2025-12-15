@@ -89,7 +89,7 @@ if [ "$LOCAL" != "$REMOTE" ] && [ "$REMOTE" != "unknown" ]; then
     git pull origin main 2>&1
     
     # Пересобираем и перезапускаем контейнеры
-    cd /root/klyro
+    cd "$PROJECT_DIR"
     docker-compose build --no-cache 2>&1 | tail -20
     docker-compose up -d 2>&1 | tail -10
     

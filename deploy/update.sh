@@ -36,6 +36,15 @@ echo -e "${YELLOW}📥 Получение обновлений из Git...${NC}"
 git fetch origin
 git pull origin main
 
+# АВТОМАТИЧЕСКАЯ НАСТРОЙКА автообновления, если его нет
+if ! systemctl is-enabled klyro-update.timer &>/dev/null; then
+    echo -e "${YELLOW}🔧 Настраиваю автообновление автоматически...${NC}"
+    if [ -f "$PROJECT_DIR/deploy/auto-update.sh" ]; then
+        # Запускаем auto-update.sh, который сам себя настроит
+        bash "$PROJECT_DIR/deploy/auto-update.sh" || true
+    fi
+fi
+
 # Проверка изменений в docker-compose.yml
 if git diff HEAD@{1} HEAD --name-only | grep -q "docker-compose.yml\|Dockerfile"; then
     echo -e "${YELLOW}🔨 Обнаружены изменения в Docker конфигурации, пересборка образов...${NC}"
