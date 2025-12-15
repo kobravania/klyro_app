@@ -785,7 +785,8 @@
     -->
 
     <script>
-        // КРИТИЧНО: Скрываем loading screen СРАЗУ при загрузке HTML
+        // КРИТИЧНО: Скрываем только loading screen СРАЗУ при загрузке HTML
+        // НЕ скрываем динамически создаваемые экраны - они будут созданы позже
         (function() {
             try {
                 const loadingScreen = document.getElementById('loading-screen');
@@ -797,10 +798,16 @@
                     console.log('[HTML] Loading screen hidden immediately in HTML');
                 }
                 
-                // Скрываем все остальные экраны
-                const allScreens = document.querySelectorAll('.screen');
-                allScreens.forEach(screen => {
-                    if (screen.id !== 'loading-screen') {
+                // Скрываем только статические экраны из HTML (auth, onboarding, profile и т.д.)
+                // НЕ трогаем динамически создаваемые экраны (dashboard-screen и т.д.)
+                const staticScreens = ['auth-screen', 'onboarding-screen', 'profile-screen', 'add-food-screen', 
+                                      'custom-product-screen', 'product-amount-screen', 'diary-screen', 
+                                      'history-screen', 'activity-screen', 'add-activity-screen', 
+                                      'settings-screen', 'debug-screen'];
+                
+                staticScreens.forEach(screenId => {
+                    const screen = document.getElementById(screenId);
+                    if (screen) {
                         screen.style.display = 'none';
                         screen.style.visibility = 'hidden';
                         screen.style.opacity = '0';

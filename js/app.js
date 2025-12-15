@@ -88,10 +88,16 @@ async function initApp() {
         if (hasProfile) {
             // Профиль есть - показываем главный экран
             console.log('[APP] Показываем Dashboard');
-            if (typeof dashboardScreen !== 'undefined') {
+            if (typeof dashboardScreen !== 'undefined' && dashboardScreen) {
+                // Убеждаемся, что экран создан
+                const dashboardEl = document.getElementById('dashboard-screen');
+                if (!dashboardEl) {
+                    console.warn('[APP] Dashboard screen не найден в DOM, пересоздаем...');
+                    dashboardScreen.createHTML();
+                }
                 dashboardScreen.show();
                 // Показываем навигацию
-                if (typeof navigation !== 'undefined') {
+                if (typeof navigation !== 'undefined' && navigation) {
                     // Навигация уже создана в init(), просто активируем таб
                     navigation.switchTab('home');
                 }
