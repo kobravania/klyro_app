@@ -17,10 +17,15 @@ logger = logging.getLogger(__name__)
 
 # Токен бота из переменных окружения
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
-WEB_APP_URL = os.environ.get('WEBHOOK_URL', 'https://klyro.69-67-173-216.sslip.io')
+# URL для WebApp (не webhook!)
+WEB_APP_URL = os.environ.get('WEB_APP_URL') or os.environ.get('DOMAIN') or 'https://klyro.69-67-173-216.sslip.io'
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
+
+logger.info(f"Bot starting...")
+logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
+logger.info(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start"""
@@ -62,15 +67,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def main() -> None:
     """Запуск бота"""
-    # Создаем приложение
-    application = Application.builder().token(BOT_TOKEN).build()
-    
-    # Регистрируем обработчики
-    application.add_handler(CommandHandler("start", start))
-    
-    # Запускаем бота
-    logger.info("Бот запущен...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    try:
+        # Создаем приложение
+        logger.info("Creating bot application...")
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # Регистрируем обработчики
+        application.add_handler(CommandHandler("start", start))
+        logger.info("Command handlers registered")
+        
+        # Запускаем бота
+        logger.info("Starting bot polling...")
+        logger.info(f"Bot will respond to /start with WebApp URL: {WEB_APP_URL}")
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True  # Игнорируем старые обновления
+        )
+    except Exception as e:
+        logger.error(f"Fatal error in bot: {e}", exc_info=True)
+        raise
 
 if __name__ == '__main__':
     main()

@@ -57,6 +57,7 @@ services:
     restart: unless-stopped
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
+      - WEB_APP_URL=${WEB_APP_URL:-${DOMAIN:-https://klyro.69-67-173-216.sslip.io}}
       - WEBHOOK_URL=${WEBHOOK_URL:-https://klyro.app/webhook}
       - BACKEND_URL=http://backend:5000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-klyro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-klyro}
