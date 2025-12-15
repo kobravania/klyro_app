@@ -105,8 +105,12 @@ if [ "$LOCAL" != "$REMOTE" ] && [ "$REMOTE" != "unknown" ]; then
     if docker-compose ps bot | grep -q "Up"; then
         echo "$(date): Бот успешно запущен"
     else
-        echo "$(date): ОШИБКА: Бот не запустился, проверь логи!"
-        docker-compose logs --tail=20 bot
+        echo "$(date): ОШИБКА: Бот не запустился, запускаю fix-bot.sh..."
+        if [ -f "$PROJECT_DIR/deploy/fix-bot.sh" ]; then
+            bash "$PROJECT_DIR/deploy/fix-bot.sh" 2>&1 | tail -30
+        else
+            docker-compose logs --tail=20 bot
+        fi
     fi
     
     echo "$(date): Обновление завершено"
