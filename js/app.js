@@ -54,16 +54,35 @@ async function initApp() {
         hideAllScreens();
         
         // Ждем, чтобы все компоненты точно загрузились
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Проверяем готовность несколько раз с таймаутами
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (attempts < maxAttempts) {
+            const screensReady = typeof dashboardScreen !== 'undefined' && 
+                                 typeof onboardingScreen !== 'undefined' &&
+                                 typeof navigation !== 'undefined' &&
+                                 document.getElementById('dashboard-screen') !== null &&
+                                 document.getElementById('onboarding-screen') !== null;
+            
+            if (screensReady) {
+                console.log('[APP] Все компоненты готовы после', attempts, 'попыток');
+                break;
+            }
+            
+            attempts++;
+            if (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
         
-        // Проверяем, что все экраны созданы
-        const screensReady = typeof dashboardScreen !== 'undefined' && 
-                             typeof onboardingScreen !== 'undefined' &&
-                             typeof navigation !== 'undefined';
-        
-        if (!screensReady) {
-            console.warn('[APP] Не все компоненты загружены, ждем еще...');
-            await new Promise(resolve => setTimeout(resolve, 300));
+        if (attempts >= maxAttempts) {
+            console.error('[APP] Не все компоненты загружены после', maxAttempts, 'попыток!');
+            console.error('[APP] dashboardScreen:', typeof dashboardScreen);
+            console.error('[APP] onboardingScreen:', typeof onboardingScreen);
+            console.error('[APP] navigation:', typeof navigation);
+            console.error('[APP] dashboard-screen element:', document.getElementById('dashboard-screen'));
+            console.error('[APP] onboarding-screen element:', document.getElementById('onboarding-screen'));
+            // Все равно пытаемся продолжить
         }
         
         if (hasProfile) {
