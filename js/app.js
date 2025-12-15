@@ -200,29 +200,59 @@ function setupNavigation() {
         
         switch(tab) {
             case 'home':
-                if (typeof dashboardScreen !== 'undefined') {
+                if (typeof dashboardScreen !== 'undefined' && dashboardScreen) {
+                    const dashboardEl = document.getElementById('dashboard-screen');
+                    if (!dashboardEl) {
+                        console.warn('[APP] Dashboard screen not found, recreating...');
+                        dashboardScreen.createHTML();
+                    }
                     dashboardScreen.show();
+                } else {
+                    console.error('[APP] dashboardScreen не определен!');
                 }
                 break;
             case 'diary':
-                if (typeof diaryScreen !== 'undefined') {
+                if (typeof diaryScreen !== 'undefined' && diaryScreen) {
+                    const diaryEl = document.getElementById('diary-screen');
+                    if (!diaryEl) {
+                        console.warn('[APP] Diary screen not found, recreating...');
+                        diaryScreen.createHTML();
+                    }
                     diaryScreen.show();
+                } else {
+                    console.error('[APP] diaryScreen не определен!');
                 }
                 break;
             case 'products':
                 // Показываем экран добавления продукта
-                if (typeof addFoodScreen !== 'undefined') {
+                if (typeof addFoodScreen !== 'undefined' && addFoodScreen) {
                     addFoodScreen.show();
+                } else {
+                    console.error('[APP] addFoodScreen не определен!');
                 }
                 break;
             case 'activity':
-                if (typeof activityScreen !== 'undefined') {
+                if (typeof activityScreen !== 'undefined' && activityScreen) {
+                    const activityEl = document.getElementById('activity-screen');
+                    if (!activityEl) {
+                        console.warn('[APP] Activity screen not found, recreating...');
+                        activityScreen.createHTML();
+                    }
                     activityScreen.show();
+                } else {
+                    console.error('[APP] activityScreen не определен!');
                 }
                 break;
             case 'profile':
-                if (typeof profileScreen !== 'undefined') {
+                if (typeof profileScreen !== 'undefined' && profileScreen) {
+                    const profileEl = document.getElementById('profile-screen');
+                    if (!profileEl) {
+                        console.warn('[APP] Profile screen not found, recreating...');
+                        profileScreen.createHTML();
+                    }
                     profileScreen.show();
+                } else {
+                    console.error('[APP] profileScreen не определен!');
                 }
                 break;
         }

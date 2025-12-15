@@ -167,24 +167,38 @@ class AddFoodScreen {
 
     updateProductsList() {
         const listEl = document.getElementById('products-list');
-        if (!listEl) return;
+        if (!listEl) {
+            console.error('[ADDFOOD] products-list element not found!');
+            return;
+        }
 
         let products = appContext.productsDatabase || [];
+        
+        console.log('[ADDFOOD] Products in database:', products.length);
         
         if (this.searchQuery) {
             const query = this.searchQuery.toLowerCase();
             products = products.filter(p => 
                 (p.name || '').toLowerCase().includes(query)
             );
+            console.log('[ADDFOOD] Filtered products:', products.length);
         }
 
         if (products.length === 0) {
-            listEl.innerHTML = '<p class="empty-state">Продукты не найдены</p>';
+            if (appContext.productsDatabase.length === 0) {
+                listEl.innerHTML = '<p class="empty-state">Загрузка продуктов...</p>';
+                // Пробуем загрузить еще раз
+                appContext.loadProducts().then(() => {
+                    this.updateProductsList();
+                });
+            } else {
+                listEl.innerHTML = '<p class="empty-state">Продукты не найдены</p>';
+            }
             return;
         }
 
         listEl.innerHTML = products.slice(0, 50).map(product => `
-            <div class="product-item" data-product-id="${product.id}">
+            <div class="product-item" data-product-id="${product.id || product.name}">
                 <div>
                     <div class="product-name">${product.name || 'Продукт'}</div>
                     <div class="product-kcal">${Math.round(product.kcal || 0)} ккал / 100г</div>
@@ -195,20 +209,37 @@ class AddFoodScreen {
             </div>
         `).join('');
 
-        // Обработчики выбора продукта
-        listEl.querySelectorAll('.product-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const productId = item.dataset.productId;
+        // Обработчики выбора продукта - используем делегирование событий
+        listEl.addEventListener('click', (e) => {
+            const productItem = e.target.closest('.product-item');
+            if (productItem) {
+                const productId = productItem.dataset.productId;
+                console.log('[ADDFOOD] Product clicked:', productId);
                 this.selectProduct(productId);
-            });
+            }
         });
     }
 
     selectProduct(productId) {
+        console.log('[ADDFOOD] Selecting product:', productId);
         const product = appContext.findProduct(productId);
-        if (!product) return;
-
-        this.selectedProduct = product;
+        if (!product) {
+            console.error('[ADDFOOD] Product not found:', productId);
+            console.log('[ADDFOOD] Available products:', appContext.productsDatabase.length);
+            // Пробуем найти по имени
+            const productByName = appContext.productsDatabase.find(p => 
+                String(p.id) === String(productId) || p.name === productId
+            );
+            if (productByName) {
+                console.log('[ADDFOOD] Found by name:', productByName);
+                this.selectedProduct = productByName;
+            } else {
+                Helpers.showNotification('Продукт не найден', 'error');
+                return;
+            }
+        } else {
+            this.selectedProduct = product;
+        }
         
         const amountSection = document.getElementById('product-amount-section');
         const nameEl = document.getElementById('selected-product-name');
