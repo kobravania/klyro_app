@@ -68,23 +68,43 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 def main() -> None:
     """Запуск бота"""
     try:
+        # Проверяем переменные окружения
+        if not BOT_TOKEN:
+            logger.error("BOT_TOKEN не установлен!")
+            raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
+        
+        logger.info("=" * 50)
+        logger.info("Запуск бота Klyro")
+        logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
+        logger.info(f"BOT_TOKEN: {'*' * 10} (установлен)")
+        logger.info("=" * 50)
+        
         # Создаем приложение
         logger.info("Creating bot application...")
         application = Application.builder().token(BOT_TOKEN).build()
+        logger.info("Application created successfully")
         
         # Регистрируем обработчики
         application.add_handler(CommandHandler("start", start))
-        logger.info("Command handlers registered")
+        logger.info("Command handlers registered: /start")
         
         # Запускаем бота
         logger.info("Starting bot polling...")
         logger.info(f"Bot will respond to /start with WebApp URL: {WEB_APP_URL}")
+        logger.info("Bot is ready to receive commands!")
+        
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True  # Игнорируем старые обновления
+            drop_pending_updates=True,  # Игнорируем старые обновления
+            close_loop=False
         )
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
     except Exception as e:
         logger.error(f"Fatal error in bot: {e}", exc_info=True)
+        # Не падаем сразу, ждем немного и перезапускаемся
+        import time
+        time.sleep(5)
         raise
 
 if __name__ == '__main__':

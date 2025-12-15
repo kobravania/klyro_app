@@ -19,10 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY bot.py ./bot.py
 
 # Создание пользователя для безопасности
-RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
-USER botuser
+# Временно запускаем от root для упрощения отладки
+# RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
+# USER botuser
 
 # Запуск бота
-CMD ["python", "bot.py"]
+CMD ["python", "-u", "bot.py"]
 
 
