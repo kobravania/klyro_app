@@ -32,6 +32,14 @@ if command -v docker-compose &> /dev/null; then
         echo "$(date): Бот не запущен, запускаю..."
         docker-compose up -d bot 2>&1 || true
     fi
+    
+    # Настраиваем systemd service для бота, если его нет
+    if [ ! -f /etc/systemd/system/klyro-bot.service ]; then
+        if [ -f "$PROJECT_DIR/deploy/setup-bot-service.sh" ]; then
+            echo "$(date): Настраиваю systemd service для бота..."
+            bash "$PROJECT_DIR/deploy/setup-bot-service.sh" > /dev/null 2>&1 || true
+        fi
+    fi
 fi
 
 exit 0
