@@ -147,8 +147,17 @@ docker-compose ps
 echo -e "${YELLOW}🔄 Настройка автообновления SSL сертификата...${NC}"
 (crontab -l 2>/dev/null; echo "0 3 * * * cd $PROJECT_DIR && docker run --rm -v \$(pwd)/nginx/certbot/conf:/etc/letsencrypt -v \$(pwd)/nginx/certbot/www:/var/www/certbot certbot/certbot renew && docker-compose restart frontend") | crontab -
 
+# Настройка автоматического обновления кода из GitHub
+echo -e "${YELLOW}🔄 Настройка автоматического обновления кода...${NC}"
+if [ -f "$PROJECT_DIR/deploy/setup-auto-update.sh" ]; then
+    bash "$PROJECT_DIR/deploy/setup-auto-update.sh"
+else
+    echo -e "${YELLOW}⚠️  Скрипт setup-auto-update.sh не найден, пропускаем${NC}"
+fi
+
 echo -e "${GREEN}✅ Установка завершена!${NC}"
 echo -e "${GREEN}🌐 Приложение доступно по адресу: https://${DOMAIN}${NC}"
+echo -e "${GREEN}🔄 Автообновление настроено - код будет обновляться каждые 2 минуты${NC}"
 echo -e "${YELLOW}📝 Для просмотра логов: docker-compose logs -f${NC}"
 echo -e "${YELLOW}📝 Для остановки: docker-compose down${NC}"
 echo -e "${YELLOW}📝 Для перезапуска: docker-compose restart${NC}"
