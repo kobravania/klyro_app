@@ -83,9 +83,20 @@ class StorageManager {
         const storageKey = this.getStorageKey(key);
         const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
         
+        console.log('[STORAGE] setItem:', { key, storageKey, valueLength: valueStr.length });
+        
         // ВСЕГДА сохраняем в localStorage первым делом
         try {
             localStorage.setItem(storageKey, valueStr);
+            console.log('[STORAGE] Данные сохранены в localStorage, ключ:', storageKey);
+            
+            // Проверяем, что данные действительно сохранились
+            const checkValue = localStorage.getItem(storageKey);
+            if (checkValue === valueStr) {
+                console.log('[STORAGE] ✅ Данные успешно сохранены и проверены');
+            } else {
+                console.error('[STORAGE] ❌ ОШИБКА: Данные не совпадают после сохранения!');
+            }
         } catch (e) {
             console.error('[STORAGE] localStorage.setItem error:', e);
             throw e;
@@ -96,6 +107,7 @@ class StorageManager {
             setTimeout(() => {
                 try {
                     this.tg.CloudStorage.setItem(storageKey, valueStr);
+                    console.log('[STORAGE] Данные синхронизированы в CloudStorage');
                 } catch (e) {
                     // Игнорируем ошибки CloudStorage - данные уже в localStorage
                 }
