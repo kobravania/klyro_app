@@ -453,8 +453,17 @@ class OnboardingScreen {
 
     async completeOnboarding() {
         try {
-            console.log('[ONBOARDING] Завершение онбординга, данные формы:', this.formData);
+            console.log('[ONBOARDING] ========== ЗАВЕРШЕНИЕ ОНБОРДИНГА ==========');
+            console.log('[ONBOARDING] Полные данные формы:', JSON.stringify(this.formData, null, 2));
             console.log('[ONBOARDING] Тип данных:', typeof this.formData, Array.isArray(this.formData));
+            console.log('[ONBOARDING] Ключи формы:', Object.keys(this.formData));
+            console.log('[ONBOARDING] Значения полей:');
+            console.log('  - dateOfBirth:', this.formData.dateOfBirth);
+            console.log('  - gender:', this.formData.gender);
+            console.log('  - height:', this.formData.height, typeof this.formData.height);
+            console.log('  - weight:', this.formData.weight, typeof this.formData.weight);
+            console.log('  - activity:', this.formData.activity);
+            console.log('  - goal:', this.formData.goal);
             
             // Рассчитываем возраст
             if (this.formData.dateOfBirth) {
@@ -463,23 +472,29 @@ class OnboardingScreen {
             }
 
             // Проверяем, что все обязательные поля заполнены
+            const errors = [];
             if (!this.formData.dateOfBirth && !this.formData.age) {
-                throw new Error('Дата рождения не указана');
+                errors.push('Дата рождения не указана');
             }
             if (!this.formData.gender) {
-                throw new Error('Пол не указан');
+                errors.push('Пол не указан');
             }
             if (!this.formData.height || this.formData.height <= 0) {
-                throw new Error('Рост не указан');
+                errors.push('Рост не указан или равен 0');
             }
             if (!this.formData.weight || this.formData.weight <= 0) {
-                throw new Error('Вес не указан');
+                errors.push('Вес не указан или равен 0');
             }
             if (!this.formData.activity) {
-                throw new Error('Уровень активности не указан');
+                errors.push('Уровень активности не указан');
             }
             if (!this.formData.goal) {
-                throw new Error('Цель не указана');
+                errors.push('Цель не указана');
+            }
+            
+            if (errors.length > 0) {
+                console.error('[ONBOARDING] Ошибки валидации:', errors);
+                throw new Error('Не все поля заполнены: ' + errors.join(', '));
             }
 
             console.log('[ONBOARDING] Все поля заполнены, сохраняем данные...');
@@ -532,12 +547,33 @@ class OnboardingScreen {
             }
             
             // Сохраняем данные
-            await appContext.setUserData(cleanData);
+            console.log('[ONBOARDING] Вызываем appContext.setUserData...');
+            try {
+                await appContext.setUserData(cleanData);
+                console.log('[ONBOARDING] ✅ appContext.setUserData выполнен успешно');
+            } catch (saveError) {
+                console.error('[ONBOARDING] ❌ Ошибка при вызове appContext.setUserData:', saveError);
+                console.error('[ONBOARDING] Stack trace:', saveError.stack);
+                throw saveError;
+            }
             
             // Проверяем, что данные сохранились
+            console.log('[ONBOARDING] Проверяем сохраненные данные...');
             const savedData = appContext.getUserData();
             console.log('[ONBOARDING] Данные сохранены, проверка:', savedData);
             console.log('[ONBOARDING] hasCompleteProfile:', appContext.hasCompleteProfile());
+            
+            if (!savedData) {
+                throw new Error('Данные не сохранились - savedData равен null');
+            }
+            
+            // Проверяем, что все поля на месте
+            const requiredFields = ['dateOfBirth', 'gender', 'height', 'weight', 'activity', 'goal'];
+            const missingFields = requiredFields.filter(field => !savedData[field]);
+            if (missingFields.length > 0) {
+                console.error('[ONBOARDING] Отсутствуют поля в сохраненных данных:', missingFields);
+                throw new Error('Не все поля сохранились: ' + missingFields.join(', '));
+            }
             
             // Дополнительно проверяем localStorage напрямую
             try {
@@ -574,10 +610,26 @@ class OnboardingScreen {
             dashboardScreen.show();
             navigation.switchTab('home');
         } catch (error) {
-            console.error('[ONBOARDING] Error:', error);
-            console.error('[ONBOARDING] Error stack:', error.stack);
+            console.error('[ONBOARDING] ========== ОШИБКА ПРИ ЗАВЕРШЕНИИ ОНБОРДИНГА ==========');
+            console.error('[ONBOARDING] Error name:', error.name);
             console.error('[ONBOARDING] Error message:', error.message);
-            Helpers.showNotification('Ошибка при сохранении данных: ' + error.message, 'error');
+            console.error('[ONBOARDING] Error stack:', error.stack);
+            console.error('[ONBOARDING] Текущие данные формы:', this.formData);
+            console.error('[ONBOARDING] =====================================================');
+            
+            // Показываем более понятное сообщение пользователю
+            let userMessage = 'Ошибка при сохранении данных';
+            if (error.message.includes('JSON')) {
+                userMessage = 'Ошибка при обработке данных. Попробуйте еще раз.';
+            } else if (error.message.includes('Не все поля')) {
+                userMessage = error.message;
+            } else {
+                userMessage = 'Ошибка: ' + error.message;
+            }
+            
+            Helpers.showNotification(userMessage, 'error');
+            
+            // Не скрываем экран онбординга при ошибке, чтобы пользователь мог попробовать снова
         }
     }
 }
