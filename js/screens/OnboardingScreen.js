@@ -417,18 +417,38 @@ class OnboardingScreen {
     }
 
     validateStep() {
+        let isValid = false;
         switch (this.currentStep) {
             case 1:
-                return !!this.formData.dateOfBirth;
+                isValid = !!this.formData.dateOfBirth;
+                if (!isValid) {
+                    console.log('[ONBOARDING] Валидация шага 1: dateOfBirth отсутствует');
+                }
+                break;
             case 2:
-                return !!this.formData.gender;
+                isValid = !!this.formData.gender;
+                console.log('[ONBOARDING] Валидация шага 2: gender =', this.formData.gender, 'isValid =', isValid);
+                if (!isValid) {
+                    console.log('[ONBOARDING] Валидация шага 2: gender отсутствует, formData:', this.formData);
+                }
+                break;
             case 3:
-                return !!(this.formData.height && this.formData.weight);
+                isValid = !!(this.formData.height && this.formData.weight);
+                if (!isValid) {
+                    console.log('[ONBOARDING] Валидация шага 3: height или weight отсутствуют');
+                }
+                break;
             case 4:
-                return !!(this.formData.activity && this.formData.goal);
+                isValid = !!(this.formData.activity && this.formData.goal);
+                console.log('[ONBOARDING] Валидация шага 4: activity =', this.formData.activity, 'goal =', this.formData.goal, 'isValid =', isValid);
+                if (!isValid) {
+                    console.log('[ONBOARDING] Валидация шага 4: activity или goal отсутствуют, formData:', this.formData);
+                }
+                break;
             default:
-                return true;
+                isValid = true;
         }
+        return isValid;
     }
 
     async completeOnboarding() {
