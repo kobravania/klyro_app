@@ -96,10 +96,10 @@ class AppContext {
         
         this.userData = userData;
         
-        const userDataStr = JSON.stringify(userData);
-        console.log('[CONTEXT] Сохраняем в storage, длина строки:', userDataStr.length);
+        // storage.setItem сам делает JSON.stringify, не нужно делать дважды
+        console.log('[CONTEXT] Сохраняем в storage (объект)');
         
-        await storage.setItem('klyro_user_data', userDataStr);
+        await storage.setItem('klyro_user_data', userData);
         
         // Проверяем, что данные действительно сохранились
         const savedStr = await storage.getItem('klyro_user_data');

@@ -316,51 +316,79 @@ h3 {
 }
 
 /* Range input (slider) */
-input[type="range"] {
+input[type="range"],
+.onboarding-slider {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
-    height: 6px;
+    height: 8px;
     background: var(--bg-surface);
     border-radius: var(--radius-full);
     outline: none;
-    opacity: 0.7;
-    transition: opacity var(--transition-fast);
+    transition: all var(--transition-fast);
+    margin: var(--spacing-md) 0;
 }
 
-input[type="range"]:hover {
-    opacity: 1;
+input[type="range"]:hover,
+.onboarding-slider:hover {
+    background: var(--bg-elevated);
 }
 
-input[type="range"]::-webkit-slider-thumb {
+input[type="range"]::-webkit-slider-thumb,
+.onboarding-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     background: var(--accent);
     border-radius: var(--radius-full);
     cursor: pointer;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 2px 8px rgba(93, 173, 226, 0.4);
     transition: all var(--transition-fast);
+    border: 2px solid var(--bg-elevated);
 }
 
-input[type="range"]::-webkit-slider-thumb:active {
-    transform: scale(1.2);
+input[type="range"]::-webkit-slider-thumb:active,
+.onboarding-slider::-webkit-slider-thumb:active {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(93, 173, 226, 0.6);
 }
 
-input[type="range"]::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
+input[type="range"]::-moz-range-thumb,
+.onboarding-slider::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
     background: var(--accent);
     border-radius: var(--radius-full);
     cursor: pointer;
-    border: none;
-    box-shadow: var(--shadow-sm);
+    border: 2px solid var(--bg-elevated);
+    box-shadow: 0 2px 8px rgba(93, 173, 226, 0.4);
     transition: all var(--transition-fast);
 }
 
-input[type="range"]::-moz-range-thumb:active {
-    transform: scale(1.2);
+input[type="range"]::-moz-range-thumb:active,
+.onboarding-slider::-moz-range-thumb:active {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(93, 173, 226, 0.6);
+}
+
+input[type="range"]::-moz-range-track,
+.onboarding-slider::-moz-range-track {
+    height: 8px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-full);
+}
+
+/* Onboarding опции */
+.onboarding-option-btn.btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.onboarding-option-btn.btn-primary .section-title,
+.onboarding-option-btn.btn-primary div {
+    color: white;
 }
 
 .search-input {

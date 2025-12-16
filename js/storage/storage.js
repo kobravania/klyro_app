@@ -81,9 +81,21 @@ class StorageManager {
      */
     async setItem(key, value) {
         const storageKey = this.getStorageKey(key);
-        const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+        // Если value уже строка (JSON), используем как есть, иначе stringify
+        let valueStr;
+        if (typeof value === 'string') {
+            // Проверяем, не является ли это уже JSON строкой
+            try {
+                JSON.parse(value);
+                valueStr = value; // Уже валидный JSON
+            } catch (e) {
+                valueStr = JSON.stringify(value); // Не JSON, делаем stringify
+            }
+        } else {
+            valueStr = JSON.stringify(value);
+        }
         
-        console.log('[STORAGE] setItem:', { key, storageKey, valueLength: valueStr.length });
+        console.log('[STORAGE] setItem:', { key, storageKey, valueType: typeof value, valueLength: valueStr.length });
         
         // ВСЕГДА сохраняем в localStorage первым делом
         try {

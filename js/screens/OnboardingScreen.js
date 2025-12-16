@@ -39,14 +39,14 @@ class OnboardingScreen {
 
                     <!-- Шаг 1: Дата рождения -->
                     <div class="onboarding-step active" data-step="1">
-                        <div class="card">
-                            <h3 class="section-title">Дата рождения</h3>
+                        <div class="card" style="margin-bottom: var(--spacing-md);">
+                            <h3 class="section-title" style="margin-bottom: var(--spacing-lg);">Дата рождения</h3>
                             <input type="date" 
                                    id="onboarding-date" 
                                    class="input" 
                                    max="${new Date().toISOString().split('T')[0]}"
-                                   style="font-size: 18px; text-align: center;">
-                            <p style="font-size: 13px; color: var(--text-secondary); margin-top: var(--spacing-sm); text-align: center;">
+                                   style="font-size: 18px; text-align: center; margin-bottom: var(--spacing-sm);">
+                            <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin: 0;">
                                 Нам нужна дата рождения для расчета возраста
                             </p>
                         </div>
@@ -54,16 +54,16 @@ class OnboardingScreen {
 
                     <!-- Шаг 2: Пол -->
                     <div class="onboarding-step" data-step="2" style="display: none;">
-                        <div class="card">
-                            <h3 class="section-title">Пол</h3>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md);">
-                                <button class="btn btn-secondary" data-gender="male" id="gender-male" style="min-height: 60px;">
-                                    <div style="font-size: 24px; margin-bottom: var(--spacing-xs);">👨</div>
-                                    <div>Мужской</div>
+                        <div class="card" style="margin-bottom: var(--spacing-md);">
+                            <h3 class="section-title" style="margin-bottom: var(--spacing-lg); text-align: center;">Пол</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); max-width: 400px; margin: 0 auto;">
+                                <button class="btn btn-secondary" data-gender="male" id="gender-male" style="min-height: 80px; flex-direction: column; display: flex; align-items: center; justify-content: center;">
+                                    <div style="font-size: 32px; margin-bottom: var(--spacing-xs);">👨</div>
+                                    <div style="font-weight: 500;">Мужской</div>
                                 </button>
-                                <button class="btn btn-secondary" data-gender="female" id="gender-female" style="min-height: 60px;">
-                                    <div style="font-size: 24px; margin-bottom: var(--spacing-xs);">👩</div>
-                                    <div>Женский</div>
+                                <button class="btn btn-secondary" data-gender="female" id="gender-female" style="min-height: 80px; flex-direction: column; display: flex; align-items: center; justify-content: center;">
+                                    <div style="font-size: 32px; margin-bottom: var(--spacing-xs);">👩</div>
+                                    <div style="font-weight: 500;">Женский</div>
                                 </button>
                             </div>
                         </div>
@@ -71,35 +71,35 @@ class OnboardingScreen {
 
                     <!-- Шаг 3: Рост и вес -->
                     <div class="onboarding-step" data-step="3" style="display: none;">
-                        <div class="card">
-                            <h3 class="section-title">Рост</h3>
+                        <div class="card" style="margin-bottom: var(--spacing-md);">
+                            <h3 class="section-title" style="margin-bottom: var(--spacing-lg);">Рост</h3>
                             <div style="margin-bottom: var(--spacing-xl);">
+                                <div style="text-align: center; margin-bottom: var(--spacing-md);">
+                                    <span class="number-large" id="height-display" style="display: inline-block;">170</span>
+                                    <span style="font-size: 18px; color: var(--text-secondary); margin-left: var(--spacing-sm);">см</span>
+                                </div>
                                 <input type="range" 
                                        id="onboarding-height" 
                                        min="100" 
                                        max="220" 
                                        value="170" 
                                        step="1"
-                                       style="width: 100%; margin: var(--spacing-lg) 0;">
-                                <div style="text-align: center;">
-                                    <span class="number-large" id="height-display">170</span>
-                                    <span style="font-size: 18px; color: var(--text-secondary); margin-left: var(--spacing-sm);">см</span>
-                                </div>
+                                       class="onboarding-slider">
                             </div>
                             
-                            <h3 class="section-title" style="margin-top: var(--spacing-xl);">Вес</h3>
+                            <h3 class="section-title" style="margin-top: var(--spacing-xl); margin-bottom: var(--spacing-lg);">Вес</h3>
                             <div>
+                                <div style="text-align: center; margin-bottom: var(--spacing-md);">
+                                    <span class="number-large" id="weight-display" style="display: inline-block;">70</span>
+                                    <span style="font-size: 18px; color: var(--text-secondary); margin-left: var(--spacing-sm);">кг</span>
+                                </div>
                                 <input type="range" 
                                        id="onboarding-weight" 
                                        min="30" 
                                        max="200" 
                                        value="70" 
                                        step="0.5"
-                                       style="width: 100%; margin: var(--spacing-lg) 0;">
-                                <div style="text-align: center;">
-                                    <span class="number-large" id="weight-display">70</span>
-                                    <span style="font-size: 18px; color: var(--text-secondary); margin-left: var(--spacing-sm);">кг</span>
-                                </div>
+                                       class="onboarding-slider">
                             </div>
                         </div>
                     </div>
