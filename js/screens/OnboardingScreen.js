@@ -40,6 +40,12 @@ class OnboardingScreen {
                         </div>
                     </div>
 
+                    <!-- Блок ошибок -->
+                    <div id="onboarding-error" style="display: none; margin-bottom: var(--spacing-md); padding: var(--spacing-md); background: rgba(255, 107, 107, 0.1); border: 1px solid var(--error); border-radius: var(--radius-md);">
+                        <div style="color: var(--error); font-size: 14px; font-weight: 500; margin-bottom: var(--spacing-xs);">Ошибка</div>
+                        <div id="onboarding-error-text" style="color: var(--error); font-size: 13px; line-height: 1.4;"></div>
+                    </div>
+
                     <!-- Шаг 1: Дата рождения -->
                     <div class="onboarding-step active" data-step="1">
                         <div class="card" style="margin-bottom: var(--spacing-md);">
@@ -208,6 +214,9 @@ class OnboardingScreen {
                     genderBtn.classList.add('btn-primary');
                     this.formData.gender = genderBtn.dataset.gender;
                     console.log('[ONBOARDING] Выбран пол:', this.formData.gender);
+                    console.log('[ONBOARDING] formData после выбора пола:', this.formData);
+                    // Скрываем ошибки при выборе
+                    this.hideError();
                     this.hapticFeedback('light');
                 }
             }
@@ -267,6 +276,9 @@ class OnboardingScreen {
                     activityBtn.classList.add('btn-primary');
                     this.formData.activity = activityBtn.dataset.activity;
                     console.log('[ONBOARDING] Выбрана активность:', this.formData.activity);
+                    console.log('[ONBOARDING] formData после выбора активности:', this.formData);
+                    // Скрываем ошибки при выборе
+                    this.hideError();
                     this.hapticFeedback('light');
                 }
             }
@@ -289,6 +301,9 @@ class OnboardingScreen {
                     goalBtn.classList.add('btn-primary');
                     this.formData.goal = goalBtn.dataset.goal;
                     console.log('[ONBOARDING] Выбрана цель:', this.formData.goal);
+                    console.log('[ONBOARDING] formData после выбора цели:', this.formData);
+                    // Скрываем ошибки при выборе
+                    this.hideError();
                     this.hapticFeedback('light');
                 }
             }
@@ -392,8 +407,13 @@ class OnboardingScreen {
     }
 
     nextStep() {
+        // Скрываем ошибки при переходе на следующий шаг
+        this.hideError();
+        
         // Валидация текущего шага
         if (!this.validateStep()) {
+            const errorMsg = this.getValidationError();
+            this.showError(errorMsg || 'Заполните все поля');
             Helpers.showNotification('Заполните все поля', 'error');
             return;
         }
@@ -405,6 +425,51 @@ class OnboardingScreen {
         } else {
             // Завершаем онбординг
             this.completeOnboarding();
+        }
+    }
+
+    getValidationError() {
+        switch (this.currentStep) {
+            case 1:
+                return !this.formData.dateOfBirth ? 'Выберите дату рождения' : null;
+            case 2:
+                return !this.formData.gender ? 'Выберите пол' : null;
+            case 3:
+                if (!this.formData.height || this.formData.height <= 0) {
+                    return 'Укажите рост';
+                }
+                if (!this.formData.weight || this.formData.weight <= 0) {
+                    return 'Укажите вес';
+                }
+                return null;
+            case 4:
+                if (!this.formData.activity) {
+                    return 'Выберите уровень активности';
+                }
+                if (!this.formData.goal) {
+                    return 'Выберите цель';
+                }
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    showError(message) {
+        const errorEl = document.getElementById('onboarding-error');
+        const errorTextEl = document.getElementById('onboarding-error-text');
+        if (errorEl && errorTextEl) {
+            errorTextEl.textContent = message;
+            errorEl.style.display = 'block';
+            // Прокручиваем к ошибке
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    hideError() {
+        const errorEl = document.getElementById('onboarding-error');
+        if (errorEl) {
+            errorEl.style.display = 'none';
         }
     }
 
@@ -494,8 +559,18 @@ class OnboardingScreen {
             
             if (errors.length > 0) {
                 console.error('[ONBOARDING] Ошибки валидации:', errors);
-                throw new Error('Не все поля заполнены: ' + errors.join(', '));
+                const errorMsg = 'Не заполнены поля: ' + errors.join(', ');
+                this.showError(errorMsg);
+                // Прокручиваем к началу формы
+                const screen = document.getElementById('onboarding-screen');
+                if (screen) {
+                    screen.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                throw new Error(errorMsg);
             }
+            
+            // Скрываем ошибки, если все в порядке
+            this.hideError();
 
             console.log('[ONBOARDING] Все поля заполнены, сохраняем данные...');
             console.log('[ONBOARDING] Данные формы:', this.formData);
@@ -546,6 +621,22 @@ class OnboardingScreen {
                 throw new Error('Не удалось преобразовать данные в JSON: ' + e.message);
             }
             
+            // Дополнительная проверка: убеждаемся, что activity и goal действительно есть
+            console.log('[ONBOARDING] Финальная проверка данных перед сохранением:');
+            console.log('[ONBOARDING]   - activity:', cleanData.activity, typeof cleanData.activity);
+            console.log('[ONBOARDING]   - goal:', cleanData.goal, typeof cleanData.goal);
+            console.log('[ONBOARDING]   - gender:', cleanData.gender, typeof cleanData.gender);
+            
+            if (!cleanData.activity || cleanData.activity === 'undefined' || cleanData.activity === 'null') {
+                this.showError('Не выбран уровень активности. Пожалуйста, вернитесь и выберите один из вариантов.');
+                throw new Error('Уровень активности не выбран');
+            }
+            
+            if (!cleanData.goal || cleanData.goal === 'undefined' || cleanData.goal === 'null') {
+                this.showError('Не выбрана цель. Пожалуйста, вернитесь и выберите один из вариантов.');
+                throw new Error('Цель не выбрана');
+            }
+            
             // Сохраняем данные
             console.log('[ONBOARDING] Вызываем appContext.setUserData...');
             try {
@@ -554,6 +645,7 @@ class OnboardingScreen {
             } catch (saveError) {
                 console.error('[ONBOARDING] ❌ Ошибка при вызове appContext.setUserData:', saveError);
                 console.error('[ONBOARDING] Stack trace:', saveError.stack);
+                this.showError('Ошибка при сохранении данных. Попробуйте еще раз.');
                 throw saveError;
             }
             
@@ -620,11 +712,24 @@ class OnboardingScreen {
             // Показываем более понятное сообщение пользователю
             let userMessage = 'Ошибка при сохранении данных';
             if (error.message.includes('JSON')) {
-                userMessage = 'Ошибка при обработке данных. Попробуйте еще раз.';
+                userMessage = 'Ошибка при обработке данных. Проверьте, что все поля заполнены правильно.';
             } else if (error.message.includes('Не все поля')) {
                 userMessage = error.message;
+            } else if (error.message.includes('activity') || error.message.includes('активности')) {
+                userMessage = 'Не выбран уровень активности. Пожалуйста, выберите один из вариантов.';
+            } else if (error.message.includes('goal') || error.message.includes('цель')) {
+                userMessage = 'Не выбрана цель. Пожалуйста, выберите один из вариантов.';
             } else {
                 userMessage = 'Ошибка: ' + error.message;
+            }
+            
+            // Показываем ошибку в интерфейсе
+            this.showError(userMessage);
+            
+            // Прокручиваем к ошибке
+            const errorEl = document.getElementById('onboarding-error');
+            if (errorEl) {
+                errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
             
             Helpers.showNotification(userMessage, 'error');
