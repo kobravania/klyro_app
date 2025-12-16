@@ -439,20 +439,53 @@ class OnboardingScreen {
             }
 
             console.log('[ONBOARDING] Все поля заполнены, сохраняем данные...');
-            console.log('[ONBOARDING] Данные для сохранения:', JSON.stringify(this.formData, null, 2));
+            console.log('[ONBOARDING] Данные формы:', this.formData);
+            console.log('[ONBOARDING] Тип данных формы:', typeof this.formData);
+            console.log('[ONBOARDING] Ключи формы:', Object.keys(this.formData));
             
-            // Создаем чистый объект для сохранения (без прототипов)
+            // Создаем чистый объект для сохранения (без прототипов) с явным преобразованием типов
             const cleanData = {
-                dateOfBirth: this.formData.dateOfBirth,
-                age: this.formData.age,
-                gender: this.formData.gender,
-                height: Number(this.formData.height),
-                weight: Number(this.formData.weight),
-                activity: this.formData.activity,
-                goal: this.formData.goal
+                dateOfBirth: String(this.formData.dateOfBirth || ''),
+                age: Number(this.formData.age || 0),
+                gender: String(this.formData.gender || ''),
+                height: Number(this.formData.height || 0),
+                weight: Number(this.formData.weight || 0),
+                activity: String(this.formData.activity || ''),
+                goal: String(this.formData.goal || '')
             };
             
+            // Проверяем, что все обязательные поля заполнены еще раз
+            if (!cleanData.dateOfBirth) {
+                throw new Error('Дата рождения не указана');
+            }
+            if (!cleanData.gender) {
+                throw new Error('Пол не указан');
+            }
+            if (!cleanData.height || cleanData.height <= 0) {
+                throw new Error('Рост не указан');
+            }
+            if (!cleanData.weight || cleanData.weight <= 0) {
+                throw new Error('Вес не указан');
+            }
+            if (!cleanData.activity) {
+                throw new Error('Уровень активности не указан');
+            }
+            if (!cleanData.goal) {
+                throw new Error('Цель не указана');
+            }
+            
             console.log('[ONBOARDING] Чистые данные для сохранения:', cleanData);
+            
+            // Проверяем, что можем сделать JSON.stringify
+            let jsonTest;
+            try {
+                jsonTest = JSON.stringify(cleanData);
+                console.log('[ONBOARDING] JSON.stringify успешен, длина:', jsonTest.length);
+                console.log('[ONBOARDING] JSON preview:', jsonTest.substring(0, 200));
+            } catch (e) {
+                console.error('[ONBOARDING] Ошибка JSON.stringify:', e);
+                throw new Error('Не удалось преобразовать данные в JSON: ' + e.message);
+            }
             
             // Сохраняем данные
             await appContext.setUserData(cleanData);
