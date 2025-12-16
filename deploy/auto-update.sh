@@ -88,6 +88,9 @@ if [ "$LOCAL" != "$REMOTE" ] && [ "$REMOTE" != "unknown" ]; then
     echo "$(date): Обнаружены изменения (LOCAL: $LOCAL, REMOTE: $REMOTE), обновляю..."
     git pull origin main 2>&1
     
+    # Делаем все скрипты исполняемыми
+    chmod +x "$PROJECT_DIR/deploy/"*.sh 2>/dev/null || true
+    
     # Пересобираем и перезапускаем контейнеры
     cd "$PROJECT_DIR"
     docker-compose build --no-cache 2>&1 | tail -20
