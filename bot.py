@@ -31,7 +31,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start"""
     try:
         user = update.effective_user
-        logger.info(f"Received /start from user {user.id if user else 'unknown'}")
+        logger.info("=" * 50)
+        logger.info(f"Received /start command from user {user.id if user else 'unknown'}")
+        logger.info(f"Update: {update}")
+        logger.info(f"Message: {update.message}")
+        logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
         
         welcome_text = (
             "👋 Добро пожаловать в Klyro!\n\n"
@@ -55,15 +59,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if update.message:
+            logger.info("Sending welcome message...")
             await update.message.reply_text(
                 welcome_text,
                 reply_markup=reply_markup
             )
-            logger.info(f"Sent welcome message to user {user.id if user else 'unknown'}")
+            logger.info(f"✅ Welcome message sent to user {user.id if user else 'unknown'}")
+        elif update.callback_query:
+            # Если это callback query, отвечаем на него
+            logger.info("Received callback query, answering...")
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_text(
+                welcome_text,
+                reply_markup=reply_markup
+            )
         else:
-            logger.error("update.message is None!")
+            logger.error("❌ update.message is None and update.callback_query is None!")
+            logger.error(f"Update type: {type(update)}")
+            logger.error(f"Update dict: {update.to_dict() if hasattr(update, 'to_dict') else 'N/A'}")
     except Exception as e:
-        logger.error(f"Error in start handler: {e}", exc_info=True)
+        logger.error(f"❌ Error in start handler: {e}", exc_info=True)
+        # Пробуем отправить простое сообщение об ошибке
+        try:
+            if update.message:
+                await update.message.reply_text("Произошла ошибка. Попробуйте еще раз.")
+        except:
+            pass
 
 def main() -> None:
     """Запуск бота"""
