@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Klyro - Персональный помощник по питанию</title>
+        <link rel="stylesheet" href="styles-apple.css?v=3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        // Ждём загрузки Telegram Web App API
+        (function() {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 секунд максимум
+            
+            function checkTelegramAPI() {
+                attempts++;
+                if (window.Telegram && window.Telegram.WebApp) {
+                    console.log('Telegram WebApp API loaded after', attempts * 100, 'ms');
+                    window.telegramReady = true;
+                } else if (attempts < maxAttempts) {
+                    setTimeout(checkTelegramAPI, 100);
+                } else {
+                    console.log('Telegram WebApp API not loaded after timeout');
+                    window.telegramReady = false;
+                }
+            }
+            
+            // Начинаем проверку сразу
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', checkTelegramAPI);
+            } else {
+                checkTelegramAPI();
+            }
+        })();
+    </script>
+</head>
+<body>
+    <!-- Версия: v3.0 - Apple UI -->
+    <div id="app">
+        <!-- Username badge в верхнем углу -->
+        <div class="username-badge" id="username-badge"></div>
+        
+        <!-- Экран загрузки -->
+        <div id="loading-screen" class="screen">
+            <div class="logo-container">
+                <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#5DADE2" stroke-width="3"/>
+                    <path d="M 30 30 L 50 50 L 70 30 M 50 50 L 50 70" stroke="#5DADE2" stroke-width="4" stroke-linecap="round" fill="none"/>
+                    <circle cx="50" cy="50" r="8" fill="#82E0AA"/>
+                </svg>
+                <h1 class="app-title">Klyro</h1>
+            </div>
+        </div>
+
+        <!-- Стартовый экран / Авторизация -->
+        <div id="auth-screen" class="screen">
+            <div class="container">
+                <div class="logo-container-small">
+                    <svg class="logo-small" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="#5DADE2" stroke-width="3"/>
+                        <path d="M 30 30 L 50 50 L 70 30 M 50 50 L 50 70" stroke="#5DADE2" stroke-width="4" stroke-linecap="round" fill="none"/>
+                        <circle cx="50" cy="50" r="8" fill="#82E0AA"/>
+                    </svg>
+                </div>
+                <h2 class="screen-title">Добро пожаловать в Klyro</h2>
+                <p class="screen-subtitle">Ваш персональный помощник по питанию и фитнесу</p>
+                <button id="auth-button" class="btn btn-primary">Войти через Telegram</button>
+            </div>
+        </div>
+
+        <!-- Экран ввода параметров -->
+        <div id="onboarding-screen" class="screen">
+            <div class="container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                
+                <!-- Шаг 1: Дата рождения и пол -->
+                <div class="onboarding-step active" data-step="1">
+                    <h2 class="screen-title">Расскажите о себе</h2>
+                    <div class="form-group">
+                        <label for="dateOfBirth">Дата рождения</label>
+                        <input type="text" id="dateOfBirth" class="input date-input" readonly placeholder="Выберите дату">
+                        <div id="datePicker" class="date-picker" style="display: none;">
+                            <div class="date-picker-header">
+                                <button type="button" class="date-picker-nav" id="prevMonth">&lt;</button>
+                                <div class="date-picker-month-year">
+                                    <select id="datePickerMonth" class="date-picker-select"></select>
+                                    <select id="datePickerYear" class="date-picker-select"></select>
+                                </div>
+                                <button type="button" class="date-picker-nav" id="nextMonth">&gt;</button>
+                            </div>
+                            <div class="date-picker-weekdays">
+                                <div class="date-picker-weekday">Пн</div>
+                                <div class="date-picker-weekday">Вт</div>
+                                <div class="date-picker-weekday">Ср</div>
+                                <div class="date-picker-weekday">Чт</div>
+                                <div class="date-picker-weekday">Пт</div>
+                                <div class="date-picker-weekday">Сб</div>
+                                <div class="date-picker-weekday">Вс</div>
+                            </div>
+                            <div id="datePickerDays" class="date-picker-days"></div>
+                            <div class="date-picker-actions">
+                                <button type="button" class="btn btn-secondary" id="datePickerReset">Сбросить</button>
+                                <button type="button" class="btn btn-primary" id="datePickerConfirm">Готово</button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="dateOfBirthValue" value="">
+                    </div>
+                    <div class="form-group">
+                        <label>Пол</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="gender" value="male" class="radio-input">
+                                <span class="radio-custom">Мужской</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="gender" value="female" class="radio-input">
+                                <span class="radio-custom">Женский</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-next" onclick="nextStep()">Далее</button>
+                </div>
+
+                <!-- Шаг 2: Рост и вес -->
+                <div class="onboarding-step" data-step="2">
+                    <h2 class="screen-title">Физические параметры</h2>
+                    <div class="form-group">
+                        <label for="height">Рост (см)</label>
+                        <div class="slider-value" id="heightValue">175 см</div>
+                        <input type="range" id="height" class="slider" min="120" max="220" value="175" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="weight">Вес (кг)</label>
+                        <div class="slider-value" id="weightValue">70.0 кг</div>
+                        <input type="range" id="weight" class="slider" min="40" max="200" value="70" step="0.5">
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="prevStep()">Назад</button>
+                        <button class="btn btn-primary btn-next" onclick="nextStep()">Далее</button>
+                    </div>
+                </div>
+
+                <!-- Шаг 3: Уровень активности -->
+                <div class="onboarding-step" data-step="3">
+                    <h2 class="screen-title">Уровень активности</h2>
+                    <div class="form-group">
+                        <div class="option-cards">
+                            <label class="option-card">
+                                <input type="radio" name="activity" value="low" class="radio-input">
+                                <div class="card-content">
+                                    <div class="card-icon">🏃</div>
+                                    <div class="card-title">Низкий</div>
+                                    <div class="card-desc">Минимальные физические нагрузки</div>
+                                </div>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="activity" value="moderate" class="radio-input">
+                                <div class="card-content">
+                                    <div class="card-icon">🏋️</div>
+                                    <div class="card-title">Средний</div>
+                                    <div class="card-desc">Тренировки 3-4 раза в неделю</div>
+                                </div>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="activity" value="high" class="radio-input">
+                                <div class="card-content">
+                                    <div class="card-icon">💪</div>
+                                    <div class="card-title">Высокий</div>
+                                    <div class="card-desc">Интенсивные тренировки 5+ раз в неделю</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="prevStep()">Назад</button>
+                        <button class="btn btn-primary btn-next" onclick="nextStep()">Далее</button>
+                    </div>
+                </div>
+
+                <!-- Шаг 4: Цель -->
+                <div class="onboarding-step" data-step="4">
+                    <h2 class="screen-title">Ваша цель</h2>
+                    <div class="form-group">
+                        <div class="option-cards">
+                            <label class="option-card">
+                                <input type="radio" name="goal" value="lose" class="radio-input">
+                                <div class="card-content">
+                                    <div class="card-icon">📉</div>
+                                    <div class="card-title">Снижение веса</div>
+                                    <div class="card-desc">Создать дефицит калорий</div>
+                                </div>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="goal" value="maintain" class="radio-input">
+                                <div class="card-content">
+                                    <div class="card-icon">⚖️</div>
+                                    <div class="card-title">Поддержание веса</div>
+                                    <div class="card-desc">Сохранить текущий вес</div>
+                                </div>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="goal" value="gain" class="radio-input">
+                                <div class="card-content">
+                                    <div class="card-icon">📈</div>
+                                    <div class="card-title">Набор массы</div>
+                                    <div class="card-desc">Увеличить мышечную массу</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="prevStep()">Назад</button>
+                        <button class="btn btn-primary btn-next" onclick="if(typeof completeOnboardingNew !== 'undefined') { completeOnboardingNew(); } else if(typeof completeOnboarding !== 'undefined') { completeOnboarding(); }">Завершить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран профиля -->
+        <div id="profile-screen" class="screen">
+            <div class="container">
+                <div class="profile-header">
+                    <h2 id="user-name" class="profile-name"></h2>
+                </div>
+
+                <!-- Расширенный Dashboard: калории сегодня -->
+                <div class="stats-card">
+                    <div class="stat-item">
+                        <div class="stat-label">Рекомендуемые калории</div>
+                        <div class="stat-value" id="calories-value">0</div>
+                        <div class="stat-unit">ккал/день</div>
+                    </div>
+                </div>
+
+                <!-- Блок "Сегодня употреблено" -->
+                <div class="today-stats-card">
+                    <div class="today-header">
+                        <h3>Сегодня</h3>
+                        <span class="today-date" id="today-date"></span>
+                    </div>
+                    <div class="calories-progress">
+                        <div class="calories-consumed">
+                            <span class="consumed-value" id="consumed-calories">0</span>
+                            <span class="consumed-label">из <span id="target-calories">0</span> ккал</span>
+                        </div>
+                        <div class="progress-bar-calories">
+                            <div class="progress-fill-calories" id="calories-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Макросы (donut chart) -->
+                <div class="macros-card">
+                    <h3 class="macros-title">Макронутриенты</h3>
+                    <div class="macros-container">
+                        <div class="macros-chart">
+                            <canvas id="macros-chart"></canvas>
+                        </div>
+                        <div class="macros-legend">
+                            <div class="macro-item">
+                                <span class="macro-color" style="background: #5DADE2;"></span>
+                                <span class="macro-label">Белки</span>
+                                <span class="macro-value" id="protein-value">0г</span>
+                            </div>
+                            <div class="macro-item">
+                                <span class="macro-color" style="background: #82E0AA;"></span>
+                                <span class="macro-label">Углеводы</span>
+                                <span class="macro-value" id="carbs-value">0г</span>
+                            </div>
+                            <div class="macro-item">
+                                <span class="macro-color" style="background: #F39C12;"></span>
+                                <span class="macro-label">Жиры</span>
+                                <span class="macro-value" id="fat-value">0г</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <div class="info-row">
+                        <span class="info-label">Возраст</span>
+                        <span class="info-value" id="profile-age">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Пол</span>
+                        <span class="info-value" id="profile-gender">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Рост</span>
+                        <span class="info-value" id="profile-height">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Вес</span>
+                        <span class="info-value" id="profile-weight">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Активность</span>
+                        <span class="info-value" id="profile-activity">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Цель</span>
+                        <span class="info-value" id="profile-goal">-</span>
+                    </div>
+                </div>
+
+                <!-- Быстрые кнопки -->
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-add-food" onclick="showAddFoodScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14m7-7H5"></path>
+                        </svg>
+                        Добавить приём пищи
+                    </button>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-icon" onclick="showDiaryScreen()" title="Дневник">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"></path>
+                        </svg>
+                        Дневник
+                    </button>
+                    <button class="btn btn-icon" onclick="showHistoryScreen()" title="История">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3v18h18M7 16l4-4 4 4 6-6"></path>
+                        </svg>
+                        История
+                    </button>
+                    <button class="btn btn-icon" onclick="showActivityScreen()" title="Тренировки">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"></path>
+                        </svg>
+                        Тренировки
+                    </button>
+                    <button class="btn btn-icon" onclick="showSettingsScreen()" title="Настройки">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"></path>
+                        </svg>
+                        Настройки
+                    </button>
+                    <button class="btn btn-icon" onclick="recalculateCalories()" title="Пересчитать">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 4v6h6"></path>
+                            <path d="M23 20v-6h-6"></path>
+                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                        </svg>
+                        Пересчитать
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран добавления еды -->
+        <div id="add-food-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Добавить приём пищи</h2>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="food-search" class="input" placeholder="Поиск продукта..." oninput="searchProducts(this.value)">
+                </div>
+
+                <div id="products-list" class="products-list">
+                    <!-- Список продуктов будет загружен динамически -->
+                </div>
+
+                <div id="add-custom-product" class="add-custom-section" style="display: none;">
+                    <button class="btn btn-secondary" onclick="showCustomProductForm()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14m7-7H5"></path>
+                        </svg>
+                        Добавить свой продукт
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Форма добавления своего продукта -->
+        <div id="custom-product-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showAddFoodScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Новый продукт</h2>
+                </div>
+
+                <div class="form-group">
+                    <label for="custom-name">Название</label>
+                    <input type="text" id="custom-name" class="input" placeholder="Название продукта">
+                </div>
+                <div class="form-group">
+                    <label for="custom-kcal">Калории (на 100г)</label>
+                    <input type="number" id="custom-kcal" class="input" placeholder="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="custom-protein">Белки (г на 100г)</label>
+                    <input type="number" id="custom-protein" class="input" placeholder="0" min="0" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="custom-fat">Жиры (г на 100г)</label>
+                    <input type="number" id="custom-fat" class="input" placeholder="0" min="0" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="custom-carbs">Углеводы (г на 100г)</label>
+                    <input type="number" id="custom-carbs" class="input" placeholder="0" min="0" step="0.1">
+                </div>
+
+                <button class="btn btn-primary" onclick="saveCustomProduct()">Сохранить</button>
+            </div>
+        </div>
+
+        <!-- Экран выбора количества продукта -->
+        <div id="product-amount-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showAddFoodScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title" id="product-amount-title">Количество</h2>
+                </div>
+
+                <div class="product-info-card">
+                    <h3 id="selected-product-name"></h3>
+                    <div class="product-macros-preview">
+                        <span id="preview-kcal">0 ккал</span>
+                        <span id="preview-protein">0г белка</span>
+                        <span id="preview-fat">0г жиров</span>
+                        <span id="preview-carbs">0г углеводов</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="product-grams">Вес (граммы)</label>
+                    <input type="number" id="product-grams" class="input" placeholder="100" min="1" value="100" oninput="updateProductPreview()">
+                </div>
+
+                <div class="quick-amounts">
+                    <button class="btn-quick" onclick="setQuickAmount(50)">50г</button>
+                    <button class="btn-quick" onclick="setQuickAmount(100)">100г</button>
+                    <button class="btn-quick" onclick="setQuickAmount(150)">150г</button>
+                    <button class="btn-quick" onclick="setQuickAmount(200)">200г</button>
+                </div>
+
+                <button class="btn btn-primary" onclick="addFoodToDiary()">Добавить в день</button>
+            </div>
+        </div>
+
+        <!-- Экран дневника питания -->
+        <div id="diary-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Дневник питания</h2>
+                    <button class="btn-icon-small" onclick="changeDiaryDate(-1)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6"></path>
+                        </svg>
+                    </button>
+                    <span class="diary-date" id="diary-date"></span>
+                    <button class="btn-icon-small" onclick="changeDiaryDate(1)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="diary-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Калории</span>
+                        <span class="summary-value" id="diary-total-kcal">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Белки</span>
+                        <span class="summary-value" id="diary-total-protein">0г</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Жиры</span>
+                        <span class="summary-value" id="diary-total-fat">0г</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Углеводы</span>
+                        <span class="summary-value" id="diary-total-carbs">0г</span>
+                    </div>
+                </div>
+
+                <div id="diary-meals" class="diary-meals">
+                    <!-- Приёмы пищи будут загружены динамически -->
+                </div>
+
+                <button class="btn btn-primary btn-fab" onclick="showAddFoodScreen()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14m7-7H5"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран истории и трендов -->
+        <div id="history-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">История</h2>
+                </div>
+
+                <div class="history-periods">
+                    <button class="btn-period active" onclick="setHistoryPeriod(7)">7 дней</button>
+                    <button class="btn-period" onclick="setHistoryPeriod(14)">14 дней</button>
+                    <button class="btn-period" onclick="setHistoryPeriod(30)">30 дней</button>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="calories-chart"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="weight-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран тренировок -->
+        <div id="activity-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Тренировки</h2>
+                </div>
+
+                <div class="activity-list" id="activity-list">
+                    <!-- Список активностей будет загружен динамически -->
+                </div>
+
+                <button class="btn btn-primary" onclick="showAddActivityForm()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14m7-7H5"></path>
+                    </svg>
+                    Добавить активность
+                </button>
+            </div>
+        </div>
+
+        <!-- Форма добавления активности -->
+        <div id="add-activity-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showActivityScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Новая тренировка</h2>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity-name">Вид активности</label>
+                    <select id="activity-name" class="input" onchange="updateActivityCalories()">
+                        <option value="">Выберите активность</option>
+                        <option value="running" data-met="11.5">Бег (10 км/ч)</option>
+                        <option value="running-fast" data-met="16">Бег (15 км/ч)</option>
+                        <option value="walking" data-met="3.5">Ходьба</option>
+                        <option value="cycling" data-met="8">Велосипед</option>
+                        <option value="swimming" data-met="8">Плавание</option>
+                        <option value="gym" data-met="5">Тренажёрный зал</option>
+                        <option value="yoga" data-met="3">Йога</option>
+                        <option value="pilates" data-met="3">Пилатес</option>
+                        <option value="dancing" data-met="6">Танцы</option>
+                        <option value="basketball" data-met="8">Баскетбол</option>
+                        <option value="football" data-met="7">Футбол</option>
+                        <option value="tennis" data-met="7">Теннис</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity-duration">Длительность (минуты)</label>
+                    <input type="number" id="activity-duration" class="input" placeholder="30" min="1" value="30" oninput="updateActivityCalories()">
+                </div>
+
+                <div class="activity-preview">
+                    <div class="preview-calories">
+                        Сожжено: <span id="activity-calories">0</span> ккал
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="add-to-diary" checked>
+                        <span>Учесть калории в дневнике</span>
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveActivity()">Сохранить</button>
+            </div>
+        </div>
+
+        <!-- Экран настроек -->
+        <div id="settings-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showProfileScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Настройки</h2>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Профиль</h3>
+                    <button class="btn btn-secondary" onclick="editProfile()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        Редактировать профиль
+                    </button>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Данные</h3>
+                    <button class="btn btn-secondary" onclick="exportData()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Экспорт данных (CSV)
+                    </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Импорт данных (CSV)
+                    </button>
+                    <input type="file" id="import-file" accept=".csv" style="display: none;" onchange="importData(event)">
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Единицы измерения</h3>
+                    <div class="form-group">
+                        <label class="radio-label">
+                            <input type="radio" name="units" value="metric" checked class="radio-input" onchange="setUnits('metric')">
+                            <span class="radio-custom">Метрические (кг, см)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="units" value="imperial" class="radio-input" onchange="setUnits('imperial')">
+                            <span class="radio-custom">Имперские (фунты, дюймы)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">О приложении</h3>
+                    <div class="info-text">
+                        <p>Klyro v1.0</p>
+                        <p>Персональный помощник по питанию и фитнесу</p>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="section-title">Отладка</h3>
+                    <button class="btn btn-secondary" onclick="showDebugScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                        Показать логи и ошибки
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearDebugLogs()">
+                        Очистить логи
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Экран отладки -->
+        <div id="debug-screen" class="screen">
+            <div class="container">
+                <div class="screen-header">
+                    <button class="btn-back" onclick="showSettingsScreen()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 class="screen-title">Логи и ошибки</h2>
+                    <button class="btn-icon-small" onclick="exportDebugLogs()" title="Экспорт">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="debug-controls">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-auto-scroll" checked>
+                        <span>Автопрокрутка</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-show-info">
+                        <span>Показывать INFO</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-show-warn" checked>
+                        <span>Показывать WARN</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="debug-show-error" checked>
+                        <span>Показывать ERROR</span>
+                    </label>
+                </div>
+
+                <div id="debug-logs" class="debug-logs">
+                    <div class="debug-log-entry info">Логи загрузятся здесь...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Новая модульная архитектура -->
+    <!-- Порядок загрузки важен! -->
+    <script src="js/storage/storage.js?v=3"></script>
+    <script src="js/utils/helpers.js?v=3"></script>
+    <script src="js/utils/calculations.js?v=3"></script>
+    <script src="js/utils/AppContext.js?v=3"></script>
+    <script src="js/components/Navigation.js?v=3"></script>
+    <script src="js/components/FAB.js?v=3"></script>
+    <script src="js/components/ExportImport.js?v=3"></script>
+    <script src="js/screens/DashboardScreen.js?v=3"></script>
+    <script src="js/screens/DiaryScreen.js?v=3"></script>
+    <script src="js/screens/AddFoodScreen.js?v=3"></script>
+    <script src="js/screens/ActivityScreen.js?v=3"></script>
+    <script src="js/screens/ProfileScreen.js?v=3"></script>
+    <script src="js/screens/OnboardingScreen.js?v=3"></script>
+    <script src="js/app.js?v=3"></script>
+    
+    <!-- Старый app.js для обратной совместимости (можно удалить после полной миграции) -->
+    <!--
+    <script>
+        // Принудительная загрузка app.js с timestamp для обхода кэша
+        (function() {
+            const script = document.createElement('script');
+            script.src = 'app.js?v=' + Date.now();
+            script.async = false;
+            document.head.appendChild(script);
+        })();
+    </script>
+    -->
+
+    <script>
+        // КРИТИЧНО: Скрываем только loading screen СРАЗУ при загрузке HTML
+        // НЕ скрываем динамически создаваемые экраны - они будут созданы позже
+        (function() {
+            try {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.style.visibility = 'hidden';
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.classList.remove('active');
+                    console.log('[HTML] Loading screen hidden immediately in HTML');
+                }
+                
+                // Скрываем только статические экраны из HTML (auth, onboarding, profile и т.д.)
+                // НЕ трогаем динамически создаваемые экраны (dashboard-screen и т.д.)
+                const staticScreens = ['auth-screen', 'onboarding-screen', 'profile-screen', 'add-food-screen', 
+                                      'custom-product-screen', 'product-amount-screen', 'diary-screen', 
+                                      'history-screen', 'activity-screen', 'add-activity-screen', 
+                                      'settings-screen', 'debug-screen'];
+                
+                staticScreens.forEach(screenId => {
+                    const screen = document.getElementById(screenId);
+                    if (screen) {
+                        screen.style.display = 'none';
+                        screen.style.visibility = 'hidden';
+                        screen.style.opacity = '0';
+                        screen.classList.remove('active');
+                    }
+                });
+            } catch (e) {
+                console.error('[HTML] Error hiding screens:', e);
+            }
+        })();
+    </script>
+</body>
+</html>
+

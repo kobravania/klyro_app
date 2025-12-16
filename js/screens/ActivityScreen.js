@@ -24,8 +24,8 @@ class ActivityScreen {
                             Функция отслеживания активности находится в разработке.
                             Здесь будет возможность добавлять тренировки и учитывать их в расчёте калорий.
                         </p>
-                    </div>
-                    
+            </div>
+            
                     <div class="card">
                         <h3 class="section-title">Рекомендации</h3>
                         <div style="line-height: 1.6; color: var(--text-secondary);">

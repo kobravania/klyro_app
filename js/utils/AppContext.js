@@ -29,6 +29,13 @@ class AppContext {
      * Инициализация - загрузка данных из хранилища
      */
     async init() {
+        await this.loadData();
+    }
+
+    /**
+     * Загрузка всех данных из хранилища
+     */
+    async loadData() {
         // Загружаем данные пользователя
         const userDataStr = await storage.getItem('klyro_user_data');
         if (userDataStr) {

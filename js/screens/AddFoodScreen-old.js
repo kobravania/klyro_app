@@ -1,6 +1,5 @@
 /**
- * AddFoodScreen - Bottom Sheet для добавления еды
- * Ключевой экран приложения
+ * Экран добавления продукта - Bottom Sheet в стиле iOS
  */
 
 class AddFoodScreen {
@@ -30,12 +29,12 @@ class AddFoodScreen {
             <div class="bottom-sheet-handle"></div>
             <div class="bottom-sheet-header">
                 <h2 class="bottom-sheet-title">Добавить продукт</h2>
-                <button class="btn-icon" id="add-food-close" aria-label="Закрыть">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="btn-icon" id="add-food-close">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
+                            </svg>
+                        </button>
             </div>
             <div class="bottom-sheet-content">
                 <div class="search-wrapper">
@@ -48,29 +47,29 @@ class AddFoodScreen {
                 
                 <div id="products-list" class="products-list">
                     <p class="empty-state">Загрузка продуктов...</p>
-                </div>
-                
+                    </div>
+                    
                 <div id="product-amount-section" class="product-amount-section" style="display: none;">
                     <div class="card">
-                        <div class="selected-product-info" style="margin-bottom: var(--spacing-lg);">
+                        <div class="selected-product-info">
                             <div class="product-name" id="selected-product-name" style="font-size: 20px; font-weight: 600; margin-bottom: var(--spacing-sm);"></div>
                             <div class="product-macros" id="selected-product-macros" style="display: flex; gap: var(--spacing-md); font-size: 14px; color: var(--text-secondary);"></div>
-                        </div>
-                        
+                    </div>
+                    
                         <div class="amount-input-group" style="margin-top: var(--spacing-lg);">
-                            <label class="input-label" style="display: block; margin-bottom: var(--spacing-sm); font-size: 15px; color: var(--text-secondary);">Количество (граммы)</label>
+                            <label class="input-label">Количество (граммы)</label>
                             <input type="number" 
                                    id="product-grams" 
                                    class="input" 
-                                   value="100" 
-                                   min="1" 
-                                   step="1"
-                                   style="font-size: 24px; text-align: center; font-family: var(--font-mono); font-weight: 600;">
+                                value="100" 
+                                min="1" 
+                                step="1"
+                                   style="font-size: 24px; text-align: center; font-family: var(--font-mono);">
                         </div>
                         
                         <div class="calculated-macros" id="calculated-macros" style="margin-top: var(--spacing-lg); padding: var(--spacing-md); background: var(--bg-elevated); border-radius: var(--radius-md);"></div>
                         
-                        <button class="btn btn-primary btn-block" id="add-to-diary-btn" style="margin-top: var(--spacing-lg); min-height: 50px; font-size: 18px; font-weight: 600;">
+                        <button class="btn btn-primary btn-block" id="add-to-diary-btn" style="margin-top: var(--spacing-lg);">
                             Добавить в дневник
                         </button>
                     </div>
@@ -125,7 +124,7 @@ class AddFoodScreen {
         const sheet = document.getElementById('add-food-sheet');
         const overlay = document.getElementById('add-food-overlay');
         const searchInput = document.getElementById('product-search');
-
+            
         if (!sheet || !overlay) return;
 
         // Загружаем продукты
@@ -149,7 +148,7 @@ class AddFoodScreen {
                 searchInput.focus();
             }
         }, 300);
-
+            
         this.updateProductsList();
         this.hapticFeedback('light');
     }
@@ -168,20 +167,27 @@ class AddFoodScreen {
 
     updateProductsList() {
         const listEl = document.getElementById('products-list');
-        if (!listEl) return;
+        if (!listEl) {
+            console.error('[ADDFOOD] products-list element not found!');
+            return;
+        }
 
         let products = appContext.productsDatabase || [];
+        
+        console.log('[ADDFOOD] Products in database:', products.length);
         
         if (this.searchQuery) {
             const query = this.searchQuery.toLowerCase();
             products = products.filter(p => 
                 (p.name || '').toLowerCase().includes(query)
             );
+            console.log('[ADDFOOD] Filtered products:', products.length);
         }
 
         if (products.length === 0) {
             if (appContext.productsDatabase.length === 0) {
                 listEl.innerHTML = '<p class="empty-state">Загрузка продуктов...</p>';
+                // Пробуем загрузить еще раз
                 appContext.loadProducts().then(() => {
                     this.updateProductsList();
                 });
@@ -203,24 +209,29 @@ class AddFoodScreen {
             </div>
         `).join('');
 
-        // Обработчики выбора продукта через делегирование
+        // Обработчики выбора продукта - используем делегирование событий
         listEl.addEventListener('click', (e) => {
             const productItem = e.target.closest('.product-item');
             if (productItem) {
                 const productId = productItem.dataset.productId;
+                console.log('[ADDFOOD] Product clicked:', productId);
                 this.selectProduct(productId);
-            }
+    }
         });
     }
 
     selectProduct(productId) {
+        console.log('[ADDFOOD] Selecting product:', productId);
         const product = appContext.findProduct(productId);
         if (!product) {
+            console.error('[ADDFOOD] Product not found:', productId);
+            console.log('[ADDFOOD] Available products:', appContext.productsDatabase.length);
             // Пробуем найти по имени
             const productByName = appContext.productsDatabase.find(p => 
                 String(p.id) === String(productId) || p.name === productId
             );
             if (productByName) {
+                console.log('[ADDFOOD] Found by name:', productByName);
                 this.selectedProduct = productByName;
             } else {
                 Helpers.showNotification('Продукт не найден', 'error');
@@ -239,13 +250,13 @@ class AddFoodScreen {
             amountSection.style.display = 'block';
             amountSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        if (nameEl) nameEl.textContent = this.selectedProduct.name || 'Продукт';
+        if (nameEl) nameEl.textContent = product.name || 'Продукт';
         if (macrosEl) {
             macrosEl.innerHTML = `
-                <span>${Math.round(this.selectedProduct.kcal || 0)} ккал</span>
-                <span>Б: ${Math.round(this.selectedProduct.protein || 0)}г</span>
-                <span>Ж: ${Math.round(this.selectedProduct.fat || 0)}г</span>
-                <span>У: ${Math.round(this.selectedProduct.carbs || 0)}г</span>
+                <span>${Math.round(product.kcal || 0)} ккал</span>
+                <span>Б: ${Math.round(product.protein || 0)}г</span>
+                <span>Ж: ${Math.round(product.fat || 0)}г</span>
+                <span>У: ${Math.round(product.carbs || 0)}г</span>
             `;
         }
         if (searchInput) searchInput.blur();
@@ -256,7 +267,7 @@ class AddFoodScreen {
 
     updateCalculatedMacros() {
         if (!this.selectedProduct) return;
-
+        
         const gramsInput = document.getElementById('product-grams');
         const calculatedEl = document.getElementById('calculated-macros');
         
@@ -297,13 +308,13 @@ class AddFoodScreen {
             Helpers.showNotification('Выберите продукт', 'error');
             return;
         }
-
+        
         const gramsInput = document.getElementById('product-grams');
         if (!gramsInput) return;
 
         const grams = parseFloat(gramsInput.value) || 100;
         const multiplier = grams / 100;
-
+        
         const entry = {
             id: Date.now().toString(),
             name: this.selectedProduct.name || 'Продукт',
@@ -314,10 +325,10 @@ class AddFoodScreen {
             carbs: (this.selectedProduct.carbs || 0) * multiplier,
             timestamp: new Date().toISOString()
         };
-
+        
         const today = Helpers.getToday();
         await appContext.addDiaryEntry(today, entry);
-
+        
         this.hapticFeedback('medium');
         Helpers.showNotification('Продукт добавлен!', 'success');
         this.hide();
@@ -334,6 +345,3 @@ const addFoodScreen = new AddFoodScreen();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AddFoodScreen;
 }
-
-window.addFoodScreen = addFoodScreen;
-

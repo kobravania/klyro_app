@@ -24,10 +24,10 @@ class ProfileScreen {
                         <div style="text-align: center; margin-bottom: var(--spacing-lg);">
                             <div class="profile-avatar" style="width: 80px; height: 80px; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--spacing-md); color: var(--text-secondary);">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px;">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="12" cy="7" r="4"/>
-                                </svg>
-                            </div>
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                        </div>
                             <div class="profile-name" id="profile-name" style="font-size: 24px; font-weight: 600; margin-bottom: var(--spacing-lg);">Пользователь</div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md);">
                                 <div>
@@ -67,7 +67,7 @@ class ProfileScreen {
                         <div class="profile-row">
                             <span class="profile-label">Цель</span>
                             <span class="profile-value" id="profile-goal">-</span>
-                        </div>
+                    </div>
                         <button class="btn btn-secondary btn-block" id="edit-profile-btn" style="margin-top: var(--spacing-md);">
                             Редактировать профиль
                         </button>
@@ -81,9 +81,9 @@ class ProfileScreen {
                                 <option value="metric">Метрические</option>
                                 <option value="imperial">Имперские</option>
                             </select>
+                            </div>
                         </div>
-                    </div>
-                    
+                        
                     <div class="card" id="export-import-section">
                         <!-- Экспорт/импорт будет добавлен через компонент -->
                     </div>
@@ -176,7 +176,7 @@ class ProfileScreen {
     update() {
         const userData = appContext.getUserData();
         if (!userData) return;
-
+        
         // Имя
         const nameEl = document.getElementById('profile-name');
         if (nameEl) {
