@@ -139,8 +139,21 @@ class AppContext {
      * Получить целевые калории
      */
     getGoalCalories() {
-        if (!this.hasCompleteProfile()) return 0;
-        return Calculations.calculateCalories(this.userData);
+        if (!this.hasCompleteProfile()) {
+            console.warn('[CONTEXT] getGoalCalories: профиль не полный');
+            return 0;
+        }
+        if (!this.userData) {
+            console.warn('[CONTEXT] getGoalCalories: userData отсутствует');
+            return 0;
+        }
+        if (typeof Calculations === 'undefined' || !Calculations.calculateCalories) {
+            console.error('[CONTEXT] getGoalCalories: Calculations не загружен!');
+            return 0;
+        }
+        const calories = Calculations.calculateCalories(this.userData);
+        console.log('[CONTEXT] getGoalCalories result:', calories);
+        return calories;
     }
 
     /**
@@ -148,7 +161,14 @@ class AppContext {
      */
     getDayProgress(date) {
         const entries = this.getDiaryForDate(date);
-        return Calculations.calculateDayProgress(entries);
+        console.log('[CONTEXT] getDayProgress for', date, 'entries:', entries.length);
+        if (typeof Calculations === 'undefined' || !Calculations.calculateDayProgress) {
+            console.error('[CONTEXT] getDayProgress: Calculations не загружен!');
+            return { kcal: 0, protein: 0, fat: 0, carbs: 0 };
+        }
+        const progress = Calculations.calculateDayProgress(entries);
+        console.log('[CONTEXT] getDayProgress result:', progress);
+        return progress;
     }
 
     /**
