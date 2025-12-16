@@ -13,7 +13,10 @@ class OnboardingScreen {
 
     init() {
         this.createHTML();
-        this.attachHandlers();
+        // Ждем, пока DOM обновится, затем привязываем обработчики
+        setTimeout(() => {
+            this.attachHandlers();
+        }, 100);
     }
 
     createHTML() {

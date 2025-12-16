@@ -305,7 +305,19 @@ h3 {
     -webkit-tap-highlight-color: transparent;
     box-sizing: border-box;
     display: block;
-    margin: 0 auto;
+    margin: 0;
+}
+
+/* Специальные стили для input[type="date"] */
+input[type="date"] {
+    width: 100% !important;
+    text-align: center;
+    text-align-last: center;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .input:focus {
