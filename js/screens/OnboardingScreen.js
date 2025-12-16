@@ -40,12 +40,12 @@ class OnboardingScreen {
                     <!-- Шаг 1: Дата рождения -->
                     <div class="onboarding-step active" data-step="1">
                         <div class="card" style="margin-bottom: var(--spacing-md);">
-                            <h3 class="section-title" style="margin-bottom: var(--spacing-lg);">Дата рождения</h3>
+                            <h3 class="section-title" style="margin-bottom: var(--spacing-lg); text-align: center;">Дата рождения</h3>
                             <input type="date" 
                                    id="onboarding-date" 
                                    class="input" 
                                    max="${new Date().toISOString().split('T')[0]}"
-                                   style="font-size: 18px; text-align: center; margin-bottom: var(--spacing-sm);">
+                                   style="font-size: 18px; text-align: center; margin-bottom: var(--spacing-sm); width: 100%; display: block;">
                             <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin: 0;">
                                 Нам нужна дата рождения для расчета возраста
                             </p>
@@ -363,6 +363,7 @@ class OnboardingScreen {
     async completeOnboarding() {
         try {
             console.log('[ONBOARDING] Завершение онбординга, данные формы:', this.formData);
+            console.log('[ONBOARDING] Тип данных:', typeof this.formData, Array.isArray(this.formData));
             
             // Рассчитываем возраст
             if (this.formData.dateOfBirth) {
@@ -391,9 +392,23 @@ class OnboardingScreen {
             }
 
             console.log('[ONBOARDING] Все поля заполнены, сохраняем данные...');
+            console.log('[ONBOARDING] Данные для сохранения:', JSON.stringify(this.formData, null, 2));
+            
+            // Создаем чистый объект для сохранения (без прототипов)
+            const cleanData = {
+                dateOfBirth: this.formData.dateOfBirth,
+                age: this.formData.age,
+                gender: this.formData.gender,
+                height: Number(this.formData.height),
+                weight: Number(this.formData.weight),
+                activity: this.formData.activity,
+                goal: this.formData.goal
+            };
+            
+            console.log('[ONBOARDING] Чистые данные для сохранения:', cleanData);
             
             // Сохраняем данные
-            await appContext.setUserData(this.formData);
+            await appContext.setUserData(cleanData);
             
             // Проверяем, что данные сохранились
             const savedData = appContext.getUserData();
@@ -403,7 +418,16 @@ class OnboardingScreen {
             // Дополнительно проверяем localStorage напрямую
             const storageKey = storage.getStorageKey('klyro_user_data');
             const localStorageData = localStorage.getItem(storageKey);
-            console.log('[ONBOARDING] Данные в localStorage:', localStorageData ? JSON.parse(localStorageData) : null);
+            if (localStorageData) {
+                try {
+                    const parsed = JSON.parse(localStorageData);
+                    console.log('[ONBOARDING] Данные в localStorage:', parsed);
+                } catch (e) {
+                    console.error('[ONBOARDING] Ошибка парсинга localStorage:', e);
+                }
+            } else {
+                console.warn('[ONBOARDING] Данные не найдены в localStorage!');
+            }
 
             this.hapticFeedback('medium');
             Helpers.showNotification('Профиль сохранен!', 'success');
@@ -419,6 +443,7 @@ class OnboardingScreen {
         } catch (error) {
             console.error('[ONBOARDING] Error:', error);
             console.error('[ONBOARDING] Error stack:', error.stack);
+            console.error('[ONBOARDING] Error message:', error.message);
             Helpers.showNotification('Ошибка при сохранении данных: ' + error.message, 'error');
         }
     }

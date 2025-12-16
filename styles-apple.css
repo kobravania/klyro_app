@@ -303,6 +303,9 @@ h3 {
     color: var(--text-primary);
     transition: all var(--transition-fast);
     -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+    display: block;
+    margin: 0 auto;
 }
 
 .input:focus {
