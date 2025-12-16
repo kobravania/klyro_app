@@ -102,14 +102,20 @@ class StorageManager {
         } else if (typeof value === 'string') {
             // Если это строка, проверяем, валидный ли это JSON
             try {
-                JSON.parse(value);
+                const parsed = JSON.parse(value);
                 // Это валидный JSON, используем как есть
                 valueStr = value;
                 console.log('[STORAGE] Строка уже является валидным JSON');
             } catch (e) {
                 // Это не JSON, делаем stringify (оборачиваем в JSON)
-                valueStr = JSON.stringify(value);
-                console.log('[STORAGE] Строка не JSON, обернули в JSON.stringify');
+                // Но только если это не пустая строка
+                if (value.trim() === '') {
+                    valueStr = '';
+                    console.log('[STORAGE] Пустая строка, сохраняем как есть');
+                } else {
+                    valueStr = JSON.stringify(value);
+                    console.log('[STORAGE] Строка не JSON, обернули в JSON.stringify');
+                }
             }
         } else {
             // Для объектов и массивов всегда делаем stringify

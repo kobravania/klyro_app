@@ -696,13 +696,40 @@ class OnboardingScreen {
             
             // Сохраняем данные
             console.log('[ONBOARDING] Вызываем appContext.setUserData...');
+            console.log('[ONBOARDING] cleanData для сохранения:', cleanData);
+            console.log('[ONBOARDING] cleanData как JSON:', JSON.stringify(cleanData));
+            
             try {
-                await appContext.setUserData(cleanData);
-                console.log('[ONBOARDING] ✅ appContext.setUserData выполнен успешно');
+                // Пробуем сохранить напрямую через storage, минуя AppContext
+                // Это поможет понять, где именно возникает ошибка
+                console.log('[ONBOARDING] Пробуем сохранить через storage напрямую...');
+                await storage.setItem('klyro_user_data', cleanData);
+                console.log('[ONBOARDING] ✅ Данные сохранены через storage');
+                
+                // Теперь обновляем AppContext
+                appContext.userData = cleanData;
+                appContext.notifyListeners('userData', cleanData);
+                console.log('[ONBOARDING] ✅ AppContext обновлен');
+                
             } catch (saveError) {
-                console.error('[ONBOARDING] ❌ Ошибка при вызове appContext.setUserData:', saveError);
+                console.error('[ONBOARDING] ❌ Ошибка при сохранении:', saveError);
+                console.error('[ONBOARDING] Error name:', saveError.name);
+                console.error('[ONBOARDING] Error message:', saveError.message);
                 console.error('[ONBOARDING] Stack trace:', saveError.stack);
-                this.showError('Ошибка при сохранении данных. Попробуйте еще раз.');
+                
+                // Показываем более детальное сообщение об ошибке
+                let errorMsg = 'Ошибка при сохранении данных';
+                if (saveError.message.includes('JSON')) {
+                    errorMsg = 'Ошибка при обработке данных. Попробуйте еще раз или перезагрузите приложение.';
+                } else if (saveError.message) {
+                    errorMsg = 'Ошибка: ' + saveError.message;
+                }
+                
+                this.showError(errorMsg);
+                if (nextBtn) {
+                    nextBtn.disabled = false;
+                    nextBtn.textContent = 'Завершить';
+                }
                 throw saveError;
             }
             
