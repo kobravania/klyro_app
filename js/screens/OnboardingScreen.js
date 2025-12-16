@@ -1,30 +1,280 @@
 /**
- * Экран онбординга (заполнение профиля)
- * Использует существующую форму из index.html
+ * OnboardingScreen - форма заполнения профиля
+ * Минималистичная форма в стиле Apple
  */
 
 class OnboardingScreen {
     constructor() {
+        this.currentStep = 1;
+        this.totalSteps = 4;
+        this.formData = {};
         this.init();
     }
 
     init() {
-        // Используем существующий экран онбординга из HTML
-        // Просто управляем его показом/скрытием
+        this.createHTML();
+        this.attachHandlers();
+    }
+
+    createHTML() {
+        const screenHTML = `
+            <div id="onboarding-screen" class="screen">
+                <div class="screen-content">
+                    <div class="onboarding-header">
+                        <h1 class="screen-title">Добро пожаловать в Klyro</h1>
+                        <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
+                            Заполните профиль для расчета целевых калорий
+                        </p>
+                    </div>
+
+                    <!-- Прогресс -->
+                    <div class="onboarding-progress" style="margin-bottom: var(--spacing-xl);">
+                        <div class="progress-bar" style="height: 4px; background: var(--bg-surface); border-radius: var(--radius-full); overflow: hidden;">
+                            <div class="progress-fill" id="onboarding-progress" style="height: 100%; background: var(--accent); transition: width var(--transition-base); width: 25%;"></div>
+                        </div>
+                        <div style="text-align: center; margin-top: var(--spacing-sm); font-size: 13px; color: var(--text-secondary);">
+                            Шаг <span id="onboarding-step-number">1</span> из ${this.totalSteps}
+                        </div>
+                    </div>
+
+                    <!-- Шаг 1: Дата рождения -->
+                    <div class="onboarding-step active" data-step="1">
+                        <div class="card">
+                            <h3 class="section-title">Дата рождения</h3>
+                            <input type="date" 
+                                   id="onboarding-date" 
+                                   class="input" 
+                                   max="${new Date().toISOString().split('T')[0]}"
+                                   style="font-size: 18px; text-align: center;">
+                            <p style="font-size: 13px; color: var(--text-secondary); margin-top: var(--spacing-sm); text-align: center;">
+                                Нам нужна дата рождения для расчета возраста
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 2: Пол -->
+                    <div class="onboarding-step" data-step="2" style="display: none;">
+                        <div class="card">
+                            <h3 class="section-title">Пол</h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md);">
+                                <button class="btn btn-secondary" data-gender="male" id="gender-male" style="min-height: 60px;">
+                                    <div style="font-size: 24px; margin-bottom: var(--spacing-xs);">👨</div>
+                                    <div>Мужской</div>
+                                </button>
+                                <button class="btn btn-secondary" data-gender="female" id="gender-female" style="min-height: 60px;">
+                                    <div style="font-size: 24px; margin-bottom: var(--spacing-xs);">👩</div>
+                                    <div>Женский</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 3: Рост и вес -->
+                    <div class="onboarding-step" data-step="3" style="display: none;">
+                        <div class="card">
+                            <h3 class="section-title">Рост</h3>
+                            <div style="margin-bottom: var(--spacing-xl);">
+                                <input type="range" 
+                                       id="onboarding-height" 
+                                       min="100" 
+                                       max="220" 
+                                       value="170" 
+                                       step="1"
+                                       style="width: 100%; margin: var(--spacing-lg) 0;">
+                                <div style="text-align: center;">
+                                    <span class="number-large" id="height-display">170</span>
+                                    <span style="font-size: 18px; color: var(--text-secondary); margin-left: var(--spacing-sm);">см</span>
+                                </div>
+                            </div>
+                            
+                            <h3 class="section-title" style="margin-top: var(--spacing-xl);">Вес</h3>
+                            <div>
+                                <input type="range" 
+                                       id="onboarding-weight" 
+                                       min="30" 
+                                       max="200" 
+                                       value="70" 
+                                       step="0.5"
+                                       style="width: 100%; margin: var(--spacing-lg) 0;">
+                                <div style="text-align: center;">
+                                    <span class="number-large" id="weight-display">70</span>
+                                    <span style="font-size: 18px; color: var(--text-secondary); margin-left: var(--spacing-sm);">кг</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 4: Активность и цель -->
+                    <div class="onboarding-step" data-step="4" style="display: none;">
+                        <div class="card" style="margin-bottom: var(--spacing-md);">
+                            <h3 class="section-title">Уровень активности</h3>
+                            <div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">
+                                <button class="btn btn-secondary" data-activity="low" id="activity-low" style="justify-content: flex-start; text-align: left;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">Низкая</div>
+                                        <div style="font-size: 13px; color: var(--text-secondary);">Сидячий образ жизни</div>
+                                    </div>
+                                </button>
+                                <button class="btn btn-secondary" data-activity="moderate" id="activity-moderate" style="justify-content: flex-start; text-align: left;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">Умеренная</div>
+                                        <div style="font-size: 13px; color: var(--text-secondary);">Тренировки 3-5 раз в неделю</div>
+                                    </div>
+                                </button>
+                                <button class="btn btn-secondary" data-activity="high" id="activity-high" style="justify-content: flex-start; text-align: left;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">Высокая</div>
+                                        <div style="font-size: 13px; color: var(--text-secondary);">Тренировки 6-7 раз в неделю</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3 class="section-title">Цель</h3>
+                            <div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">
+                                <button class="btn btn-secondary" data-goal="lose" id="goal-lose" style="justify-content: flex-start; text-align: left;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">Похудение</div>
+                                        <div style="font-size: 13px; color: var(--text-secondary);">Снизить вес</div>
+                                    </div>
+                                </button>
+                                <button class="btn btn-secondary" data-goal="maintain" id="goal-maintain" style="justify-content: flex-start; text-align: left;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">Поддержание</div>
+                                        <div style="font-size: 13px; color: var(--text-secondary);">Сохранить текущий вес</div>
+                                    </div>
+                                </button>
+                                <button class="btn btn-secondary" data-goal="gain" id="goal-gain" style="justify-content: flex-start; text-align: left;">
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 4px;">Набор массы</div>
+                                        <div style="font-size: 13px; color: var(--text-secondary);">Увеличить мышечную массу</div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Кнопки навигации -->
+                    <div class="onboarding-actions" style="margin-top: var(--spacing-xl); display: flex; gap: var(--spacing-md);">
+                        <button class="btn btn-secondary" id="onboarding-back" style="flex: 1; display: none;">
+                            Назад
+                        </button>
+                        <button class="btn btn-primary" id="onboarding-next" style="flex: 1;">
+                            Далее
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const app = document.getElementById('app');
+        if (app) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = screenHTML;
+            app.appendChild(tempDiv.firstElementChild);
+        }
+    }
+
+    attachHandlers() {
+        // Дата рождения
+        const dateInput = document.getElementById('onboarding-date');
+        if (dateInput) {
+            dateInput.addEventListener('change', (e) => {
+                this.formData.dateOfBirth = e.target.value;
+            });
+        }
+
+        // Пол
+        document.querySelectorAll('[data-gender]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('[data-gender]').forEach(b => b.classList.remove('btn-primary'));
+                e.target.closest('[data-gender]').classList.add('btn-primary');
+                this.formData.gender = e.target.closest('[data-gender]').dataset.gender;
+                this.hapticFeedback('light');
+            });
+        });
+
+        // Рост
+        const heightInput = document.getElementById('onboarding-height');
+        const heightDisplay = document.getElementById('height-display');
+        if (heightInput && heightDisplay) {
+            heightInput.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                heightDisplay.textContent = value;
+                this.formData.height = value;
+            });
+            this.formData.height = parseInt(heightInput.value);
+        }
+
+        // Вес
+        const weightInput = document.getElementById('onboarding-weight');
+        const weightDisplay = document.getElementById('weight-display');
+        if (weightInput && weightDisplay) {
+            weightInput.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                weightDisplay.textContent = value.toFixed(1);
+                this.formData.weight = value;
+            });
+            this.formData.weight = parseFloat(weightInput.value);
+        }
+
+        // Активность
+        document.querySelectorAll('[data-activity]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('[data-activity]').forEach(b => b.classList.remove('btn-primary'));
+                e.target.closest('[data-activity]').classList.add('btn-primary');
+                this.formData.activity = e.target.closest('[data-activity]').dataset.activity;
+                this.hapticFeedback('light');
+            });
+        });
+
+        // Цель
+        document.querySelectorAll('[data-goal]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('[data-goal]').forEach(b => b.classList.remove('btn-primary'));
+                e.target.closest('[data-goal]').classList.add('btn-primary');
+                this.formData.goal = e.target.closest('[data-goal]').dataset.goal;
+                this.hapticFeedback('light');
+            });
+        });
+
+        // Кнопки навигации
+        const nextBtn = document.getElementById('onboarding-next');
+        const backBtn = document.getElementById('onboarding-back');
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => this.nextStep());
+        }
+        
+        if (backBtn) {
+            backBtn.addEventListener('click', () => this.prevStep());
+        }
+    }
+
+    hapticFeedback(type = 'light') {
+        if (window.Telegram?.WebApp?.HapticFeedback) {
+            try {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred(type);
+            } catch (e) {}
+        }
     }
 
     show() {
         const screen = document.getElementById('onboarding-screen');
-        if (screen) {
-            hideAllScreens();
-            screen.classList.add('active');
-            screen.style.display = 'block';
-            this.initForm();
-        } else {
-            console.error('[ONBOARDING] Screen element not found!');
-            // Если экрана нет, создаем временный
-            this.createTemporaryScreen();
+        if (!screen) {
+            this.createHTML();
+            setTimeout(() => this.show(), 50);
+            return;
         }
+        
+        hideAllScreens();
+        screen.classList.add('active');
+        screen.style.display = 'flex';
+        screen.style.flexDirection = 'column';
+        
+        this.currentStep = 1;
+        this.updateStep();
     }
 
     hide() {
@@ -35,133 +285,112 @@ class OnboardingScreen {
         }
     }
 
-    initForm() {
-        // Инициализируем форму если нужно
-        // Можно использовать существующую логику из старого app.js
-    }
+    updateStep() {
+        // Показываем/скрываем шаги
+        document.querySelectorAll('.onboarding-step').forEach((step, index) => {
+            if (index + 1 === this.currentStep) {
+                step.style.display = 'block';
+            } else {
+                step.style.display = 'none';
+            }
+        });
 
-    createTemporaryScreen() {
-        // Создаем временный экран если основной не найден
-        const screen = document.createElement('div');
-        screen.id = 'onboarding-screen';
-        screen.className = 'screen';
-        screen.innerHTML = `
-            <div class="screen-content">
-                <h1>Добро пожаловать в Klyro</h1>
-                <p>Заполните профиль для начала работы</p>
-                <button class="btn btn-primary" onclick="window.location.reload()">Начать</button>
-            </div>
-        `;
-        document.getElementById('app').appendChild(screen);
-        this.show();
-    }
+        // Обновляем прогресс
+        const progress = (this.currentStep / this.totalSteps) * 100;
+        const progressEl = document.getElementById('onboarding-progress');
+        if (progressEl) progressEl.style.width = `${progress}%`;
 
-    async completeOnboarding(formData) {
-        // Сохраняем данные профиля
-        const userData = {
-            ...appContext.getUserData(),
-            ...formData,
-            calories: Calculations.calculateCalories(formData)
-        };
+        const stepNumberEl = document.getElementById('onboarding-step-number');
+        if (stepNumberEl) stepNumberEl.textContent = this.currentStep;
 
-        await appContext.setUserData(userData);
-        
-        // Показываем главный экран
-        if (typeof hideAllScreens === 'function') {
-            hideAllScreens();
-        }
-        dashboardScreen.show();
-        fab.show();
-        
-        Helpers.showNotification('Профиль сохранен!', 'success');
-    }
-}
+        // Обновляем кнопки
+        const nextBtn = document.getElementById('onboarding-next');
+        const backBtn = document.getElementById('onboarding-back');
 
-// Адаптер для старой функции completeOnboarding из app.js
-// Создаем глобальную функцию, которая будет работать со старой формой
-window.completeOnboardingNew = async function() {
-    try {
-        // Собираем данные из формы
-        const genderInput = document.querySelector('input[name="gender"]:checked');
-        const heightSlider = document.getElementById('height');
-        const weightSlider = document.getElementById('weight');
-        const activityInput = document.querySelector('input[name="activity"]:checked');
-        const goalInput = document.querySelector('input[name="goal"]:checked');
-        const dateOfBirthValue = document.getElementById('dateOfBirthValue');
-        const dateInput = document.getElementById('dateOfBirth');
-        
-        let userData = appContext.getUserData() || {};
-        
-        // Дата рождения
-        if (dateOfBirthValue && dateOfBirthValue.value) {
-            userData.dateOfBirth = dateOfBirthValue.value;
-            userData.age = Helpers.getAge(dateOfBirthValue.value);
-        } else if (dateInput && dateInput.value) {
-            const dateMatch = dateInput.value.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-            if (dateMatch) {
-                const day = parseInt(dateMatch[1]);
-                const month = parseInt(dateMatch[2]) - 1;
-                const year = parseInt(dateMatch[3]);
-                const date = new Date(year, month, day);
-                if (!isNaN(date.getTime())) {
-                    userData.dateOfBirth = date.toISOString().split('T')[0];
-                    userData.age = Helpers.getAge(userData.dateOfBirth);
-                }
+        if (nextBtn) {
+            if (this.currentStep === this.totalSteps) {
+                nextBtn.textContent = 'Завершить';
+            } else {
+                nextBtn.textContent = 'Далее';
             }
         }
-        
-        // Остальные данные
-        if (genderInput) userData.gender = genderInput.value;
-        if (heightSlider) userData.height = parseInt(heightSlider.value);
-        if (weightSlider) userData.weight = parseFloat(weightSlider.value);
-        if (activityInput) userData.activity = activityInput.value;
-        if (goalInput) userData.goal = goalInput.value;
-        
-        // Рассчитываем калории
-        userData.calories = Calculations.calculateCalories(userData);
-        
-        // Сохраняем через новый контекст
-        await appContext.setUserData(userData);
-        
-        // Показываем главный экран
-        if (typeof hideAllScreens === 'function') {
-            hideAllScreens();
+
+        if (backBtn) {
+            backBtn.style.display = this.currentStep > 1 ? 'flex' : 'none';
         }
-        dashboardScreen.show();
-        fab.show();
-        
-        Helpers.showNotification('Профиль сохранен!', 'success');
-    } catch (e) {
-        console.error('[ONBOARDING] Error:', e);
-        Helpers.showNotification('Ошибка при сохранении данных', 'error');
     }
-};
 
-// Если старая функция completeOnboarding существует, переопределяем её
-if (typeof window.completeOnboarding === 'function') {
-    const oldCompleteOnboarding = window.completeOnboarding;
-    window.completeOnboarding = async function() {
-        // Пробуем использовать новую функцию
-        if (typeof window.completeOnboardingNew === 'function') {
-            await window.completeOnboardingNew();
-        } else {
-            // Fallback на старую
-            await oldCompleteOnboarding();
+    nextStep() {
+        // Валидация текущего шага
+        if (!this.validateStep()) {
+            Helpers.showNotification('Заполните все поля', 'error');
+            return;
         }
-    };
-} else {
-    // Если старой функции нет, создаем новую
-    window.completeOnboarding = window.completeOnboardingNew;
-}
-const onboardingScreen = new OnboardingScreen();
 
-// Обновляем функцию showOnboardingScreen в app.js
-window.showOnboardingScreen = () => {
-    hideAllScreens();
-    onboardingScreen.show();
-};
+        if (this.currentStep < this.totalSteps) {
+            this.currentStep++;
+            this.updateStep();
+            this.hapticFeedback('light');
+        } else {
+            // Завершаем онбординг
+            this.completeOnboarding();
+        }
+    }
+
+    prevStep() {
+        if (this.currentStep > 1) {
+            this.currentStep--;
+            this.updateStep();
+            this.hapticFeedback('light');
+        }
+    }
+
+    validateStep() {
+        switch (this.currentStep) {
+            case 1:
+                return !!this.formData.dateOfBirth;
+            case 2:
+                return !!this.formData.gender;
+            case 3:
+                return !!(this.formData.height && this.formData.weight);
+            case 4:
+                return !!(this.formData.activity && this.formData.goal);
+            default:
+                return true;
+        }
+    }
+
+    async completeOnboarding() {
+        try {
+            // Рассчитываем возраст
+            if (this.formData.dateOfBirth) {
+                this.formData.age = Helpers.getAge(this.formData.dateOfBirth);
+            }
+
+            // Сохраняем данные
+            await appContext.setUserData(this.formData);
+
+            this.hapticFeedback('medium');
+            Helpers.showNotification('Профиль сохранен!', 'success');
+
+            // Показываем Dashboard
+            hideAllScreens();
+            navigation.show();
+            dashboardScreen.show();
+            navigation.switchTab('home');
+        } catch (error) {
+            console.error('[ONBOARDING] Error:', error);
+            Helpers.showNotification('Ошибка при сохранении данных', 'error');
+        }
+    }
+}
+
+const onboardingScreen = new OnboardingScreen();
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = OnboardingScreen;
 }
+
+window.onboardingScreen = onboardingScreen;
+window.showOnboardingScreen = () => onboardingScreen.show();
 
