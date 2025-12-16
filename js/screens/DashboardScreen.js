@@ -145,24 +145,62 @@ class DashboardScreen {
     }
 
     update() {
+        const screen = document.getElementById('dashboard-screen');
+        if (!screen) {
+            console.warn('[DASHBOARD] Screen not found in update(), skipping');
+            return;
+        }
+        
+        console.log('[DASHBOARD] Starting update...');
+        console.log('[DASHBOARD] appContext:', typeof appContext, appContext);
+        console.log('[DASHBOARD] Helpers:', typeof Helpers, Helpers);
+        
         const today = Helpers.getToday();
-        const progress = appContext.getDayProgress(today);
+        console.log('[DASHBOARD] Today:', today);
+        
         const userData = appContext.getUserData();
+        console.log('[DASHBOARD] UserData:', userData);
+        console.log('[DASHBOARD] hasCompleteProfile:', appContext.hasCompleteProfile());
         
         const goal = appContext.getGoalCalories();
-        const current = Math.round(progress.kcal);
+        console.log('[DASHBOARD] Goal calories:', goal);
+        
+        const progress = appContext.getDayProgress(today);
+        console.log('[DASHBOARD] Progress:', progress);
+        
+        const current = Math.round(progress.kcal || 0);
         const remaining = Math.max(0, goal - current);
+
+        console.log('[DASHBOARD] Updating:', { goal, current, remaining, progress });
 
         // Обновляем калории
         const goalEl = document.getElementById('calories-goal');
         const currentEl = document.getElementById('calories-current');
         const remainingEl = document.getElementById('calories-remaining');
 
-        if (goalEl) goalEl.textContent = goal;
-        if (currentEl) currentEl.textContent = current;
+        if (goalEl) {
+            goalEl.textContent = goal || 0;
+            console.log('[DASHBOARD] Updated goal:', goal);
+        } else {
+            console.error('[DASHBOARD] calories-goal element not found!');
+            // Пробуем пересоздать экран
+            this.createHTML();
+            setTimeout(() => this.update(), 100);
+            return;
+        }
+        
+        if (currentEl) {
+            currentEl.textContent = current || 0;
+            console.log('[DASHBOARD] Updated current:', current);
+        } else {
+            console.error('[DASHBOARD] calories-current element not found!');
+        }
+        
         if (remainingEl) {
             remainingEl.textContent = `Осталось: ${remaining}`;
             remainingEl.style.color = remaining > 0 ? 'var(--accent-soft)' : 'var(--text-secondary)';
+        } else {
+            console.error('[DASHBOARD] calories-remaining element not found!');
         }
 
         // Обновляем макросы
