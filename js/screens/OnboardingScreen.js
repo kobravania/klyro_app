@@ -190,15 +190,39 @@ class OnboardingScreen {
             });
         }
 
-        // Пол
-        document.querySelectorAll('[data-gender]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('[data-gender]').forEach(b => b.classList.remove('btn-primary'));
-                e.target.closest('[data-gender]').classList.add('btn-primary');
-                this.formData.gender = e.target.closest('[data-gender]').dataset.gender;
-                this.hapticFeedback('light');
-            });
-        });
+        // Пол - используем делегирование событий как для активности/цели
+        const handleGenderClick = (e) => {
+            const genderBtn = e.target.closest('[data-gender]');
+            if (genderBtn) {
+                const screen = document.getElementById('onboarding-screen');
+                if (screen && screen.contains(genderBtn)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    document.querySelectorAll('[data-gender]').forEach(b => {
+                        b.classList.remove('btn-primary');
+                        if (!b.classList.contains('btn-secondary')) {
+                            b.classList.add('btn-secondary');
+                        }
+                    });
+                    genderBtn.classList.remove('btn-secondary');
+                    genderBtn.classList.add('btn-primary');
+                    this.formData.gender = genderBtn.dataset.gender;
+                    console.log('[ONBOARDING] Выбран пол:', this.formData.gender);
+                    this.hapticFeedback('light');
+                }
+            }
+        };
+
+        // Удаляем старый обработчик, если есть
+        if (this._genderHandler) {
+            document.removeEventListener('click', this._genderHandler, true);
+        }
+
+        // Сохраняем ссылку на обработчик
+        this._genderHandler = handleGenderClick;
+
+        // Добавляем обработчик на document с capture phase
+        document.addEventListener('click', this._genderHandler, true);
 
         // Рост
         const heightInput = document.getElementById('onboarding-height');
