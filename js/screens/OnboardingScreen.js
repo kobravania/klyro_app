@@ -219,25 +219,44 @@ class OnboardingScreen {
             this.formData.weight = parseFloat(weightInput.value);
         }
 
-        // Активность
-        document.querySelectorAll('[data-activity]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('[data-activity]').forEach(b => b.classList.remove('btn-primary'));
-                e.target.closest('[data-activity]').classList.add('btn-primary');
-                this.formData.activity = e.target.closest('[data-activity]').dataset.activity;
-                this.hapticFeedback('light');
+        // Активность - используем делегирование событий для динамически созданных элементов
+        const onboardingScreen = document.getElementById('onboarding-screen');
+        if (onboardingScreen) {
+            onboardingScreen.addEventListener('click', (e) => {
+                const activityBtn = e.target.closest('[data-activity]');
+                if (activityBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    document.querySelectorAll('[data-activity]').forEach(b => {
+                        b.classList.remove('btn-primary');
+                        b.classList.add('btn-secondary');
+                    });
+                    activityBtn.classList.remove('btn-secondary');
+                    activityBtn.classList.add('btn-primary');
+                    this.formData.activity = activityBtn.dataset.activity;
+                    console.log('[ONBOARDING] Выбрана активность:', this.formData.activity);
+                    this.hapticFeedback('light');
+                }
             });
-        });
 
-        // Цель
-        document.querySelectorAll('[data-goal]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('[data-goal]').forEach(b => b.classList.remove('btn-primary'));
-                e.target.closest('[data-goal]').classList.add('btn-primary');
-                this.formData.goal = e.target.closest('[data-goal]').dataset.goal;
-                this.hapticFeedback('light');
+            // Цель - используем делегирование событий
+            onboardingScreen.addEventListener('click', (e) => {
+                const goalBtn = e.target.closest('[data-goal]');
+                if (goalBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    document.querySelectorAll('[data-goal]').forEach(b => {
+                        b.classList.remove('btn-primary');
+                        b.classList.add('btn-secondary');
+                    });
+                    goalBtn.classList.remove('btn-secondary');
+                    goalBtn.classList.add('btn-primary');
+                    this.formData.goal = goalBtn.dataset.goal;
+                    console.log('[ONBOARDING] Выбрана цель:', this.formData.goal);
+                    this.hapticFeedback('light');
+                }
             });
-        });
+        }
 
         // Кнопки навигации
         const nextBtn = document.getElementById('onboarding-next');
