@@ -36,15 +36,24 @@ class AppContext {
      * Загрузка всех данных из хранилища
      */
     async loadData() {
+        console.log('[CONTEXT] Загрузка данных из хранилища...');
+        
         // Загружаем данные пользователя
         const userDataStr = await storage.getItem('klyro_user_data');
+        console.log('[CONTEXT] userDataStr из storage:', userDataStr ? 'есть' : 'нет');
+        
         if (userDataStr) {
             try {
                 this.userData = JSON.parse(userDataStr);
+                console.log('[CONTEXT] userData загружен:', this.userData);
+                console.log('[CONTEXT] hasCompleteProfile:', this.hasCompleteProfile());
             } catch (e) {
                 console.error('[CONTEXT] Error parsing userData:', e);
                 this.userData = null;
             }
+        } else {
+            console.log('[CONTEXT] userData не найден в storage');
+            this.userData = null;
         }
 
         // Загружаем дневник
@@ -83,8 +92,24 @@ class AppContext {
      * Обновить данные пользователя
      */
     async setUserData(userData) {
+        console.log('[CONTEXT] setUserData вызван с данными:', userData);
+        
         this.userData = userData;
-        await storage.setItem('klyro_user_data', JSON.stringify(userData));
+        
+        const userDataStr = JSON.stringify(userData);
+        console.log('[CONTEXT] Сохраняем в storage, длина строки:', userDataStr.length);
+        
+        await storage.setItem('klyro_user_data', userDataStr);
+        
+        // Проверяем, что данные действительно сохранились
+        const savedStr = await storage.getItem('klyro_user_data');
+        if (savedStr) {
+            const savedData = JSON.parse(savedStr);
+            console.log('[CONTEXT] Данные успешно сохранены и проверены:', savedData);
+        } else {
+            console.error('[CONTEXT] ОШИБКА: Данные не сохранились!');
+        }
+        
         this.notifyListeners('userData', userData);
     }
 

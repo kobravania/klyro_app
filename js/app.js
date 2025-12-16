@@ -70,9 +70,19 @@ async function initApp() {
         
         // Проверяем наличие профиля
         const hasProfile = appContext.hasCompleteProfile();
+        const userData = appContext.getUserData();
         
         console.log('[APP] Профиль загружен:', hasProfile);
-        console.log('[APP] UserData:', appContext.getUserData());
+        console.log('[APP] UserData:', userData);
+        console.log('[APP] Проверка полей:', {
+            hasDate: !!(userData?.dateOfBirth || userData?.age),
+            hasHeight: !!(userData?.height && userData.height > 0),
+            dateOfBirth: userData?.dateOfBirth,
+            age: userData?.age,
+            height: userData?.height,
+            weight: userData?.weight,
+            gender: userData?.gender
+        });
         
         // Скрываем экран загрузки
         hideLoadingScreen();

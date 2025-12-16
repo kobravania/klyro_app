@@ -362,16 +362,54 @@ class OnboardingScreen {
 
     async completeOnboarding() {
         try {
+            console.log('[ONBOARDING] Завершение онбординга, данные формы:', this.formData);
+            
             // Рассчитываем возраст
             if (this.formData.dateOfBirth) {
                 this.formData.age = Helpers.getAge(this.formData.dateOfBirth);
+                console.log('[ONBOARDING] Рассчитан возраст:', this.formData.age);
             }
 
+            // Проверяем, что все обязательные поля заполнены
+            if (!this.formData.dateOfBirth && !this.formData.age) {
+                throw new Error('Дата рождения не указана');
+            }
+            if (!this.formData.gender) {
+                throw new Error('Пол не указан');
+            }
+            if (!this.formData.height || this.formData.height <= 0) {
+                throw new Error('Рост не указан');
+            }
+            if (!this.formData.weight || this.formData.weight <= 0) {
+                throw new Error('Вес не указан');
+            }
+            if (!this.formData.activity) {
+                throw new Error('Уровень активности не указан');
+            }
+            if (!this.formData.goal) {
+                throw new Error('Цель не указана');
+            }
+
+            console.log('[ONBOARDING] Все поля заполнены, сохраняем данные...');
+            
             // Сохраняем данные
             await appContext.setUserData(this.formData);
+            
+            // Проверяем, что данные сохранились
+            const savedData = appContext.getUserData();
+            console.log('[ONBOARDING] Данные сохранены, проверка:', savedData);
+            console.log('[ONBOARDING] hasCompleteProfile:', appContext.hasCompleteProfile());
+            
+            // Дополнительно проверяем localStorage напрямую
+            const storageKey = storage.getStorageKey('klyro_user_data');
+            const localStorageData = localStorage.getItem(storageKey);
+            console.log('[ONBOARDING] Данные в localStorage:', localStorageData ? JSON.parse(localStorageData) : null);
 
             this.hapticFeedback('medium');
             Helpers.showNotification('Профиль сохранен!', 'success');
+
+            // Небольшая задержка перед переходом
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             // Показываем Dashboard
             hideAllScreens();
@@ -380,7 +418,8 @@ class OnboardingScreen {
             navigation.switchTab('home');
         } catch (error) {
             console.error('[ONBOARDING] Error:', error);
-            Helpers.showNotification('Ошибка при сохранении данных', 'error');
+            console.error('[ONBOARDING] Error stack:', error.stack);
+            Helpers.showNotification('Ошибка при сохранении данных: ' + error.message, 'error');
         }
     }
 }
