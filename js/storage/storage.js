@@ -124,6 +124,8 @@ class StorageManager {
     async getItem(key) {
         const storageKey = this.getStorageKey(key);
         
+        console.log('[STORAGE] getItem:', { key, storageKey });
+        
         // Пробуем загрузить из CloudStorage
         if (this.tgReady && this.tg && this.tg.CloudStorage && typeof this.tg.CloudStorage.getItem === 'function') {
             try {
@@ -133,17 +135,21 @@ class StorageManager {
                 ]);
                 
                 if (cloudValue) {
+                    console.log('[STORAGE] Данные загружены из CloudStorage');
                     // Обновляем localStorage из CloudStorage
                     localStorage.setItem(storageKey, cloudValue);
                     return cloudValue;
                 }
             } catch (e) {
+                console.log('[STORAGE] CloudStorage недоступен, используем localStorage');
                 // Игнорируем ошибки CloudStorage, используем localStorage
             }
         }
         
         // Fallback на localStorage
-        return localStorage.getItem(storageKey);
+        const localValue = localStorage.getItem(storageKey);
+        console.log('[STORAGE] Значение из localStorage:', localValue ? 'есть (длина: ' + localValue.length + ')' : 'нет');
+        return localValue;
     }
 
     /**
