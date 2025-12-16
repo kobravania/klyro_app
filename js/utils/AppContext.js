@@ -40,15 +40,29 @@ class AppContext {
         
         // Загружаем данные пользователя
         const userDataStr = await storage.getItem('klyro_user_data');
-        console.log('[CONTEXT] userDataStr из storage:', userDataStr ? 'есть' : 'нет');
+        console.log('[CONTEXT] userDataStr из storage:', userDataStr ? 'есть (длина: ' + userDataStr.length + ')' : 'нет');
         
         if (userDataStr) {
             try {
-                this.userData = JSON.parse(userDataStr);
-                console.log('[CONTEXT] userData загружен:', this.userData);
-                console.log('[CONTEXT] hasCompleteProfile:', this.hasCompleteProfile());
+                // Проверяем, что это не пустая строка
+                if (userDataStr.trim() === '') {
+                    console.log('[CONTEXT] userDataStr пустая строка');
+                    this.userData = null;
+                } else {
+                    // Парсим JSON
+                    const parsed = JSON.parse(userDataStr);
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        this.userData = parsed;
+                        console.log('[CONTEXT] userData загружен:', this.userData);
+                        console.log('[CONTEXT] hasCompleteProfile:', this.hasCompleteProfile());
+                    } else {
+                        console.error('[CONTEXT] userData не является объектом:', typeof parsed);
+                        this.userData = null;
+                    }
+                }
             } catch (e) {
                 console.error('[CONTEXT] Error parsing userData:', e);
+                console.error('[CONTEXT] userDataStr (первые 200 символов):', userDataStr.substring(0, 200));
                 this.userData = null;
             }
         } else {

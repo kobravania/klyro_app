@@ -82,38 +82,58 @@ class StorageManager {
     async setItem(key, value) {
         const storageKey = this.getStorageKey(key);
         
-        // Всегда делаем JSON.stringify, если это не строка
+        console.log('[STORAGE] setItem вызван:', { 
+            key, 
+            storageKey, 
+            valueType: typeof value,
+            isNull: value === null,
+            isUndefined: value === undefined,
+            isString: typeof value === 'string',
+            isObject: value && typeof value === 'object' && !Array.isArray(value),
+            isArray: Array.isArray(value),
+            value: value
+        });
+        
+        // Всегда делаем JSON.stringify для объектов и массивов
         let valueStr;
-        if (typeof value === 'string') {
+        if (value === null || value === undefined) {
+            // null или undefined сохраняем как пустую строку
+            valueStr = '';
+        } else if (typeof value === 'string') {
             // Если это строка, проверяем, валидный ли это JSON
             try {
                 JSON.parse(value);
                 // Это валидный JSON, используем как есть
                 valueStr = value;
+                console.log('[STORAGE] Строка уже является валидным JSON');
             } catch (e) {
-                // Это не JSON, делаем stringify
+                // Это не JSON, делаем stringify (оборачиваем в JSON)
                 valueStr = JSON.stringify(value);
+                console.log('[STORAGE] Строка не JSON, обернули в JSON.stringify');
             }
-        } else if (value === null || value === undefined) {
-            // null или undefined сохраняем как пустую строку
-            valueStr = '';
         } else {
-            // Для объектов и массивов делаем stringify
+            // Для объектов и массивов всегда делаем stringify
             try {
                 valueStr = JSON.stringify(value);
+                console.log('[STORAGE] Объект преобразован в JSON, длина:', valueStr.length);
             } catch (e) {
                 console.error('[STORAGE] Ошибка JSON.stringify:', e);
+                console.error('[STORAGE] Значение, которое не удалось преобразовать:', value);
                 throw new Error('Не удалось преобразовать значение в JSON: ' + e.message);
             }
         }
         
-        console.log('[STORAGE] setItem:', { 
-            key, 
-            storageKey, 
-            valueType: typeof value, 
-            isObject: value && typeof value === 'object',
-            valueLength: valueStr ? valueStr.length : 0,
-            valuePreview: valueStr ? valueStr.substring(0, 100) : 'empty'
+        console.log('[STORAGE] Итоговая строка для сохранения:', {
+            length: valueStr ? valueStr.length : 0,
+            preview: valueStr ? valueStr.substring(0, 150) : 'empty',
+            isValidJSON: (() => {
+                try {
+                    JSON.parse(valueStr);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            })()
         });
         
         // ВСЕГДА сохраняем в localStorage первым делом
