@@ -140,6 +140,22 @@ function showErrorScreen(error) {
     
     hideAllScreens();
     
+    // Безопасное получение сообщения об ошибке
+    let errorMessage = 'Произошла ошибка при загрузке приложения';
+    if (error) {
+        if (typeof error === 'string') {
+            errorMessage = error;
+        } else if (error.message) {
+            errorMessage = String(error.message);
+        } else if (error.toString) {
+            try {
+                errorMessage = String(error.toString());
+            } catch (e) {
+                errorMessage = 'Неизвестная ошибка';
+            }
+        }
+    }
+    
     const errorScreen = document.createElement('div');
     errorScreen.className = 'screen active';
     errorScreen.style.display = 'flex';
@@ -147,8 +163,8 @@ function showErrorScreen(error) {
     errorScreen.innerHTML = `
         <div class="screen-content">
             <h1 class="screen-title">Ошибка</h1>
-            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                ${error.message || 'Произошла ошибка при загрузке приложения'}
+            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl); white-space: pre-wrap; word-break: break-word;">
+                ${errorMessage}
             </p>
             <button class="btn btn-primary btn-block" onclick="location.reload()">
                 Перезагрузить
