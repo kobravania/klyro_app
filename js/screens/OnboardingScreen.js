@@ -222,17 +222,20 @@ class OnboardingScreen {
             this.formData.weight = parseFloat(weightInput.value);
         }
 
-        // Активность - используем делегирование событий для динамически созданных элементов
-        const onboardingScreen = document.getElementById('onboarding-screen');
-        if (onboardingScreen) {
-            onboardingScreen.addEventListener('click', (e) => {
-                const activityBtn = e.target.closest('[data-activity]');
-                if (activityBtn) {
+        // Активность и цель - используем делегирование событий на document с capture phase
+        // Это гарантирует, что обработчики будут работать даже если элементы создаются динамически
+        const handleActivityClick = (e) => {
+            const activityBtn = e.target.closest('[data-activity]');
+            if (activityBtn) {
+                const screen = document.getElementById('onboarding-screen');
+                if (screen && screen.contains(activityBtn)) {
                     e.preventDefault();
                     e.stopPropagation();
                     document.querySelectorAll('[data-activity]').forEach(b => {
                         b.classList.remove('btn-primary');
-                        b.classList.add('btn-secondary');
+                        if (!b.classList.contains('btn-secondary')) {
+                            b.classList.add('btn-secondary');
+                        }
                     });
                     activityBtn.classList.remove('btn-secondary');
                     activityBtn.classList.add('btn-primary');
@@ -240,17 +243,21 @@ class OnboardingScreen {
                     console.log('[ONBOARDING] Выбрана активность:', this.formData.activity);
                     this.hapticFeedback('light');
                 }
-            });
+            }
+        };
 
-            // Цель - используем делегирование событий
-            onboardingScreen.addEventListener('click', (e) => {
-                const goalBtn = e.target.closest('[data-goal]');
-                if (goalBtn) {
+        const handleGoalClick = (e) => {
+            const goalBtn = e.target.closest('[data-goal]');
+            if (goalBtn) {
+                const screen = document.getElementById('onboarding-screen');
+                if (screen && screen.contains(goalBtn)) {
                     e.preventDefault();
                     e.stopPropagation();
                     document.querySelectorAll('[data-goal]').forEach(b => {
                         b.classList.remove('btn-primary');
-                        b.classList.add('btn-secondary');
+                        if (!b.classList.contains('btn-secondary')) {
+                            b.classList.add('btn-secondary');
+                        }
                     });
                     goalBtn.classList.remove('btn-secondary');
                     goalBtn.classList.add('btn-primary');
@@ -258,8 +265,24 @@ class OnboardingScreen {
                     console.log('[ONBOARDING] Выбрана цель:', this.formData.goal);
                     this.hapticFeedback('light');
                 }
-            });
+            }
+        };
+
+        // Удаляем старые обработчики, если они есть
+        if (this._activityHandler) {
+            document.removeEventListener('click', this._activityHandler, true);
         }
+        if (this._goalHandler) {
+            document.removeEventListener('click', this._goalHandler, true);
+        }
+
+        // Сохраняем ссылки на обработчики для последующего удаления
+        this._activityHandler = handleActivityClick;
+        this._goalHandler = handleGoalClick;
+
+        // Добавляем обработчики на document с capture phase
+        document.addEventListener('click', this._activityHandler, true);
+        document.addEventListener('click', this._goalHandler, true);
 
         // Кнопки навигации
         const nextBtn = document.getElementById('onboarding-next');
