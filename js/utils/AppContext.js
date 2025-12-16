@@ -39,10 +39,16 @@ class AppContext {
         console.log('[CONTEXT] Загрузка данных из хранилища...');
         
         // Загружаем данные пользователя
-        const userDataStr = await storage.getItem('klyro_user_data');
+        let userDataStr;
+        try {
+            userDataStr = await storage.getItem('klyro_user_data');
+        } catch (e) {
+            console.error('[CONTEXT] Ошибка при получении userData из storage:', e);
+            userDataStr = null;
+        }
+        
         console.log('[CONTEXT] userDataStr из storage:', userDataStr ? 'есть' : 'нет');
         console.log('[CONTEXT] userDataStr тип:', typeof userDataStr);
-        console.log('[CONTEXT] userDataStr значение:', userDataStr);
         
         if (userDataStr) {
             try {
@@ -67,8 +73,9 @@ class AppContext {
                 }
             } catch (e) {
                 console.error('[CONTEXT] Error parsing userData:', e);
-                if (typeof userDataStr === 'string') {
-                    console.error('[CONTEXT] userDataStr (первые 200 символов):', userDataStr.substring(0, 200));
+                if (userDataStr && typeof userDataStr === 'string') {
+                    const preview = userDataStr.length > 200 ? userDataStr.substring(0, 200) + '...' : userDataStr;
+                    console.error('[CONTEXT] userDataStr preview:', preview);
                 } else {
                     console.error('[CONTEXT] userDataStr не строка, значение:', userDataStr);
                 }

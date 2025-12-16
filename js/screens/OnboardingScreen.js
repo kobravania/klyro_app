@@ -496,17 +496,26 @@ class OnboardingScreen {
             console.log('[ONBOARDING] hasCompleteProfile:', appContext.hasCompleteProfile());
             
             // Дополнительно проверяем localStorage напрямую
-            const storageKey = storage.getStorageKey('klyro_user_data');
-            const localStorageData = localStorage.getItem(storageKey);
-            if (localStorageData) {
-                try {
-                    const parsed = JSON.parse(localStorageData);
-                    console.log('[ONBOARDING] Данные в localStorage:', parsed);
-                } catch (e) {
-                    console.error('[ONBOARDING] Ошибка парсинга localStorage:', e);
+            try {
+                const storageKey = storage.getStorageKey('klyro_user_data');
+                const localStorageData = localStorage.getItem(storageKey);
+                if (localStorageData && typeof localStorageData === 'string') {
+                    try {
+                        const parsed = JSON.parse(localStorageData);
+                        console.log('[ONBOARDING] Данные в localStorage:', parsed);
+                    } catch (e) {
+                        console.error('[ONBOARDING] Ошибка парсинга localStorage:', e);
+                        if (localStorageData.length > 200) {
+                            console.error('[ONBOARDING] localStorage preview:', localStorageData.substring(0, 200) + '...');
+                        } else {
+                            console.error('[ONBOARDING] localStorage value:', localStorageData);
+                        }
+                    }
+                } else {
+                    console.warn('[ONBOARDING] Данные не найдены в localStorage или не строка:', typeof localStorageData);
                 }
-            } else {
-                console.warn('[ONBOARDING] Данные не найдены в localStorage!');
+            } catch (e) {
+                console.error('[ONBOARDING] Ошибка при проверке localStorage:', e);
             }
 
             this.hapticFeedback('medium');
