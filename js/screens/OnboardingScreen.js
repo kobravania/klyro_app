@@ -518,7 +518,43 @@ class OnboardingScreen {
 
     async completeOnboarding() {
         try {
+            // Показываем индикатор загрузки
+            const nextBtn = document.getElementById('onboarding-next');
+            if (nextBtn) {
+                nextBtn.disabled = true;
+                nextBtn.textContent = 'Сохранение...';
+            }
+            
             console.log('[ONBOARDING] ========== ЗАВЕРШЕНИЕ ОНБОРДИНГА ==========');
+            
+            // ПРЯМАЯ ПРОВЕРКА DOM - читаем значения напрямую из кнопок
+            const selectedActivityBtn = document.querySelector('[data-activity].btn-primary');
+            const selectedGoalBtn = document.querySelector('[data-goal].btn-primary');
+            
+            console.log('[ONBOARDING] Проверка DOM элементов:');
+            console.log('  - selectedActivityBtn:', selectedActivityBtn);
+            console.log('  - selectedGoalBtn:', selectedGoalBtn);
+            
+            if (selectedActivityBtn) {
+                const activityFromDOM = selectedActivityBtn.dataset.activity;
+                console.log('  - activity из DOM:', activityFromDOM);
+                // Обновляем formData из DOM, если там есть значение
+                if (activityFromDOM) {
+                    this.formData.activity = activityFromDOM;
+                    console.log('  - formData.activity обновлен из DOM:', this.formData.activity);
+                }
+            }
+            
+            if (selectedGoalBtn) {
+                const goalFromDOM = selectedGoalBtn.dataset.goal;
+                console.log('  - goal из DOM:', goalFromDOM);
+                // Обновляем formData из DOM, если там есть значение
+                if (goalFromDOM) {
+                    this.formData.goal = goalFromDOM;
+                    console.log('  - formData.goal обновлен из DOM:', this.formData.goal);
+                }
+            }
+            
             console.log('[ONBOARDING] Полные данные формы:', JSON.stringify(this.formData, null, 2));
             console.log('[ONBOARDING] Тип данных:', typeof this.formData, Array.isArray(this.formData));
             console.log('[ONBOARDING] Ключи формы:', Object.keys(this.formData));
@@ -527,8 +563,8 @@ class OnboardingScreen {
             console.log('  - gender:', this.formData.gender);
             console.log('  - height:', this.formData.height, typeof this.formData.height);
             console.log('  - weight:', this.formData.weight, typeof this.formData.weight);
-            console.log('  - activity:', this.formData.activity);
-            console.log('  - goal:', this.formData.goal);
+            console.log('  - activity:', this.formData.activity, typeof this.formData.activity);
+            console.log('  - goal:', this.formData.goal, typeof this.formData.goal);
             
             // Рассчитываем возраст
             if (this.formData.dateOfBirth) {
@@ -623,18 +659,39 @@ class OnboardingScreen {
             
             // Дополнительная проверка: убеждаемся, что activity и goal действительно есть
             console.log('[ONBOARDING] Финальная проверка данных перед сохранением:');
-            console.log('[ONBOARDING]   - activity:', cleanData.activity, typeof cleanData.activity);
-            console.log('[ONBOARDING]   - goal:', cleanData.goal, typeof cleanData.goal);
+            console.log('[ONBOARDING]   - activity:', cleanData.activity, typeof cleanData.activity, 'length:', cleanData.activity ? cleanData.activity.length : 0);
+            console.log('[ONBOARDING]   - goal:', cleanData.goal, typeof cleanData.goal, 'length:', cleanData.goal ? cleanData.goal.length : 0);
             console.log('[ONBOARDING]   - gender:', cleanData.gender, typeof cleanData.gender);
             
-            if (!cleanData.activity || cleanData.activity === 'undefined' || cleanData.activity === 'null') {
-                this.showError('Не выбран уровень активности. Пожалуйста, вернитесь и выберите один из вариантов.');
-                throw new Error('Уровень активности не выбран');
+            // Проверяем еще раз через DOM, если cleanData пустой
+            if (!cleanData.activity || cleanData.activity === 'undefined' || cleanData.activity === 'null' || cleanData.activity.trim() === '') {
+                const activityFromDOM = selectedActivityBtn ? selectedActivityBtn.dataset.activity : null;
+                if (activityFromDOM) {
+                    console.log('[ONBOARDING] Восстанавливаем activity из DOM:', activityFromDOM);
+                    cleanData.activity = activityFromDOM;
+                } else {
+                    this.showError('Не выбран уровень активности. Пожалуйста, выберите один из вариантов.');
+                    if (nextBtn) {
+                        nextBtn.disabled = false;
+                        nextBtn.textContent = 'Далее';
+                    }
+                    throw new Error('Уровень активности не выбран');
+                }
             }
             
-            if (!cleanData.goal || cleanData.goal === 'undefined' || cleanData.goal === 'null') {
-                this.showError('Не выбрана цель. Пожалуйста, вернитесь и выберите один из вариантов.');
-                throw new Error('Цель не выбрана');
+            if (!cleanData.goal || cleanData.goal === 'undefined' || cleanData.goal === 'null' || cleanData.goal.trim() === '') {
+                const goalFromDOM = selectedGoalBtn ? selectedGoalBtn.dataset.goal : null;
+                if (goalFromDOM) {
+                    console.log('[ONBOARDING] Восстанавливаем goal из DOM:', goalFromDOM);
+                    cleanData.goal = goalFromDOM;
+                } else {
+                    this.showError('Не выбрана цель. Пожалуйста, выберите один из вариантов.');
+                    if (nextBtn) {
+                        nextBtn.disabled = false;
+                        nextBtn.textContent = 'Далее';
+                    }
+                    throw new Error('Цель не выбрана');
+                }
             }
             
             // Сохраняем данные
@@ -701,6 +758,12 @@ class OnboardingScreen {
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
+            
+            // Восстанавливаем кнопку
+            if (nextBtn) {
+                nextBtn.disabled = false;
+                nextBtn.textContent = 'Далее';
+            }
         } catch (error) {
             console.error('[ONBOARDING] ========== ОШИБКА ПРИ ЗАВЕРШЕНИИ ОНБОРДИНГА ==========');
             console.error('[ONBOARDING] Error name:', error.name);
@@ -733,6 +796,12 @@ class OnboardingScreen {
             }
             
             Helpers.showNotification(userMessage, 'error');
+            
+            // Восстанавливаем кнопку
+            if (nextBtn) {
+                nextBtn.disabled = false;
+                nextBtn.textContent = 'Далее';
+            }
             
             // Не скрываем экран онбординга при ошибке, чтобы пользователь мог попробовать снова
         }
