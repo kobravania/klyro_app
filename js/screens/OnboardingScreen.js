@@ -44,11 +44,13 @@ class OnboardingScreen {
                     <div class="onboarding-step active" data-step="1">
                         <div class="card" style="margin-bottom: var(--spacing-md);">
                             <h3 class="section-title" style="margin-bottom: var(--spacing-lg); text-align: center;">Дата рождения</h3>
-                            <input type="date" 
-                                   id="onboarding-date" 
-                                   class="input" 
-                                   max="${new Date().toISOString().split('T')[0]}"
-                                   style="font-size: 18px; text-align: center; margin-bottom: var(--spacing-sm); width: 100%; display: block;">
+                            <div style="width: 100%; display: flex; justify-content: center; margin-bottom: var(--spacing-sm);">
+                                <input type="date" 
+                                       id="onboarding-date" 
+                                       class="input onboarding-date-input" 
+                                       max="${new Date().toISOString().split('T')[0]}"
+                                       style="font-size: 18px; text-align: center; width: 100%; max-width: 300px; margin: 0 auto;">
+                            </div>
                             <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin: 0;">
                                 Нам нужна дата рождения для расчета возраста
                             </p>

@@ -309,15 +309,21 @@ h3 {
 }
 
 /* Специальные стили для input[type="date"] */
-input[type="date"] {
+input[type="date"],
+.onboarding-date-input {
     width: 100% !important;
-    text-align: center;
-    text-align-last: center;
+    max-width: 300px !important;
+    text-align: center !important;
+    text-align-last: center !important;
+    margin: 0 auto !important;
+    display: block !important;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"]::-webkit-calendar-picker-indicator,
+.onboarding-date-input::-webkit-calendar-picker-indicator {
     margin-left: auto;
     margin-right: auto;
+    cursor: pointer;
 }
 
 .input:focus {

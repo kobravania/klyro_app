@@ -93,13 +93,26 @@ class AppContext {
      */
     async setUserData(userData) {
         console.log('[CONTEXT] setUserData вызван с данными:', userData);
+        console.log('[CONTEXT] Тип данных:', typeof userData);
+        console.log('[CONTEXT] Это объект?', userData && typeof userData === 'object' && !Array.isArray(userData));
+        
+        // Проверяем, что это объект
+        if (!userData || typeof userData !== 'object' || Array.isArray(userData)) {
+            throw new Error('userData должен быть объектом');
+        }
         
         this.userData = userData;
         
-        // storage.setItem сам делает JSON.stringify, не нужно делать дважды
+        // storage.setItem сам делает JSON.stringify, передаем объект напрямую
         console.log('[CONTEXT] Сохраняем в storage (объект)');
         
-        await storage.setItem('klyro_user_data', userData);
+        try {
+            await storage.setItem('klyro_user_data', userData);
+            console.log('[CONTEXT] ✅ Данные успешно сохранены');
+        } catch (error) {
+            console.error('[CONTEXT] ❌ Ошибка при сохранении:', error);
+            throw error;
+        }
         
         // Проверяем, что данные действительно сохранились
         const savedStr = await storage.getItem('klyro_user_data');
