@@ -23,6 +23,24 @@
             </div>
         </div>
 
+        <!-- Экран онбординга (для новых пользователей) -->
+        <div id="onboarding-screen" class="screen">
+            <div class="screen-content">
+                <h1 class="screen-title">Добро пожаловать в Klyro</h1>
+                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
+                    Заполните профиль для начала работы
+                </p>
+                <div class="card">
+                    <p style="color: var(--text-secondary); margin-bottom: var(--spacing-lg);">
+                        Для расчета ваших целевых калорий нам нужна базовая информация о вас.
+                    </p>
+                    <button class="btn btn-primary btn-block" onclick="location.reload()">
+                        Начать настройку
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Экраны будут созданы динамически через JS -->
         <!-- Dashboard, Diary, Activity, Profile создаются в соответствующих классах -->
         <!-- AddFood создается как bottom sheet -->
