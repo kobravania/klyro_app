@@ -208,13 +208,14 @@ def get_profile():
         finally:
             conn.close()
             
-    except ValueError:
-        return {'error': 'Invalid telegram_user_id'}, 400
+    except ValueError as e:
+        print(f"Ошибка валидации telegram_user_id: {e}")
+        return {'error': 'Service unavailable'}, 500
     except Exception as e:
         print(f"Ошибка при получении профиля: {e}")
         import traceback
         traceback.print_exc()
-        return {'error': f'Database error: {str(e)}'}, 500
+        return {'error': 'Service unavailable'}, 500
 
 @app.route('/api/profile', methods=['POST'])
 def save_profile():
