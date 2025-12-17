@@ -521,17 +521,35 @@ class OnboardingScreen {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
             
+            // Отправляем POST и ждём успешного ответа
             try {
                 await apiClient.saveProfile(profileData);
             } catch (e) {
-                // Игнорируем ошибки POST - проверим через GET
+                // Если POST упал - это ошибка
+                throw new Error('SERVICE_UNAVAILABLE');
             }
             
-            // Сразу после POST вызываем GET /api/profile (источник истины)
-            const savedProfile = await apiClient.getProfile();
+            // Небольшая задержка для гарантии сохранения в БД
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Вызываем GET /api/profile (источник истины) с несколькими попытками
+            let savedProfile = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    savedProfile = await apiClient.getProfile();
+                    if (savedProfile) {
+                        break;
+                    }
+                } catch (e) {
+                    // Игнорируем ошибки, пробуем ещё раз
+                }
+                if (attempt < 2) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
             
             if (!savedProfile) {
-                // GET вернул 404 - профиль не создан
+                // GET вернул 404 после нескольких попыток - профиль не создан
                 throw new Error('SERVICE_UNAVAILABLE');
             }
             
