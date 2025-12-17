@@ -700,23 +700,41 @@ class OnboardingScreen {
             console.log('[ONBOARDING] cleanData как JSON:', JSON.stringify(cleanData));
             
             try {
-                // Пробуем сохранить напрямую через storage, минуя AppContext
-                // Это поможет понять, где именно возникает ошибка
-                console.log('[ONBOARDING] Пробуем сохранить через storage напрямую...');
+                // Сохраняем данные через storage
+                console.log('[ONBOARDING] Сохраняем данные через storage...');
+                const storageKey = storage.getStorageKey('klyro_user_data');
+                console.log('[ONBOARDING] Storage key:', storageKey);
+                console.log('[ONBOARDING] Telegram User ID:', storage.getTelegramUserId());
+                
                 await storage.setItem('klyro_user_data', cleanData);
                 console.log('[ONBOARDING] ✅ Данные сохранены через storage');
                 
-                // Проверяем, что данные действительно сохранились
-                const checkData = await storage.getItem('klyro_user_data');
-                if (checkData) {
+                // Проверяем, что данные действительно сохранились в localStorage
+                const localStorageData = localStorage.getItem(storageKey);
+                if (localStorageData) {
                     try {
-                        const parsedCheck = JSON.parse(checkData);
-                        console.log('[ONBOARDING] ✅ Проверка сохранения: данные найдены в storage:', parsedCheck);
+                        const parsedCheck = JSON.parse(localStorageData);
+                        console.log('[ONBOARDING] ✅ Проверка: данные в localStorage:', parsedCheck);
                     } catch (e) {
-                        console.error('[ONBOARDING] ❌ Ошибка при проверке сохраненных данных:', e);
+                        console.error('[ONBOARDING] ❌ Ошибка парсинга данных из localStorage:', e);
                     }
                 } else {
-                    console.error('[ONBOARDING] ❌ ОШИБКА: Данные не найдены в storage после сохранения!');
+                    console.error('[ONBOARDING] ❌ ОШИБКА: Данные не найдены в localStorage после сохранения!');
+                    console.error('[ONBOARDING] Проверяем все ключи в localStorage:');
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.includes('klyro')) {
+                            console.log('[ONBOARDING] Найден ключ:', key);
+                        }
+                    }
+                }
+                
+                // Также сохраняем в старый ключ для обратной совместимости
+                try {
+                    localStorage.setItem('klyro_user_data', JSON.stringify(cleanData));
+                    console.log('[ONBOARDING] ✅ Данные также сохранены в старый ключ для обратной совместимости');
+                } catch (e) {
+                    console.error('[ONBOARDING] Ошибка при сохранении в старый ключ:', e);
                 }
                 
                 // Теперь обновляем AppContext
