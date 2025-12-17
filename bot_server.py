@@ -6,6 +6,7 @@ Flask сервер для раздачи статических файлов Tel
 from flask import Flask, send_from_directory, send_file, Response, request, jsonify
 from flask_cors import CORS
 import os
+import sys
 import json
 import psycopg2
 from psycopg2.extras import RealDictCursor

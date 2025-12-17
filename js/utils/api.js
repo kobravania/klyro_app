@@ -37,46 +37,49 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
+        const telegramUserId = this.getTelegramUserId();
+        if (!telegramUserId) {
+            return null;
+        }
+
+        const initData = this.getInitData();
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        if (initData) {
+            headers['X-Telegram-Init-Data'] = initData;
+        }
+
+        const url = `${this.baseUrl}/api/profile?telegram_user_id=${telegramUserId}`;
+
+        // Добавляем таймаут для запроса
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
+
         try {
-            const telegramUserId = this.getTelegramUserId();
-            if (!telegramUserId) {
-                console.error('[API] Telegram User ID не найден');
-                return null;
-            }
-
-            const initData = this.getInitData();
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (initData) {
-                headers['X-Telegram-Init-Data'] = initData;
-            }
-
-            const url = `${this.baseUrl}/api/profile?telegram_user_id=${telegramUserId}`;
-            console.log('[API] Запрос профиля:', url);
-
             const response = await fetch(url, {
                 method: 'GET',
-                headers: headers
+                headers: headers,
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
+
             if (response.status === 404) {
-                console.log('[API] Профиль не найден на сервере');
                 return null;
             }
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-                console.error('[API] Ошибка при загрузке профиля:', error);
-                throw new Error(error.error || 'Failed to load profile');
+                throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            const profile = await response.json();
-            console.log('[API] Профиль загружен с сервера:', profile);
-            return profile;
+            return await response.json();
         } catch (error) {
-            console.error('[API] Ошибка при запросе профиля:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || error.message.includes('Failed to fetch')) {
+                throw new Error('SERVICE_UNAVAILABLE');
+            }
             return null;
         }
     }

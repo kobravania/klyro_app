@@ -39,7 +39,17 @@ class AppContext {
         // ШАГ 1: Загружаем профиль с СЕРВЕРА (источник истины)
         let userData = null;
         
-        if (typeof apiClient !== 'undefined') {
+        if (typeof apiClient === 'undefined') {
+            // apiClient недоступен - пробуем загрузить из кэша
+            try {
+                const userDataStr = localStorage.getItem('klyro_user_data');
+                if (userDataStr) {
+                    userData = JSON.parse(userDataStr);
+                }
+            } catch (e) {
+                // Игнорируем ошибки парсинга
+            }
+        } else {
             try {
                 userData = await apiClient.getProfile();
                 
@@ -52,19 +62,18 @@ class AppContext {
                     }
                 }
             } catch (error) {
-                // Если сервер недоступен, пробуем загрузить из кэша
-                if (error.message !== 'SERVICE_UNAVAILABLE') {
-                    try {
-                        const userDataStr = localStorage.getItem('klyro_user_data');
-                        if (userDataStr) {
-                            userData = JSON.parse(userDataStr);
-                        }
-                    } catch (e) {
-                        // Игнорируем ошибки парсинга
-                    }
-                } else {
-                    // Сервер недоступен - выбрасываем ошибку дальше
+                // Если сервер недоступен, выбрасываем ошибку дальше
+                if (error.message === 'SERVICE_UNAVAILABLE') {
                     throw error;
+                }
+                // Для других ошибок пробуем загрузить из кэша
+                try {
+                    const userDataStr = localStorage.getItem('klyro_user_data');
+                    if (userDataStr) {
+                        userData = JSON.parse(userDataStr);
+                    }
+                } catch (e) {
+                    // Игнорируем ошибки парсинга
                 }
             }
         }
