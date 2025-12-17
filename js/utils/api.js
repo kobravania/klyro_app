@@ -15,8 +15,17 @@ class ApiClient {
         if (window.Telegram && window.Telegram.WebApp) {
             const tg = window.Telegram.WebApp;
             if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                return tg.initDataUnsafe.user.id;
+                const userId = tg.initDataUnsafe.user.id;
+                console.log('[API] Telegram User ID:', userId);
+                return String(userId); // Преобразуем в строку для консистентности
+            } else {
+                console.warn('[API] initDataUnsafe.user не найден:', {
+                    hasInitDataUnsafe: !!tg.initDataUnsafe,
+                    initDataUnsafe: tg.initDataUnsafe
+                });
             }
+        } else {
+            console.warn('[API] Telegram WebApp API не найден');
         }
         return null;
     }
@@ -39,7 +48,8 @@ class ApiClient {
     async getProfile() {
         const telegramUserId = this.getTelegramUserId();
         if (!telegramUserId) {
-            return null;
+            console.error('[API] getProfile: telegram_user_id не найден');
+            throw new Error('SERVICE_UNAVAILABLE');
         }
 
         const initData = this.getInitData();
@@ -52,6 +62,7 @@ class ApiClient {
         }
 
         const url = `${this.baseUrl}/api/profile?telegram_user_id=${telegramUserId}`;
+        console.log('[API] GET /api/profile, URL:', url);
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -65,22 +76,28 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
+            console.log('[API] GET /api/profile response status:', response.status);
 
             if (response.status === 404) {
+                console.log('[API] Профиль не найден (404)');
                 return null;
             }
 
             if (!response.ok) {
+                console.error('[API] GET /api/profile failed:', response.status, response.statusText);
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            return await response.json();
+            const profile = await response.json();
+            console.log('[API] Профиль загружен:', profile);
+            return profile;
         } catch (error) {
             clearTimeout(timeoutId);
+            console.error('[API] GET /api/profile error:', error);
             if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || error.message.includes('Failed to fetch')) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
-            return null;
+            throw error;
         }
     }
 
@@ -92,6 +109,7 @@ class ApiClient {
     async saveProfile(profileData) {
         const telegramUserId = this.getTelegramUserId();
         if (!telegramUserId) {
+            console.error('[API] saveProfile: telegram_user_id не найден');
             throw new Error('SERVICE_UNAVAILABLE');
         }
 
@@ -110,6 +128,7 @@ class ApiClient {
         };
 
         const url = `${this.baseUrl}/api/profile`;
+        console.log('[API] POST /api/profile, URL:', url, 'Payload:', payload);
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -124,14 +143,20 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
+            console.log('[API] POST /api/profile response status:', response.status);
 
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[API] POST /api/profile failed:', response.status, response.statusText, errorText);
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            return await response.json();
+            const result = await response.json();
+            console.log('[API] Профиль сохранён:', result);
+            return result;
         } catch (error) {
             clearTimeout(timeoutId);
+            console.error('[API] POST /api/profile error:', error);
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
