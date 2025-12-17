@@ -171,9 +171,12 @@ def get_profile():
                         telegram_user_id = str(user_id)
         
         if not telegram_user_id:
-            return {'error': 'telegram_user_id required'}, 400
+            return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = int(telegram_user_id)
+        try:
+            telegram_user_id = int(telegram_user_id)
+        except (ValueError, TypeError):
+            return {'error': 'Service unavailable'}, 500
         
         # Загружаем профиль из БД
         conn = get_db_connection()
