@@ -744,6 +744,23 @@ class OnboardingScreen {
                 console.log('[ONBOARDING] ✅ AppContext обновлен');
                 console.log('[ONBOARDING] hasCompleteProfile после сохранения:', appContext.hasCompleteProfile());
                 
+                // Дополнительная проверка: загружаем данные обратно из localStorage
+                setTimeout(async () => {
+                    try {
+                        const reloadedData = localStorage.getItem('klyro_user_data');
+                        if (reloadedData) {
+                            const parsed = JSON.parse(reloadedData);
+                            console.log('[ONBOARDING] ✅ Проверка после сохранения: данные можно загрузить обратно:', parsed);
+                            console.log('[ONBOARDING] hasCompleteProfile для загруженных данных:', 
+                                parsed && parsed.dateOfBirth && parsed.height && parsed.gender && parsed.weight);
+                        } else {
+                            console.error('[ONBOARDING] ❌ КРИТИЧЕСКАЯ ОШИБКА: Данные не найдены в localStorage после сохранения!');
+                        }
+                    } catch (e) {
+                        console.error('[ONBOARDING] Ошибка при проверке загруженных данных:', e);
+                    }
+                }, 100);
+                
             } catch (saveError) {
                 console.error('[ONBOARDING] ❌ Ошибка при сохранении:', saveError);
                 console.error('[ONBOARDING] Error name:', saveError.name);

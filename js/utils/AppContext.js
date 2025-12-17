@@ -222,14 +222,20 @@ class AppContext {
             return false;
         }
         
+        // Проверяем минимально необходимые поля для расчета калорий
         const hasDate = !!(this.userData.dateOfBirth || this.userData.age);
         const hasHeight = !!this.userData.height && this.userData.height > 0;
         const hasGender = !!this.userData.gender;
         const hasWeight = !!this.userData.weight && this.userData.weight > 0;
+        
+        // activity и goal могут быть не обязательными для базового профиля
+        // но если они есть, проверяем их
         const hasActivity = !!this.userData.activity;
         const hasGoal = !!this.userData.goal;
         
-        const isComplete = hasDate && hasHeight && hasGender && hasWeight && hasActivity && hasGoal;
+        // Для полного профиля нужны: дата рождения, рост, пол, вес
+        // activity и goal желательны, но не критичны
+        const isComplete = hasDate && hasHeight && hasGender && hasWeight;
         
         console.log('[CONTEXT] hasCompleteProfile проверка:', {
             hasDate,
@@ -239,6 +245,7 @@ class AppContext {
             hasActivity,
             hasGoal,
             isComplete,
+            userDataKeys: Object.keys(this.userData),
             userData: this.userData
         });
         
