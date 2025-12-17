@@ -8,8 +8,8 @@ COPY index.html /usr/share/nginx/html/
 COPY styles-apple.css /usr/share/nginx/html/
 COPY styles-new.css /usr/share/nginx/html/
 COPY styles.css /usr/share/nginx/html/
-COPY web_app_banner.png /usr/share/nginx/html/ 2>/dev/null || true
-COPY web_app_demo.gif /usr/share/nginx/html/ 2>/dev/null || true
+    COPY web_app_banner.png /usr/share/nginx/html/ || true
+    COPY web_app_demo.gif /usr/share/nginx/html/ || true
 COPY data/ /usr/share/nginx/html/data/
 COPY js/ /usr/share/nginx/html/js/
 
