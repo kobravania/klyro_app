@@ -40,11 +40,6 @@ class OnboardingScreen {
                         </div>
                     </div>
 
-                    <!-- Блок ошибок -->
-                    <div id="onboarding-error" style="display: none; margin-bottom: var(--spacing-md); padding: var(--spacing-md); background: rgba(255, 107, 107, 0.1); border: 1px solid var(--error); border-radius: var(--radius-md);">
-                        <div style="color: var(--error); font-size: 14px; font-weight: 500; margin-bottom: var(--spacing-xs);">Ошибка</div>
-                        <div id="onboarding-error-text" style="color: var(--error); font-size: 13px; line-height: 1.4;"></div>
-                    </div>
 
                     <!-- Шаг 1: Дата рождения -->
                     <div class="onboarding-step active" data-step="1">
@@ -215,8 +210,7 @@ class OnboardingScreen {
                     this.formData.gender = genderBtn.dataset.gender;
                     console.log('[ONBOARDING] Выбран пол:', this.formData.gender);
                     console.log('[ONBOARDING] formData после выбора пола:', this.formData);
-                    // Скрываем ошибки при выборе
-                    this.hideError();
+                    // Ошибки не показываем
                     this.hapticFeedback('light');
                 }
             }
@@ -277,8 +271,7 @@ class OnboardingScreen {
                     this.formData.activity = activityBtn.dataset.activity;
                     console.log('[ONBOARDING] Выбрана активность:', this.formData.activity);
                     console.log('[ONBOARDING] formData после выбора активности:', this.formData);
-                    // Скрываем ошибки при выборе
-                    this.hideError();
+                    // Ошибки не показываем
                     this.hapticFeedback('light');
                 }
             }
@@ -302,8 +295,7 @@ class OnboardingScreen {
                     this.formData.goal = goalBtn.dataset.goal;
                     console.log('[ONBOARDING] Выбрана цель:', this.formData.goal);
                     console.log('[ONBOARDING] formData после выбора цели:', this.formData);
-                    // Скрываем ошибки при выборе
-                    this.hideError();
+                    // Ошибки не показываем
                     this.hapticFeedback('light');
                 }
             }
@@ -413,7 +405,7 @@ class OnboardingScreen {
         // Валидация текущего шага
         if (!this.validateStep()) {
             const errorMsg = this.getValidationError();
-            this.showError(errorMsg || 'Заполните все поля');
+            // Валидационные ошибки не показываем - они должны быть предотвращены
             Helpers.showNotification('Заполните все поля', 'error');
             return;
         }
@@ -455,23 +447,6 @@ class OnboardingScreen {
         }
     }
 
-    showError(message) {
-        const errorEl = document.getElementById('onboarding-error');
-        const errorTextEl = document.getElementById('onboarding-error-text');
-        if (errorEl && errorTextEl) {
-            errorTextEl.textContent = message;
-            errorEl.style.display = 'block';
-            // Прокручиваем к ошибке
-            errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    }
-
-    hideError() {
-        const errorEl = document.getElementById('onboarding-error');
-        if (errorEl) {
-            errorEl.style.display = 'none';
-        }
-    }
 
     prevStep() {
         if (this.currentStep > 1) {
@@ -670,7 +645,7 @@ class OnboardingScreen {
                     console.log('[ONBOARDING] Восстанавливаем activity из DOM:', activityFromDOM);
                     cleanData.activity = activityFromDOM;
                 } else {
-                    this.showError('Не выбран уровень активности. Пожалуйста, выберите один из вариантов.');
+                    // Валидация активности - ошибка не показывается
                     if (nextBtn) {
                         nextBtn.disabled = false;
                         nextBtn.textContent = 'Далее';
@@ -685,7 +660,7 @@ class OnboardingScreen {
                     console.log('[ONBOARDING] Восстанавливаем goal из DOM:', goalFromDOM);
                     cleanData.goal = goalFromDOM;
                 } else {
-                    this.showError('Не выбрана цель. Пожалуйста, выберите один из вариантов.');
+                    // Валидация цели - ошибка не показывается
                     if (nextBtn) {
                         nextBtn.disabled = false;
                         nextBtn.textContent = 'Далее';
