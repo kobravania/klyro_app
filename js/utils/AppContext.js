@@ -37,40 +37,46 @@ class AppContext {
      */
     async loadData() {
         console.log('[CONTEXT] Загрузка данных из хранилища...');
-        console.log('[CONTEXT] storage.getStorageKey для klyro_user_data:', storage.getStorageKey('klyro_user_data'));
         
         // Загружаем данные пользователя
-        let userDataStr;
+        // klyro_user_data находится в legacyKeys, поэтому всегда будет 'klyro_user_data' без namespacing
+        let userDataStr = null;
+        
+        // Пробуем загрузить напрямую из localStorage (самый надежный способ)
         try {
-            userDataStr = await storage.getItem('klyro_user_data');
+            userDataStr = localStorage.getItem('klyro_user_data');
+            console.log('[CONTEXT] Прямая загрузка из localStorage:');
+            console.log('  - ключ: klyro_user_data');
+            console.log('  - данные найдены?', !!userDataStr);
+            if (userDataStr) {
+                console.log('  - длина:', userDataStr.length);
+                console.log('  - preview:', userDataStr.substring(0, 200));
+            }
         } catch (e) {
-            console.error('[CONTEXT] Ошибка при получении userData из storage:', e);
-            userDataStr = null;
+            console.error('[CONTEXT] Ошибка при прямой загрузке из localStorage:', e);
         }
         
-        // Дополнительная проверка: пробуем загрузить напрямую из localStorage
-        try {
-            const storageKey = storage.getStorageKey('klyro_user_data');
-            const directLocalStorage = localStorage.getItem(storageKey);
-            console.log('[CONTEXT] Прямая проверка localStorage:');
-            console.log('  - storageKey:', storageKey);
-            console.log('  - directLocalStorage есть?', !!directLocalStorage);
-            if (directLocalStorage) {
-                console.log('  - directLocalStorage длина:', directLocalStorage.length);
-                console.log('  - directLocalStorage preview:', directLocalStorage.substring(0, 200));
+        // Если не нашли напрямую, пробуем через storage.getItem (для CloudStorage синхронизации)
+        if (!userDataStr) {
+            try {
+                userDataStr = await storage.getItem('klyro_user_data');
+                console.log('[CONTEXT] Данные из storage.getItem:', userDataStr ? 'найдены' : 'не найдены');
+            } catch (e) {
+                console.error('[CONTEXT] Ошибка при получении userData из storage:', e);
             }
-            
-            // Также проверяем старый ключ без namespacing (для обратной совместимости)
-            const oldKey = 'klyro_user_data';
-            const oldKeyData = localStorage.getItem(oldKey);
-            console.log('  - oldKey (klyro_user_data) есть?', !!oldKeyData);
-            if (oldKeyData && !directLocalStorage) {
-                console.log('[CONTEXT] ⚠️ Найдены данные в старом ключе, но не в новом!');
-                console.log('[CONTEXT] Используем данные из старого ключа');
-                userDataStr = oldKeyData;
+        }
+        
+        // Если все еще не нашли, выводим все ключи для отладки
+        if (!userDataStr) {
+            console.log('[CONTEXT] ⚠️ Данные не найдены');
+            console.log('[CONTEXT] Все ключи в localStorage, содержащие "klyro":');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('klyro')) {
+                    const value = localStorage.getItem(key);
+                    console.log('[CONTEXT]   -', key, ':', value ? `длина ${value.length}` : 'пусто');
+                }
             }
-        } catch (e) {
-            console.error('[CONTEXT] Ошибка при прямой проверке localStorage:', e);
         }
         
         console.log('[CONTEXT] userDataStr из storage:', userDataStr ? 'есть' : 'нет');
