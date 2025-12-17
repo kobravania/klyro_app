@@ -66,23 +66,65 @@ async function initApp() {
         initTelegramWebApp();
         
         // Загружаем данные
+        console.log('[APP] Начинаем загрузку данных...');
         await appContext.loadData();
+        console.log('[APP] Данные загружены');
         
         // Проверяем наличие профиля
         const hasProfile = appContext.hasCompleteProfile();
         const userData = appContext.getUserData();
         
+        console.log('[APP] ========== ПРОВЕРКА ПРОФИЛЯ ==========');
         console.log('[APP] Профиль загружен:', hasProfile);
         console.log('[APP] UserData:', userData);
-        console.log('[APP] Проверка полей:', {
-            hasDate: !!(userData?.dateOfBirth || userData?.age),
-            hasHeight: !!(userData?.height && userData.height > 0),
-            dateOfBirth: userData?.dateOfBirth,
-            age: userData?.age,
-            height: userData?.height,
-            weight: userData?.weight,
-            gender: userData?.gender
-        });
+        console.log('[APP] UserData тип:', typeof userData);
+        console.log('[APP] UserData null?', userData === null);
+        console.log('[APP] UserData undefined?', userData === undefined);
+        
+        if (userData) {
+            console.log('[APP] Проверка полей:');
+            console.log('  - dateOfBirth:', userData.dateOfBirth, 'age:', userData.age);
+            console.log('  - height:', userData.height, typeof userData.height);
+            console.log('  - weight:', userData.weight, typeof userData.weight);
+            console.log('  - gender:', userData.gender, typeof userData.gender);
+            console.log('  - activity:', userData.activity, typeof userData.activity);
+            console.log('  - goal:', userData.goal, typeof userData.goal);
+            
+            const checks = {
+                hasDate: !!(userData.dateOfBirth || userData.age),
+                hasHeight: !!(userData.height && userData.height > 0),
+                hasWeight: !!(userData.weight && userData.weight > 0),
+                hasGender: !!userData.gender,
+                hasActivity: !!userData.activity,
+                hasGoal: !!userData.goal
+            };
+            console.log('[APP] Результаты проверки:', checks);
+            console.log('[APP] Все поля заполнены?', Object.values(checks).every(v => v === true));
+        } else {
+            console.log('[APP] ❌ UserData отсутствует!');
+            
+            // Проверяем localStorage напрямую
+            try {
+                const storageKey = storage.getStorageKey('klyro_user_data');
+                const localStorageData = localStorage.getItem(storageKey);
+                console.log('[APP] Проверка localStorage напрямую:');
+                console.log('  - storageKey:', storageKey);
+                console.log('  - localStorageData есть?', !!localStorageData);
+                console.log('  - localStorageData тип:', typeof localStorageData);
+                if (localStorageData) {
+                    try {
+                        const parsed = JSON.parse(localStorageData);
+                        console.log('  - parsed данные:', parsed);
+                    } catch (e) {
+                        console.error('  - Ошибка парсинга:', e);
+                        console.error('  - Сырые данные (первые 200 символов):', localStorageData.substring(0, 200));
+                    }
+                }
+            } catch (e) {
+                console.error('[APP] Ошибка при проверке localStorage:', e);
+            }
+        }
+        console.log('[APP] ======================================');
         
         // Скрываем экран загрузки
         hideLoadingScreen();
