@@ -399,14 +399,9 @@ class OnboardingScreen {
     }
 
     nextStep() {
-        // Скрываем ошибки при переходе на следующий шаг
-        this.hideError();
-        
         // Валидация текущего шага
         if (!this.validateStep()) {
-            const errorMsg = this.getValidationError();
-            // Валидационные ошибки не показываем - они должны быть предотвращены
-            Helpers.showNotification('Заполните все поля', 'error');
+            // Валидационные ошибки не показываем - форма должна предотвращать их
             return;
         }
 
