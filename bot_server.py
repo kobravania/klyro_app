@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import psycopg2
+from psycopg2 import errors as psycopg2_errors
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import hashlib
@@ -50,25 +51,46 @@ def init_db():
     
     try:
         cur = conn.cursor()
+        # Проверяем, существует ли таблица
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS profiles (
-                telegram_user_id BIGINT PRIMARY KEY,
-                birth_date VARCHAR(10),
-                age INTEGER,
-                gender VARCHAR(10),
-                height INTEGER,
-                weight DECIMAL(5,2),
-                activity VARCHAR(20),
-                goal VARCHAR(20),
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'profiles'
             )
         """)
-        conn.commit()
+        table_exists = cur.fetchone()[0]
+        
+        if not table_exists:
+            cur.execute("""
+                CREATE TABLE profiles (
+                    telegram_user_id BIGINT PRIMARY KEY,
+                    birth_date VARCHAR(10),
+                    age INTEGER,
+                    gender VARCHAR(10),
+                    height INTEGER,
+                    weight DECIMAL(5,2),
+                    activity VARCHAR(20),
+                    goal VARCHAR(20),
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            print("✓ Таблица profiles создана")
+        else:
+            print("✓ Таблица profiles уже существует")
+        
         cur.close()
-        print("✓ Таблица profiles инициализирована")
+    except psycopg2_errors.DuplicateTable:
+        # Таблица уже существует, это нормально
+        conn.rollback()
+        print("✓ Таблица profiles уже существует (duplicate)")
     except Exception as e:
+        conn.rollback()
         print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     finally:
         conn.close()
@@ -149,6 +171,7 @@ def health():
 
 @app.route('/api/profile', methods=['GET'])
 def get_profile():
+    print(f"[API] GET /api/profile - запрос получен")
     """
     Получить профиль пользователя
     Требует: telegram_user_id в query параметрах или initData в headers
@@ -218,6 +241,7 @@ def save_profile():
     Сохранить или обновить профиль пользователя
     Требует: telegram_user_id и profile данные в JSON body
     """
+    print(f"[API] POST /api/profile - запрос получен")
     try:
         data = request.json
         if not data:
