@@ -614,53 +614,30 @@ class OnboardingScreen {
                 throw new Error('Цель не указана');
             }
             
-            console.log('[ONBOARDING] Чистые данные для сохранения:', cleanData);
-            
-            // Проверяем, что можем сделать JSON.stringify
-            let jsonTest;
-            try {
-                jsonTest = JSON.stringify(cleanData);
-                console.log('[ONBOARDING] JSON.stringify успешен, длина:', jsonTest.length);
-                console.log('[ONBOARDING] JSON preview:', jsonTest.substring(0, 200));
-            } catch (e) {
-                console.error('[ONBOARDING] Ошибка JSON.stringify:', e);
-                throw new Error('Не удалось преобразовать данные в JSON: ' + e.message);
-            }
-            
-            // Дополнительная проверка: убеждаемся, что activity и goal действительно есть
-            console.log('[ONBOARDING] Финальная проверка данных перед сохранением:');
-            console.log('[ONBOARDING]   - activity:', cleanData.activity, typeof cleanData.activity, 'length:', cleanData.activity ? cleanData.activity.length : 0);
-            console.log('[ONBOARDING]   - goal:', cleanData.goal, typeof cleanData.goal, 'length:', cleanData.goal ? cleanData.goal.length : 0);
-            console.log('[ONBOARDING]   - gender:', cleanData.gender, typeof cleanData.gender);
-            
             // Проверяем еще раз через DOM, если cleanData пустой
             if (!cleanData.activity || cleanData.activity === 'undefined' || cleanData.activity === 'null' || cleanData.activity.trim() === '') {
                 const activityFromDOM = selectedActivityBtn ? selectedActivityBtn.dataset.activity : null;
                 if (activityFromDOM) {
-                    console.log('[ONBOARDING] Восстанавливаем activity из DOM:', activityFromDOM);
                     cleanData.activity = activityFromDOM;
                 } else {
-                    // Валидация активности - ошибка не показывается
                     if (nextBtn) {
                         nextBtn.disabled = false;
-                        nextBtn.textContent = 'Далее';
+                        nextBtn.textContent = 'Завершить';
                     }
-                    throw new Error('Уровень активности не выбран');
+                    return;
                 }
             }
             
             if (!cleanData.goal || cleanData.goal === 'undefined' || cleanData.goal === 'null' || cleanData.goal.trim() === '') {
                 const goalFromDOM = selectedGoalBtn ? selectedGoalBtn.dataset.goal : null;
                 if (goalFromDOM) {
-                    console.log('[ONBOARDING] Восстанавливаем goal из DOM:', goalFromDOM);
                     cleanData.goal = goalFromDOM;
                 } else {
-                    // Валидация цели - ошибка не показывается
                     if (nextBtn) {
                         nextBtn.disabled = false;
-                        nextBtn.textContent = 'Далее';
+                        nextBtn.textContent = 'Завершить';
                     }
-                    throw new Error('Цель не выбрана');
+                    return;
                 }
             }
             
