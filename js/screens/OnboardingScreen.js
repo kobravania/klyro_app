@@ -821,8 +821,9 @@ class OnboardingScreen {
                 // Сервер недоступен - показываем нейтральный экран
                 this.showServiceUnavailable();
             } else if (error.message.includes('Не все поля')) {
-                // Ошибка валидации - показываем понятное сообщение
-                this.showError(error.message);
+                // Ошибка валидации - показываем только валидационное сообщение без технических деталей
+                const validationMsg = error.message.replace('Не все поля сохранились: ', '');
+                this.showValidationError(validationMsg);
             } else {
                 // Любая другая ошибка - нейтральный экран
                 this.showServiceUnavailable();
