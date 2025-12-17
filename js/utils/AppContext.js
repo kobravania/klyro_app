@@ -36,46 +36,50 @@ class AppContext {
      * Загрузка всех данных из хранилища
      */
     async loadData() {
-        console.log('[CONTEXT] Загрузка данных из хранилища...');
+        console.log('[CONTEXT] ========== ЗАГРУЗКА ДАННЫХ ==========');
+        console.log('[CONTEXT] НОВАЯ АРХИТЕКТУРА: Сервер = источник истины');
         
-        // Загружаем данные пользователя
-        // klyro_user_data находится в legacyKeys, поэтому всегда будет 'klyro_user_data' без namespacing
-        let userDataStr = null;
+        // ШАГ 1: Загружаем профиль с СЕРВЕРА (источник истины)
+        let userData = null;
         
-        // Пробуем загрузить напрямую из localStorage (самый надежный способ)
-        try {
-            userDataStr = localStorage.getItem('klyro_user_data');
-            console.log('[CONTEXT] Прямая загрузка из localStorage:');
-            console.log('  - ключ: klyro_user_data');
-            console.log('  - данные найдены?', !!userDataStr);
-            if (userDataStr) {
-                console.log('  - длина:', userDataStr.length);
-                console.log('  - preview:', userDataStr.substring(0, 200));
-            }
-        } catch (e) {
-            console.error('[CONTEXT] Ошибка при прямой загрузке из localStorage:', e);
-        }
-        
-        // Если не нашли напрямую, пробуем через storage.getItem (для CloudStorage синхронизации)
-        if (!userDataStr) {
+        if (typeof apiClient !== 'undefined') {
             try {
-                userDataStr = await storage.getItem('klyro_user_data');
-                console.log('[CONTEXT] Данные из storage.getItem:', userDataStr ? 'найдены' : 'не найдены');
-            } catch (e) {
-                console.error('[CONTEXT] Ошибка при получении userData из storage:', e);
+                console.log('[CONTEXT] Запрос профиля с сервера...');
+                userData = await apiClient.getProfile();
+                
+                if (userData) {
+                    console.log('[CONTEXT] ✅ Профиль загружен с сервера:', userData);
+                    // Сохраняем в localStorage как кэш
+                    try {
+                        localStorage.setItem('klyro_user_data', JSON.stringify(userData));
+                        console.log('[CONTEXT] Профиль сохранен в localStorage как кэш');
+                    } catch (e) {
+                        console.warn('[CONTEXT] Не удалось сохранить в localStorage (не критично):', e);
+                    }
+                } else {
+                    console.log('[CONTEXT] Профиль не найден на сервере');
+                }
+            } catch (error) {
+                console.error('[CONTEXT] Ошибка при загрузке профиля с сервера:', error);
+                // Продолжаем - попробуем загрузить из кэша
             }
+        } else {
+            console.warn('[CONTEXT] apiClient не доступен, пропускаем загрузку с сервера');
         }
         
-        // Если все еще не нашли, выводим все ключи для отладки
-        if (!userDataStr) {
-            console.log('[CONTEXT] ⚠️ Данные не найдены');
-            console.log('[CONTEXT] Все ключи в localStorage, содержащие "klyro":');
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.includes('klyro')) {
-                    const value = localStorage.getItem(key);
-                    console.log('[CONTEXT]   -', key, ':', value ? `длина ${value.length}` : 'пусто');
+        // ШАГ 2: Если не нашли на сервере, пробуем загрузить из localStorage (только как fallback)
+        if (!userData) {
+            console.log('[CONTEXT] Загрузка из localStorage (fallback)...');
+            let userDataStr = null;
+            
+            try {
+                userDataStr = localStorage.getItem('klyro_user_data');
+                if (userDataStr) {
+                    userData = JSON.parse(userDataStr);
+                    console.log('[CONTEXT] Профиль загружен из localStorage (fallback):', userData);
                 }
+            } catch (e) {
+                console.error('[CONTEXT] Ошибка при загрузке из localStorage:', e);
             }
         }
         
@@ -96,6 +100,8 @@ class AppContext {
             console.log('[CONTEXT] ⚠️ userData не найден или невалиден');
             this.userData = null;
         }
+        
+        console.log('[CONTEXT] ======================================');
 
         // Загружаем дневник
         const diaryStr = await storage.getItem('klyro_diary');
