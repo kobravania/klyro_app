@@ -220,8 +220,6 @@ def get_profile():
         
         # Загружаем профиль из БД
         conn = get_db_connection()
-        if not conn:
-            return {'error': 'Database connection failed'}, 500
         
         try:
             cur = conn.cursor(cursor_factory=RealDictCursor)
