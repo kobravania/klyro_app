@@ -641,120 +641,46 @@ class OnboardingScreen {
                 }
             }
             
-            // Сохраняем данные
-            console.log('[ONBOARDING] ========== СОХРАНЕНИЕ ПРОФИЛЯ ==========');
-            console.log('[ONBOARDING] НОВАЯ АРХИТЕКТУРА: Сервер = источник истины');
-            console.log('[ONBOARDING] cleanData для сохранения:', cleanData);
-            
-            try {
-                // ШАГ 1: Сохраняем на СЕРВЕР (источник истины)
-                if (typeof apiClient !== 'undefined') {
-                    console.log('[ONBOARDING] Сохранение профиля на сервер...');
-                    await apiClient.saveProfile(cleanData);
-                    console.log('[ONBOARDING] ✅ Профиль сохранен на сервер');
-                } else {
-                    console.error('[ONBOARDING] ❌ apiClient не доступен!');
-                    throw new Error('API client not available');
-                }
-                
-                // ШАГ 2: Сохраняем в localStorage как кэш (опционально, не критично)
-                try {
-                    localStorage.setItem('klyro_user_data', JSON.stringify(cleanData));
-                    console.log('[ONBOARDING] Профиль сохранен в localStorage как кэш');
-                } catch (e) {
-                    console.warn('[ONBOARDING] Не удалось сохранить в localStorage (не критично):', e);
-                }
-                
-                // ШАГ 3: Обновляем AppContext
-                appContext.userData = cleanData;
-                appContext.notifyListeners('userData', cleanData);
-                console.log('[ONBOARDING] ✅ AppContext обновлен');
-                console.log('[ONBOARDING] hasCompleteProfile после сохранения:', appContext.hasCompleteProfile());
-                
-                console.log('[ONBOARDING] ======================================');
-                
-            } catch (saveError) {
-                console.error('[ONBOARDING] ❌ Ошибка при сохранении:', saveError);
-                console.error('[ONBOARDING] Error name:', saveError.name);
-                console.error('[ONBOARDING] Error message:', saveError.message);
-                console.error('[ONBOARDING] Stack trace:', saveError.stack);
-                
-                // Показываем более детальное сообщение об ошибке
-                let errorMsg = 'Ошибка при сохранении данных на сервер';
-                
-                if (saveError.message) {
-                    if (saveError.message.includes('Failed to fetch') || saveError.message.includes('NetworkError')) {
-                        errorMsg = 'Ошибка подключения к серверу. Проверьте интернет-соединение.';
-                    } else if (saveError.message.includes('Database connection failed')) {
-                        errorMsg = 'Ошибка подключения к базе данных. Попробуйте позже.';
-                    } else if (saveError.message.includes('telegram_user_id required')) {
-                        errorMsg = 'Ошибка: не удалось определить пользователя. Перезагрузите приложение.';
-                    } else {
-                        errorMsg = 'Ошибка: ' + saveError.message;
-                    }
-                }
-                
-                this.showError(errorMsg);
+            // Сохраняем данные на сервер
+            if (typeof apiClient === 'undefined') {
                 if (nextBtn) {
                     nextBtn.disabled = false;
                     nextBtn.textContent = 'Завершить';
                 }
-                throw saveError;
+                this.showServiceUnavailable();
+                return;
             }
             
-            // Проверяем, что данные сохранились
-            console.log('[ONBOARDING] Проверяем сохраненные данные...');
-            const savedData = appContext.getUserData();
-            console.log('[ONBOARDING] Данные сохранены, проверка:', savedData);
-            console.log('[ONBOARDING] hasCompleteProfile:', appContext.hasCompleteProfile());
-            
-            if (!savedData) {
-                throw new Error('Данные не сохранились - savedData равен null');
-            }
-            
-            // Проверяем, что все поля на месте
-            const requiredFields = ['dateOfBirth', 'gender', 'height', 'weight', 'activity', 'goal'];
-            const missingFields = requiredFields.filter(field => !savedData[field]);
-            if (missingFields.length > 0) {
-                console.error('[ONBOARDING] Отсутствуют поля в сохраненных данных:', missingFields);
-                throw new Error('Не все поля сохранились: ' + missingFields.join(', '));
-            }
-            
-            // Дополнительно проверяем localStorage напрямую
             try {
-                const storageKey = storage.getStorageKey('klyro_user_data');
-                const localStorageData = localStorage.getItem(storageKey);
-                if (localStorageData && typeof localStorageData === 'string') {
-                    try {
-                        const parsed = JSON.parse(localStorageData);
-                        console.log('[ONBOARDING] Данные в localStorage:', parsed);
-                    } catch (e) {
-                        console.error('[ONBOARDING] Ошибка парсинга localStorage:', e);
-                        if (localStorageData.length > 200) {
-                            console.error('[ONBOARDING] localStorage preview:', localStorageData.substring(0, 200) + '...');
-                        } else {
-                            console.error('[ONBOARDING] localStorage value:', localStorageData);
-                        }
-                    }
-                } else {
-                    console.warn('[ONBOARDING] Данные не найдены в localStorage или не строка:', typeof localStorageData);
+                await apiClient.saveProfile(cleanData);
+                
+                // Сохраняем в localStorage как кэш
+                try {
+                    localStorage.setItem('klyro_user_data', JSON.stringify(cleanData));
+                } catch (e) {
+                    // Игнорируем ошибки localStorage
                 }
-            } catch (e) {
-                console.error('[ONBOARDING] Ошибка при проверке localStorage:', e);
-            }
+                
+                // Обновляем AppContext
+                appContext.userData = cleanData;
+                appContext.notifyListeners('userData', cleanData);
 
-            this.hapticFeedback('medium');
+                this.hapticFeedback('medium');
 
-            // Показываем Dashboard
-            hideAllScreens();
-            navigation.show();
-            dashboardScreen.show();
-            navigation.switchTab('home');
-            
-            // Восстанавливаем кнопку
-            if (nextBtn) {
-                nextBtn.disabled = false;
-                nextBtn.textContent = 'Завершить';
+                // Показываем Dashboard
+                hideAllScreens();
+                navigation.show();
+                dashboardScreen.show();
+                navigation.switchTab('home');
+            } catch (saveError) {
+                // При любой ошибке сохранения показываем нейтральный экран
+                this.showServiceUnavailable();
+            } finally {
+                // Всегда восстанавливаем кнопку
+                if (nextBtn) {
+                    nextBtn.disabled = false;
+                    nextBtn.textContent = 'Завершить';
+                }
             }
         } catch (error) {
             // Кнопка уже восстановлена в finally блоке выше
