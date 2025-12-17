@@ -218,16 +218,44 @@ def save_profile():
         weight_kg = data.get('weight_kg') or data.get('weight')
         
         # Проверка обязательных полей
-        if not birth_date or not gender or not height_cm or not weight_kg:
+        if not birth_date or birth_date == '':
+            print(f"Ошибка: birth_date отсутствует или пустой. Данные: {data}")
             return {'error': 'Service unavailable'}, 500
         
+        if not gender or gender == '':
+            print(f"Ошибка: gender отсутствует или пустой. Данные: {data}")
+            return {'error': 'Service unavailable'}, 500
+        
+        if not height_cm or height_cm == 0:
+            print(f"Ошибка: height_cm отсутствует или равен 0. Данные: {data}")
+            return {'error': 'Service unavailable'}, 500
+        
+        if not weight_kg or weight_kg == 0:
+            print(f"Ошибка: weight_kg отсутствует или равен 0. Данные: {data}")
+            return {'error': 'Service unavailable'}, 500
+        
+        # Нормализация gender (приводим к lowercase)
+        gender = str(gender).lower().strip()
         if gender not in ('male', 'female'):
+            print(f"Ошибка: gender недопустимое значение '{gender}'. Данные: {data}")
             return {'error': 'Service unavailable'}, 500
         
         try:
             height_cm = int(height_cm)
             weight_kg = int(weight_kg)
-        except (ValueError, TypeError):
+            if height_cm <= 0 or weight_kg <= 0:
+                print(f"Ошибка: height_cm или weight_kg <= 0. height_cm={height_cm}, weight_kg={weight_kg}")
+                return {'error': 'Service unavailable'}, 500
+        except (ValueError, TypeError) as e:
+            print(f"Ошибка преобразования типов: {e}. height_cm={height_cm}, weight_kg={weight_kg}")
+            return {'error': 'Service unavailable'}, 500
+        
+        # Проверка формата даты (должна быть YYYY-MM-DD)
+        try:
+            from datetime import datetime
+            datetime.strptime(birth_date, '%Y-%m-%d')
+        except (ValueError, TypeError) as e:
+            print(f"Ошибка формата даты: {e}. birth_date={birth_date}")
             return {'error': 'Service unavailable'}, 500
         
         # Сохраняем в БД

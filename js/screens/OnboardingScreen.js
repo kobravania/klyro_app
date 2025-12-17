@@ -494,13 +494,38 @@ class OnboardingScreen {
         }
         
         try {
+            // Проверяем, что все обязательные поля заполнены
+            if (!this.formData.dateOfBirth) {
+                throw new Error('Дата рождения не указана');
+            }
+            if (!this.formData.gender) {
+                throw new Error('Пол не указан');
+            }
+            if (!this.formData.height || this.formData.height <= 0) {
+                throw new Error('Рост не указан');
+            }
+            if (!this.formData.weight || this.formData.weight <= 0) {
+                throw new Error('Вес не указан');
+            }
+            
             // Собираем данные из формы в формате API
             const profileData = {
-                birth_date: this.formData.dateOfBirth || '',
-                gender: this.formData.gender || '',
-                height_cm: parseInt(this.formData.height) || 0,
-                weight_kg: parseInt(this.formData.weight) || 0
+                birth_date: String(this.formData.dateOfBirth).trim(),
+                gender: String(this.formData.gender).toLowerCase().trim(),
+                height_cm: parseInt(this.formData.height),
+                weight_kg: parseInt(this.formData.weight)
             };
+            
+            // Проверяем, что данные корректны
+            if (!profileData.birth_date || profileData.birth_date === '') {
+                throw new Error('Дата рождения не указана');
+            }
+            if (profileData.gender !== 'male' && profileData.gender !== 'female') {
+                throw new Error('Пол указан неверно');
+            }
+            if (profileData.height_cm <= 0 || profileData.weight_kg <= 0) {
+                throw new Error('Рост или вес указаны неверно');
+            }
             
             // Отправляем POST /api/profile
             if (typeof apiClient === 'undefined') {
