@@ -79,60 +79,21 @@ class AppContext {
             }
         }
         
-        console.log('[CONTEXT] userDataStr из storage:', userDataStr ? 'есть' : 'нет');
-        console.log('[CONTEXT] userDataStr тип:', typeof userDataStr);
-        if (userDataStr && typeof userDataStr === 'string') {
-            console.log('[CONTEXT] userDataStr длина:', userDataStr.length);
-            console.log('[CONTEXT] userDataStr preview (первые 200 символов):', userDataStr.substring(0, 200));
-        }
-        
-        if (userDataStr) {
-            try {
-                // Проверяем, что это строка
-                if (typeof userDataStr !== 'string') {
-                    console.error('[CONTEXT] userDataStr не является строкой:', typeof userDataStr, userDataStr);
-                    this.userData = null;
-                } else if (userDataStr.trim() === '') {
-                    console.log('[CONTEXT] userDataStr пустая строка');
-                    this.userData = null;
-                } else {
-                    // Парсим JSON
-                    const parsed = JSON.parse(userDataStr);
-                    console.log('[CONTEXT] JSON распарсен успешно, тип:', typeof parsed);
-                    console.log('[CONTEXT] parsed данные:', parsed);
-                    
-                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                        this.userData = parsed;
-                        console.log('[CONTEXT] ✅ userData загружен и установлен');
-                        console.log('[CONTEXT] userData содержимое:', {
-                            dateOfBirth: this.userData.dateOfBirth,
-                            age: this.userData.age,
-                            gender: this.userData.gender,
-                            height: this.userData.height,
-                            weight: this.userData.weight,
-                            activity: this.userData.activity,
-                            goal: this.userData.goal
-                        });
-                        console.log('[CONTEXT] hasCompleteProfile:', this.hasCompleteProfile());
-                    } else {
-                        console.error('[CONTEXT] userData не является объектом:', typeof parsed);
-                        this.userData = null;
-                    }
-                }
-            } catch (e) {
-                console.error('[CONTEXT] ❌ Error parsing userData:', e);
-                console.error('[CONTEXT] Error name:', e.name);
-                console.error('[CONTEXT] Error message:', e.message);
-                if (userDataStr && typeof userDataStr === 'string') {
-                    const preview = userDataStr.length > 200 ? userDataStr.substring(0, 200) + '...' : userDataStr;
-                    console.error('[CONTEXT] userDataStr preview:', preview);
-                } else {
-                    console.error('[CONTEXT] userDataStr не строка, значение:', userDataStr);
-                }
-                this.userData = null;
-            }
+        // Устанавливаем загруженные данные
+        if (userData && typeof userData === 'object' && !Array.isArray(userData)) {
+            this.userData = userData;
+            console.log('[CONTEXT] ✅ userData установлен:', {
+                dateOfBirth: this.userData.dateOfBirth,
+                age: this.userData.age,
+                gender: this.userData.gender,
+                height: this.userData.height,
+                weight: this.userData.weight,
+                activity: this.userData.activity,
+                goal: this.userData.goal
+            });
+            console.log('[CONTEXT] hasCompleteProfile:', this.hasCompleteProfile());
         } else {
-            console.log('[CONTEXT] ⚠️ userData не найден в storage');
+            console.log('[CONTEXT] ⚠️ userData не найден или невалиден');
             this.userData = null;
         }
 

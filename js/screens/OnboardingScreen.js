@@ -695,71 +695,36 @@ class OnboardingScreen {
             }
             
             // Сохраняем данные
-            console.log('[ONBOARDING] Вызываем appContext.setUserData...');
+            console.log('[ONBOARDING] ========== СОХРАНЕНИЕ ПРОФИЛЯ ==========');
+            console.log('[ONBOARDING] НОВАЯ АРХИТЕКТУРА: Сервер = источник истины');
             console.log('[ONBOARDING] cleanData для сохранения:', cleanData);
-            console.log('[ONBOARDING] cleanData как JSON:', JSON.stringify(cleanData));
             
             try {
-                // Сохраняем данные напрямую в localStorage (самый надежный способ)
-                // klyro_user_data находится в legacyKeys, поэтому всегда будет 'klyro_user_data' без namespacing
-                const storageKey = 'klyro_user_data';
-                const dataString = JSON.stringify(cleanData);
-                
-                console.log('[ONBOARDING] Сохраняем данные:');
-                console.log('  - ключ:', storageKey);
-                console.log('  - данные:', cleanData);
-                console.log('  - JSON длина:', dataString.length);
-                
-                // Сохраняем напрямую в localStorage
-                localStorage.setItem(storageKey, dataString);
-                console.log('[ONBOARDING] ✅ Данные сохранены напрямую в localStorage');
-                
-                // Проверяем, что данные действительно сохранились
-                const checkData = localStorage.getItem(storageKey);
-                if (checkData === dataString) {
-                    console.log('[ONBOARDING] ✅ Проверка: данные успешно сохранены и проверены');
-                    try {
-                        const parsedCheck = JSON.parse(checkData);
-                        console.log('[ONBOARDING] ✅ Парсинг проверочных данных успешен:', parsedCheck);
-                    } catch (e) {
-                        console.error('[ONBOARDING] ❌ Ошибка парсинга проверочных данных:', e);
-                    }
+                // ШАГ 1: Сохраняем на СЕРВЕР (источник истины)
+                if (typeof apiClient !== 'undefined') {
+                    console.log('[ONBOARDING] Сохранение профиля на сервер...');
+                    await apiClient.saveProfile(cleanData);
+                    console.log('[ONBOARDING] ✅ Профиль сохранен на сервер');
                 } else {
-                    console.error('[ONBOARDING] ❌ ОШИБКА: Данные не совпадают после сохранения!');
-                    console.error('[ONBOARDING] Ожидалось:', dataString.substring(0, 100));
-                    console.error('[ONBOARDING] Получено:', checkData ? checkData.substring(0, 100) : 'null');
+                    console.error('[ONBOARDING] ❌ apiClient не доступен!');
+                    throw new Error('API client not available');
                 }
                 
-                // Также сохраняем через storage.setItem для синхронизации с CloudStorage
+                // ШАГ 2: Сохраняем в localStorage как кэш (опционально, не критично)
                 try {
-                    await storage.setItem('klyro_user_data', cleanData);
-                    console.log('[ONBOARDING] ✅ Данные также сохранены через storage для CloudStorage синхронизации');
+                    localStorage.setItem('klyro_user_data', JSON.stringify(cleanData));
+                    console.log('[ONBOARDING] Профиль сохранен в localStorage как кэш');
                 } catch (e) {
-                    console.error('[ONBOARDING] Ошибка при сохранении через storage (не критично):', e);
+                    console.warn('[ONBOARDING] Не удалось сохранить в localStorage (не критично):', e);
                 }
                 
-                // Обновляем AppContext
+                // ШАГ 3: Обновляем AppContext
                 appContext.userData = cleanData;
                 appContext.notifyListeners('userData', cleanData);
                 console.log('[ONBOARDING] ✅ AppContext обновлен');
                 console.log('[ONBOARDING] hasCompleteProfile после сохранения:', appContext.hasCompleteProfile());
                 
-                // Дополнительная проверка: загружаем данные обратно из localStorage
-                setTimeout(async () => {
-                    try {
-                        const reloadedData = localStorage.getItem('klyro_user_data');
-                        if (reloadedData) {
-                            const parsed = JSON.parse(reloadedData);
-                            console.log('[ONBOARDING] ✅ Проверка после сохранения: данные можно загрузить обратно:', parsed);
-                            console.log('[ONBOARDING] hasCompleteProfile для загруженных данных:', 
-                                parsed && parsed.dateOfBirth && parsed.height && parsed.gender && parsed.weight);
-                        } else {
-                            console.error('[ONBOARDING] ❌ КРИТИЧЕСКАЯ ОШИБКА: Данные не найдены в localStorage после сохранения!');
-                        }
-                    } catch (e) {
-                        console.error('[ONBOARDING] Ошибка при проверке загруженных данных:', e);
-                    }
-                }, 100);
+                console.log('[ONBOARDING] ======================================');
                 
             } catch (saveError) {
                 console.error('[ONBOARDING] ❌ Ошибка при сохранении:', saveError);
