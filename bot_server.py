@@ -25,25 +25,29 @@ logs_storage = []
 # Подключение к PostgreSQL
 def get_db_connection():
     """Получить подключение к базе данных"""
+    # Проверяем обязательные переменные окружения
+    required_vars = ['POSTGRES_HOST', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD']
+    missing_vars = [var for var in required_vars if not os.environ.get(var)]
+    if missing_vars:
+        print(f"КРИТИЧЕСКАЯ ОШИБКА: Отсутствуют переменные окружения: {', '.join(missing_vars)}")
+        sys.exit(1)
+    
     try:
         conn = psycopg2.connect(
-            host=os.environ.get('POSTGRES_HOST', 'postgres'),
+            host=os.environ.get('POSTGRES_HOST'),
             port=os.environ.get('POSTGRES_PORT', '5432'),
-            database=os.environ.get('POSTGRES_DB', 'klyro'),
-            user=os.environ.get('POSTGRES_USER', 'klyro'),
-            password=os.environ.get('POSTGRES_PASSWORD', '')
+            database=os.environ.get('POSTGRES_DB'),
+            user=os.environ.get('POSTGRES_USER'),
+            password=os.environ.get('POSTGRES_PASSWORD')
         )
         return conn
     except Exception as e:
-        print(f"Ошибка подключения к БД: {e}")
-        return None
+        print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось подключиться к БД: {e}")
+        sys.exit(1)
 
 def init_db():
-    """Инициализировать таблицу profiles если её нет"""
+    """Инициализировать таблицу profiles. FAIL-FAST: выходит если не удалось."""
     conn = get_db_connection()
-    if not conn:
-        print("Не удалось подключиться к БД для инициализации")
-        return
     
     try:
         cur = conn.cursor()
@@ -63,9 +67,10 @@ def init_db():
         """)
         conn.commit()
         cur.close()
-        print("Таблица profiles инициализирована")
+        print("✓ Таблица profiles инициализирована")
     except Exception as e:
-        print(f"Ошибка инициализации БД: {e}")
+        print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
+        sys.exit(1)
     finally:
         conn.close()
 
@@ -120,26 +125,11 @@ def validate_telegram_init_data(init_data, bot_token):
         print(f"Ошибка валидации initData: {e}")
         return False, None
 
-# Инициализируем БД при старте (с задержкой, чтобы дать PostgreSQL время на запуск)
-def delayed_init():
-    """Инициализация БД с повторными попытками"""
-    max_attempts = 5
-    for attempt in range(max_attempts):
-        try:
-            time.sleep(2 + attempt)  # Увеличиваем задержку с каждой попыткой
-            init_db()
-            print("БД успешно инициализирована")
-            return
-        except Exception as e:
-            print(f"Попытка {attempt + 1}/{max_attempts} инициализации БД: {e}")
-            if attempt < max_attempts - 1:
-                print("Повторная попытка через несколько секунд...")
-            else:
-                print("Не удалось инициализировать БД после всех попыток")
-
-# Запускаем инициализацию в фоне
-init_thread = threading.Thread(target=delayed_init, daemon=True)
-init_thread.start()
+# FAIL-FAST: Инициализируем БД ПЕРЕД запуском сервера
+# Если не удалось - процесс завершается
+print("Инициализация базы данных...")
+init_db()
+print("✓ База данных готова")
 
 def add_no_cache_headers(response):
     """Добавляет заголовки для предотвращения кэширования"""
@@ -313,8 +303,6 @@ def save_profile():
         
         # Сохраняем в БД
         conn = get_db_connection()
-        if not conn:
-            return {'error': 'Database connection failed'}, 500
         
         try:
             cur = conn.cursor()
@@ -354,10 +342,9 @@ def save_profile():
     except ValueError:
         return {'error': 'Invalid telegram_user_id'}, 400
     except Exception as e:
+        # Логируем для сервера, но не возвращаем технические детали клиенту
         print(f"Ошибка при сохранении профиля: {e}")
-        import traceback
-        traceback.print_exc()
-        return {'error': f'Database error: {str(e)}'}, 500
+        return {'error': 'Service unavailable'}, 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

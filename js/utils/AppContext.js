@@ -36,72 +36,45 @@ class AppContext {
      * Загрузка всех данных из хранилища
      */
     async loadData() {
-        console.log('[CONTEXT] ========== ЗАГРУЗКА ДАННЫХ ==========');
-        console.log('[CONTEXT] НОВАЯ АРХИТЕКТУРА: Сервер = источник истины');
-        
         // ШАГ 1: Загружаем профиль с СЕРВЕРА (источник истины)
         let userData = null;
         
         if (typeof apiClient !== 'undefined') {
             try {
-                console.log('[CONTEXT] Запрос профиля с сервера...');
                 userData = await apiClient.getProfile();
                 
                 if (userData) {
-                    console.log('[CONTEXT] ✅ Профиль загружен с сервера:', userData);
                     // Сохраняем в localStorage как кэш
                     try {
                         localStorage.setItem('klyro_user_data', JSON.stringify(userData));
-                        console.log('[CONTEXT] Профиль сохранен в localStorage как кэш');
                     } catch (e) {
-                        console.warn('[CONTEXT] Не удалось сохранить в localStorage (не критично):', e);
+                        // Игнорируем ошибки localStorage
                     }
-                } else {
-                    console.log('[CONTEXT] Профиль не найден на сервере');
                 }
             } catch (error) {
-                console.error('[CONTEXT] Ошибка при загрузке профиля с сервера:', error);
-                // Продолжаем - попробуем загрузить из кэша
-            }
-        } else {
-            console.warn('[CONTEXT] apiClient не доступен, пропускаем загрузку с сервера');
-        }
-        
-        // ШАГ 2: Если не нашли на сервере, пробуем загрузить из localStorage (только как fallback)
-        if (!userData) {
-            console.log('[CONTEXT] Загрузка из localStorage (fallback)...');
-            let userDataStr = null;
-            
-            try {
-                userDataStr = localStorage.getItem('klyro_user_data');
-                if (userDataStr) {
-                    userData = JSON.parse(userDataStr);
-                    console.log('[CONTEXT] Профиль загружен из localStorage (fallback):', userData);
+                // Если сервер недоступен, пробуем загрузить из кэша
+                if (error.message !== 'SERVICE_UNAVAILABLE') {
+                    try {
+                        const userDataStr = localStorage.getItem('klyro_user_data');
+                        if (userDataStr) {
+                            userData = JSON.parse(userDataStr);
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки парсинга
+                    }
+                } else {
+                    // Сервер недоступен - выбрасываем ошибку дальше
+                    throw error;
                 }
-            } catch (e) {
-                console.error('[CONTEXT] Ошибка при загрузке из localStorage:', e);
             }
         }
         
         // Устанавливаем загруженные данные
         if (userData && typeof userData === 'object' && !Array.isArray(userData)) {
             this.userData = userData;
-            console.log('[CONTEXT] ✅ userData установлен:', {
-                dateOfBirth: this.userData.dateOfBirth,
-                age: this.userData.age,
-                gender: this.userData.gender,
-                height: this.userData.height,
-                weight: this.userData.weight,
-                activity: this.userData.activity,
-                goal: this.userData.goal
-            });
-            console.log('[CONTEXT] hasCompleteProfile:', this.hasCompleteProfile());
         } else {
-            console.log('[CONTEXT] ⚠️ userData не найден или невалиден');
             this.userData = null;
         }
-        
-        console.log('[CONTEXT] ======================================');
 
         // Загружаем дневник
         const diaryStr = await storage.getItem('klyro_diary');
@@ -139,37 +112,11 @@ class AppContext {
      * Обновить данные пользователя
      */
     async setUserData(userData) {
-        console.log('[CONTEXT] setUserData вызван с данными:', userData);
-        console.log('[CONTEXT] Тип данных:', typeof userData);
-        console.log('[CONTEXT] Это объект?', userData && typeof userData === 'object' && !Array.isArray(userData));
-        
-        // Проверяем, что это объект
         if (!userData || typeof userData !== 'object' || Array.isArray(userData)) {
             throw new Error('userData должен быть объектом');
         }
         
         this.userData = userData;
-        
-        // storage.setItem сам делает JSON.stringify, передаем объект напрямую
-        console.log('[CONTEXT] Сохраняем в storage (объект)');
-        
-        try {
-            await storage.setItem('klyro_user_data', userData);
-            console.log('[CONTEXT] ✅ Данные успешно сохранены');
-        } catch (error) {
-            console.error('[CONTEXT] ❌ Ошибка при сохранении:', error);
-            throw error;
-        }
-        
-        // Проверяем, что данные действительно сохранились
-        const savedStr = await storage.getItem('klyro_user_data');
-        if (savedStr) {
-            const savedData = JSON.parse(savedStr);
-            console.log('[CONTEXT] Данные успешно сохранены и проверены:', savedData);
-        } else {
-            console.error('[CONTEXT] ОШИБКА: Данные не сохранились!');
-        }
-        
         this.notifyListeners('userData', userData);
     }
 
@@ -185,38 +132,15 @@ class AppContext {
      */
     hasCompleteProfile() {
         if (!this.userData) {
-            console.log('[CONTEXT] hasCompleteProfile: userData отсутствует');
             return false;
         }
         
-        // Проверяем минимально необходимые поля для расчета калорий
         const hasDate = !!(this.userData.dateOfBirth || this.userData.age);
         const hasHeight = !!this.userData.height && this.userData.height > 0;
         const hasGender = !!this.userData.gender;
         const hasWeight = !!this.userData.weight && this.userData.weight > 0;
         
-        // activity и goal могут быть не обязательными для базового профиля
-        // но если они есть, проверяем их
-        const hasActivity = !!this.userData.activity;
-        const hasGoal = !!this.userData.goal;
-        
-        // Для полного профиля нужны: дата рождения, рост, пол, вес
-        // activity и goal желательны, но не критичны
-        const isComplete = hasDate && hasHeight && hasGender && hasWeight;
-        
-        console.log('[CONTEXT] hasCompleteProfile проверка:', {
-            hasDate,
-            hasHeight,
-            hasGender,
-            hasWeight,
-            hasActivity,
-            hasGoal,
-            isComplete,
-            userDataKeys: Object.keys(this.userData),
-            userData: this.userData
-        });
-        
-        return isComplete;
+        return hasDate && hasHeight && hasGender && hasWeight;
     }
 
     /**

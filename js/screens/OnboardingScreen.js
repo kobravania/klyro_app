@@ -797,10 +797,6 @@ class OnboardingScreen {
             }
 
             this.hapticFeedback('medium');
-            Helpers.showNotification('Профиль сохранен!', 'success');
-
-            // Небольшая задержка перед переходом
-            await new Promise(resolve => setTimeout(resolve, 300));
 
             // Показываем Dashboard
             hideAllScreens();
@@ -811,48 +807,63 @@ class OnboardingScreen {
             // Восстанавливаем кнопку
             if (nextBtn) {
                 nextBtn.disabled = false;
-                nextBtn.textContent = 'Далее';
+                nextBtn.textContent = 'Завершить';
             }
         } catch (error) {
-            console.error('[ONBOARDING] ========== ОШИБКА ПРИ ЗАВЕРШЕНИИ ОНБОРДИНГА ==========');
-            console.error('[ONBOARDING] Error name:', error.name);
-            console.error('[ONBOARDING] Error message:', error.message);
-            console.error('[ONBOARDING] Error stack:', error.stack);
-            console.error('[ONBOARDING] Текущие данные формы:', this.formData);
-            console.error('[ONBOARDING] =====================================================');
-            
-            // Показываем более понятное сообщение пользователю
-            let userMessage = 'Ошибка при сохранении данных';
-            if (error.message.includes('JSON')) {
-                userMessage = 'Ошибка при обработке данных. Проверьте, что все поля заполнены правильно.';
-            } else if (error.message.includes('Не все поля')) {
-                userMessage = error.message;
-            } else if (error.message.includes('activity') || error.message.includes('активности')) {
-                userMessage = 'Не выбран уровень активности. Пожалуйста, выберите один из вариантов.';
-            } else if (error.message.includes('goal') || error.message.includes('цель')) {
-                userMessage = 'Не выбрана цель. Пожалуйста, выберите один из вариантов.';
-            } else {
-                userMessage = 'Ошибка: ' + error.message;
-            }
-            
-            // Показываем ошибку в интерфейсе
-            this.showError(userMessage);
-            
-            // Прокручиваем к ошибке
-            const errorEl = document.getElementById('onboarding-error');
-            if (errorEl) {
-                errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-            
-            Helpers.showNotification(userMessage, 'error');
-            
             // Восстанавливаем кнопку
             if (nextBtn) {
                 nextBtn.disabled = false;
-                nextBtn.textContent = 'Далее';
+                nextBtn.textContent = 'Завершить';
             }
             
-            // Не скрываем экран онбординга при ошибке, чтобы пользователь мог попробовать снова
+            // Проверяем тип ошибки
+            if (error.message === 'SERVICE_UNAVAILABLE' || error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                // Сервер недоступен - показываем нейтральный экран
+                this.showServiceUnavailable();
+            } else if (error.message.includes('Не все поля')) {
+                // Ошибка валидации - показываем понятное сообщение
+                this.showError(error.message);
+            } else {
+                // Любая другая ошибка - нейтральный экран
+                this.showServiceUnavailable();
+            }
+        }
+    }
+
+    showServiceUnavailable() {
+        // Скрываем форму онбординга
+        const screen = document.getElementById('onboarding-screen');
+        if (screen) {
+            screen.style.display = 'none';
+        }
+        
+        // Показываем нейтральный экран
+        const unavailableHTML = `
+            <div id="service-unavailable-screen" class="screen active" style="display: flex; align-items: center; justify-content: center; padding: var(--spacing-xl);">
+                <div class="card" style="text-align: center; max-width: 400px;">
+                    <div style="font-size: 48px; margin-bottom: var(--spacing-lg);">⚠️</div>
+                    <h2 class="screen-title" style="margin-bottom: var(--spacing-md);">Сервис временно недоступен</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
+                        Попробуйте позже
+                    </p>
+                    <button class="btn btn-primary" onclick="location.reload()" style="min-width: 200px;">
+                        Обновить
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        const app = document.getElementById('app');
+        if (app) {
+            // Удаляем старый экран если есть
+            const oldScreen = document.getElementById('service-unavailable-screen');
+            if (oldScreen) {
+                oldScreen.remove();
+            }
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = unavailableHTML;
+            app.appendChild(tempDiv.firstElementChild);
         }
     }
 }

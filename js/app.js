@@ -66,89 +66,38 @@ async function initApp() {
         initTelegramWebApp();
         
         // Загружаем данные
-        console.log('[APP] Начинаем загрузку данных...');
-        await appContext.loadData();
-        console.log('[APP] Данные загружены');
-        
-        // Проверяем наличие профиля
-        const hasProfile = appContext.hasCompleteProfile();
-        const userData = appContext.getUserData();
-        
-        console.log('[APP] ========== ПРОВЕРКА ПРОФИЛЯ ==========');
-        console.log('[APP] Профиль загружен:', hasProfile);
-        console.log('[APP] UserData:', userData);
-        console.log('[APP] UserData тип:', typeof userData);
-        console.log('[APP] UserData null?', userData === null);
-        console.log('[APP] UserData undefined?', userData === undefined);
-        
-        if (userData) {
-            console.log('[APP] Проверка полей:');
-            console.log('  - dateOfBirth:', userData.dateOfBirth, 'age:', userData.age);
-            console.log('  - height:', userData.height, typeof userData.height);
-            console.log('  - weight:', userData.weight, typeof userData.weight);
-            console.log('  - gender:', userData.gender, typeof userData.gender);
-            console.log('  - activity:', userData.activity, typeof userData.activity);
-            console.log('  - goal:', userData.goal, typeof userData.goal);
-            
-            const checks = {
-                hasDate: !!(userData.dateOfBirth || userData.age),
-                hasHeight: !!(userData.height && userData.height > 0),
-                hasWeight: !!(userData.weight && userData.weight > 0),
-                hasGender: !!userData.gender,
-                hasActivity: !!userData.activity,
-                hasGoal: !!userData.goal
-            };
-            console.log('[APP] Результаты проверки:', checks);
-            console.log('[APP] Все поля заполнены?', Object.values(checks).every(v => v === true));
-        } else {
-            console.log('[APP] ❌ UserData отсутствует!');
-            
-            // Проверяем localStorage напрямую
-            try {
-                const storageKey = storage.getStorageKey('klyro_user_data');
-                const localStorageData = localStorage.getItem(storageKey);
-                console.log('[APP] Проверка localStorage напрямую:');
-                console.log('  - storageKey:', storageKey);
-                console.log('  - localStorageData есть?', !!localStorageData);
-                console.log('  - localStorageData тип:', typeof localStorageData);
-                if (localStorageData) {
-                    try {
-                        const parsed = JSON.parse(localStorageData);
-                        console.log('  - parsed данные:', parsed);
-                    } catch (e) {
-                        console.error('  - Ошибка парсинга:', e);
-                        console.error('  - Сырые данные (первые 200 символов):', localStorageData.substring(0, 200));
-                    }
-                }
-            } catch (e) {
-                console.error('[APP] Ошибка при проверке localStorage:', e);
-            }
+        try {
+            await appContext.loadData();
+        } catch (error) {
+            // Сервер недоступен - показываем нейтральный экран
+            hideLoadingScreen();
+            showServiceUnavailable();
+            return;
         }
-        console.log('[APP] ======================================');
         
         // Скрываем экран загрузки
         hideLoadingScreen();
         
+        // Проверяем наличие профиля
+        const hasProfile = appContext.hasCompleteProfile();
+        
         if (hasProfile) {
             // Профиль есть - показываем Dashboard
-            console.log('[APP] Показываем Dashboard');
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
         } else {
             // Профиля нет - показываем онбординг
-            console.log('[APP] Показываем онбординг');
             navigation.hide();
             if (typeof onboardingScreen !== 'undefined') {
                 onboardingScreen.show();
             } else {
-                // Если онбординг не загружен, показываем временный экран
                 showTemporaryOnboarding();
             }
         }
     } catch (error) {
-        console.error('[APP] Ошибка инициализации:', error);
         hideLoadingScreen();
+        showServiceUnavailable();
         showErrorScreen(error);
     }
 }
@@ -274,9 +223,35 @@ if (document.readyState === 'loading') {
     setTimeout(initApp, 100);
 }
 
+function showServiceUnavailable() {
+    hideAllScreens();
+    const unavailableHTML = `
+        <div id="service-unavailable-screen" class="screen active" style="display: flex; align-items: center; justify-content: center; padding: var(--spacing-xl); min-height: 100vh;">
+            <div class="card" style="text-align: center; max-width: 400px;">
+                <div style="font-size: 48px; margin-bottom: var(--spacing-lg);">⚠️</div>
+                <h2 class="screen-title" style="margin-bottom: var(--spacing-md);">Сервис временно недоступен</h2>
+                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
+                    Попробуйте позже
+                </p>
+                <button class="btn btn-primary" onclick="location.reload()" style="min-width: 200px;">
+                    Обновить
+                </button>
+            </div>
+        </div>
+    `;
+    
+    const app = document.getElementById('app');
+    if (app) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = unavailableHTML;
+        app.appendChild(tempDiv.firstElementChild);
+    }
+}
+
 // Экспортируем функции
 window.hideAllScreens = hideAllScreens;
 window.showLoadingScreen = showLoadingScreen;
 window.hideLoadingScreen = hideLoadingScreen;
+window.showServiceUnavailable = showServiceUnavailable;
 window.initApp = initApp;
 
