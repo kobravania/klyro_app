@@ -516,26 +516,26 @@ class OnboardingScreen {
                 weight_kg: parseInt(this.formData.weight)
             };
             
-            // Проверяем, что данные корректны
-            if (!profileData.birth_date || profileData.birth_date === '') {
-                throw new Error('Дата рождения не указана');
-            }
-            if (profileData.gender !== 'male' && profileData.gender !== 'female') {
-                throw new Error('Пол указан неверно');
-            }
-            if (profileData.height_cm <= 0 || profileData.weight_kg <= 0) {
-                throw new Error('Рост или вес указаны неверно');
-            }
-            
-            // Отправляем POST /api/profile
+            // Отправляем POST /api/profile (не делаем выводов по ответу)
             if (typeof apiClient === 'undefined') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
             
-            // Получаем сохранённый профиль
-            const savedProfile = await apiClient.saveProfile(profileData);
+            try {
+                await apiClient.saveProfile(profileData);
+            } catch (e) {
+                // Игнорируем ошибки POST - проверим через GET
+            }
             
-            // Обновляем AppContext
+            // Сразу после POST вызываем GET /api/profile (источник истины)
+            const savedProfile = await apiClient.getProfile();
+            
+            if (!savedProfile) {
+                // GET вернул 404 - профиль не создан
+                throw new Error('SERVICE_UNAVAILABLE');
+            }
+            
+            // GET вернул 200 - профиль создан, обновляем state
             appContext.userData = savedProfile;
             appContext.notifyListeners('userData', savedProfile);
             

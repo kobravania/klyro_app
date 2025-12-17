@@ -198,9 +198,10 @@ def get_profile():
 @app.route('/api/profile', methods=['POST'])
 def save_profile():
     """
-    Сохранить или обновить профиль пользователя (upsert)
+    Сохранить или обновить профиль пользователя (upsert, idempotent)
     Требует: telegram_user_id и profile данные в JSON body
-    Возвращает: сохранённый профиль
+    Возвращает: 200 если данные сохранены (даже если частично)
+    Backend игнорирует лишние поля, принимает только нужные
     """
     try:
         data = request.json
@@ -211,53 +212,29 @@ def save_profile():
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 500
         
-        # Валидация и извлечение данных профиля
+        # Извлекаем данные профиля (игнорируем лишние поля)
         birth_date = data.get('birth_date') or data.get('dateOfBirth')
         gender = data.get('gender')
         height_cm = data.get('height_cm') or data.get('height')
         weight_kg = data.get('weight_kg') or data.get('weight')
         
-        # Проверка обязательных полей
-        if not birth_date or birth_date == '':
-            print(f"Ошибка: birth_date отсутствует или пустой. Данные: {data}")
+        # Минимальная валидация - только проверяем наличие обязательных полей
+        if not birth_date or not gender or not height_cm or not weight_kg:
             return {'error': 'Service unavailable'}, 500
         
-        if not gender or gender == '':
-            print(f"Ошибка: gender отсутствует или пустой. Данные: {data}")
-            return {'error': 'Service unavailable'}, 500
-        
-        if not height_cm or height_cm == 0:
-            print(f"Ошибка: height_cm отсутствует или равен 0. Данные: {data}")
-            return {'error': 'Service unavailable'}, 500
-        
-        if not weight_kg or weight_kg == 0:
-            print(f"Ошибка: weight_kg отсутствует или равен 0. Данные: {data}")
-            return {'error': 'Service unavailable'}, 500
-        
-        # Нормализация gender (приводим к lowercase)
+        # Нормализация gender
         gender = str(gender).lower().strip()
         if gender not in ('male', 'female'):
-            print(f"Ошибка: gender недопустимое значение '{gender}'. Данные: {data}")
             return {'error': 'Service unavailable'}, 500
         
+        # Преобразование типов
         try:
             height_cm = int(height_cm)
             weight_kg = int(weight_kg)
-            if height_cm <= 0 or weight_kg <= 0:
-                print(f"Ошибка: height_cm или weight_kg <= 0. height_cm={height_cm}, weight_kg={weight_kg}")
-                return {'error': 'Service unavailable'}, 500
-        except (ValueError, TypeError) as e:
-            print(f"Ошибка преобразования типов: {e}. height_cm={height_cm}, weight_kg={weight_kg}")
+        except (ValueError, TypeError):
             return {'error': 'Service unavailable'}, 500
         
-        # Проверка формата даты (должна быть YYYY-MM-DD)
-        try:
-            datetime.strptime(birth_date, '%Y-%m-%d')
-        except (ValueError, TypeError) as e:
-            print(f"Ошибка формата даты: {e}. birth_date={birth_date}")
-            return {'error': 'Service unavailable'}, 500
-        
-        # Сохраняем в БД
+        # Сохраняем в БД (idempotent - всегда успешно, если данные валидны)
         conn = get_db_connection()
         
         try:
@@ -283,30 +260,10 @@ def save_profile():
             ))
             
             conn.commit()
-            
-            # Загружаем сохранённый профиль
-            cur = conn.cursor(cursor_factory=RealDictCursor)
-            cur.execute("""
-                SELECT telegram_user_id, birth_date, gender, height_cm, weight_kg, 
-                       created_at, updated_at
-                FROM profiles
-                WHERE telegram_user_id = %s
-            """, (str(telegram_user_id),))
-            
-            row = cur.fetchone()
             cur.close()
             
-            if row:
-                profile = {
-                    'telegram_user_id': row['telegram_user_id'],
-                    'birth_date': row['birth_date'].isoformat() if row['birth_date'] else None,
-                    'gender': row['gender'],
-                    'height_cm': int(row['height_cm']),
-                    'weight_kg': int(row['weight_kg'])
-                }
-                return jsonify(profile), 200
-            else:
-                return {'error': 'Service unavailable'}, 500
+            # Всегда возвращаем 200 если сохранение прошло успешно
+            return {'status': 'ok'}, 200
         finally:
             conn.close()
             
