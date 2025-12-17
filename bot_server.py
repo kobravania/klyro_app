@@ -294,11 +294,14 @@ def save_profile():
         finally:
             conn.close()
             
-    except ValueError:
-        return {'error': 'Invalid telegram_user_id'}, 400
+    except ValueError as e:
+        print(f"Ошибка валидации telegram_user_id: {e}")
+        return {'error': 'Service unavailable'}, 500
     except Exception as e:
         # Логируем для сервера, но не возвращаем технические детали клиенту
         print(f"Ошибка при сохранении профиля: {e}")
+        import traceback
+        traceback.print_exc()
         return {'error': 'Service unavailable'}, 500
 
 if __name__ == '__main__':
