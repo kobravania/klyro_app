@@ -210,9 +210,6 @@ def get_profile():
         finally:
             conn.close()
             
-    except ValueError as e:
-        print(f"Ошибка валидации telegram_user_id: {e}")
-        return {'error': 'Service unavailable'}, 500
     except Exception as e:
         print(f"Ошибка при получении профиля: {e}")
         import traceback
@@ -244,9 +241,12 @@ def save_profile():
                         telegram_user_id = user_id
         
         if not telegram_user_id:
-            return {'error': 'telegram_user_id required'}, 400
+            return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = int(telegram_user_id)
+        try:
+            telegram_user_id = int(telegram_user_id)
+        except (ValueError, TypeError):
+            return {'error': 'Service unavailable'}, 500
         
         # Извлекаем данные профиля
         profile_data = {
@@ -297,9 +297,6 @@ def save_profile():
         finally:
             conn.close()
             
-    except ValueError as e:
-        print(f"Ошибка валидации telegram_user_id: {e}")
-        return {'error': 'Service unavailable'}, 500
     except Exception as e:
         # Логируем для сервера, но не возвращаем технические детали клиенту
         print(f"Ошибка при сохранении профиля: {e}")
