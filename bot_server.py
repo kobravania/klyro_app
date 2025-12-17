@@ -252,7 +252,6 @@ def save_profile():
         
         # Проверка формата даты (должна быть YYYY-MM-DD)
         try:
-            from datetime import datetime
             datetime.strptime(birth_date, '%Y-%m-%d')
         except (ValueError, TypeError) as e:
             print(f"Ошибка формата даты: {e}. birth_date={birth_date}")
