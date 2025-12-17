@@ -13,6 +13,8 @@ from datetime import datetime
 import hashlib
 import hmac
 import urllib.parse
+import time
+import threading
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
@@ -118,8 +120,26 @@ def validate_telegram_init_data(init_data, bot_token):
         print(f"Ошибка валидации initData: {e}")
         return False, None
 
-# Инициализируем БД при старте
-init_db()
+# Инициализируем БД при старте (с задержкой, чтобы дать PostgreSQL время на запуск)
+def delayed_init():
+    """Инициализация БД с повторными попытками"""
+    max_attempts = 5
+    for attempt in range(max_attempts):
+        try:
+            time.sleep(2 + attempt)  # Увеличиваем задержку с каждой попыткой
+            init_db()
+            print("БД успешно инициализирована")
+            return
+        except Exception as e:
+            print(f"Попытка {attempt + 1}/{max_attempts} инициализации БД: {e}")
+            if attempt < max_attempts - 1:
+                print("Повторная попытка через несколько секунд...")
+            else:
+                print("Не удалось инициализировать БД после всех попыток")
+
+# Запускаем инициализацию в фоне
+init_thread = threading.Thread(target=delayed_init, daemon=True)
+init_thread.start()
 
 def add_no_cache_headers(response):
     """Добавляет заголовки для предотвращения кэширования"""
