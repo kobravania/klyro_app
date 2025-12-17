@@ -34,54 +34,25 @@ class AppContext {
 
     /**
      * Загрузка всех данных из хранилища
+     * Единственный источник истины = сервер (PostgreSQL)
      */
     async loadData() {
-        // ШАГ 1: Загружаем профиль с СЕРВЕРА (источник истины)
-        let userData = null;
-        
+        // Загружаем профиль с СЕРВЕРА (источник истины)
         if (typeof apiClient === 'undefined') {
-            // apiClient недоступен - пробуем загрузить из кэша
-            try {
-                const userDataStr = localStorage.getItem('klyro_user_data');
-                if (userDataStr) {
-                    userData = JSON.parse(userDataStr);
-                }
-            } catch (e) {
-                // Игнорируем ошибки парсинга
-            }
-        } else {
-            try {
-                userData = await apiClient.getProfile();
-                
-                if (userData) {
-                    // Сохраняем в localStorage как кэш
-                    try {
-                        localStorage.setItem('klyro_user_data', JSON.stringify(userData));
-                    } catch (e) {
-                        // Игнорируем ошибки localStorage
-                    }
-                }
-            } catch (error) {
-                // Если сервер недоступен, выбрасываем ошибку дальше
-                if (error.message === 'SERVICE_UNAVAILABLE') {
-                    throw error;
-                }
-                // Для других ошибок пробуем загрузить из кэша
-                try {
-                    const userDataStr = localStorage.getItem('klyro_user_data');
-                    if (userDataStr) {
-                        userData = JSON.parse(userDataStr);
-                    }
-                } catch (e) {
-                    // Игнорируем ошибки парсинга
-                }
-            }
+            throw new Error('SERVICE_UNAVAILABLE');
         }
         
-        // Устанавливаем загруженные данные
-        if (userData && typeof userData === 'object' && !Array.isArray(userData)) {
+        try {
+            const userData = await apiClient.getProfile();
+            // Если профиль найден (200) - устанавливаем его
+            // Если профиль не найден (404) - userData будет null, это нормально
             this.userData = userData;
-        } else {
+        } catch (error) {
+            // Если сервер недоступен - выбрасываем ошибку дальше
+            if (error.message === 'SERVICE_UNAVAILABLE') {
+                throw error;
+            }
+            // Для других ошибок - считаем что профиля нет
             this.userData = null;
         }
 
@@ -137,19 +108,11 @@ class AppContext {
     }
 
     /**
-     * Проверить, есть ли полный профиль
+     * Проверить, есть ли профиль
+     * Профиль есть если userData не null
      */
-    hasCompleteProfile() {
-        if (!this.userData) {
-            return false;
-        }
-        
-        const hasDate = !!(this.userData.dateOfBirth || this.userData.age);
-        const hasHeight = !!this.userData.height && this.userData.height > 0;
-        const hasGender = !!this.userData.gender;
-        const hasWeight = !!this.userData.weight && this.userData.weight > 0;
-        
-        return hasDate && hasHeight && hasGender && hasWeight;
+    hasProfile() {
+        return this.userData !== null && this.userData !== undefined;
     }
 
     /**

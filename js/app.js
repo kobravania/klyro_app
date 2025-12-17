@@ -78,16 +78,14 @@ async function initApp() {
         // Скрываем экран загрузки
         hideLoadingScreen();
         
-        // Проверяем наличие профиля
-        const hasProfile = appContext.hasCompleteProfile();
-        
-        if (hasProfile) {
-            // Профиль есть - показываем Dashboard
+        // Проверяем наличие профиля (строгая логика: если userData есть - профиль есть)
+        if (appContext.hasProfile()) {
+            // Профиль есть (200) - показываем Dashboard
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
         } else {
-            // Профиля нет - показываем онбординг
+            // Профиля нет (404) - показываем онбординг
             navigation.hide();
             if (typeof onboardingScreen !== 'undefined') {
                 onboardingScreen.show();

@@ -487,205 +487,48 @@ class OnboardingScreen {
     }
 
     async completeOnboarding() {
+        const nextBtn = document.getElementById('onboarding-next');
+        if (nextBtn) {
+            nextBtn.disabled = true;
+            nextBtn.textContent = 'Сохранение...';
+        }
+        
         try {
-            // Показываем индикатор загрузки
-            const nextBtn = document.getElementById('onboarding-next');
-            if (nextBtn) {
-                nextBtn.disabled = true;
-                nextBtn.textContent = 'Сохранение...';
-            }
-            
-            console.log('[ONBOARDING] ========== ЗАВЕРШЕНИЕ ОНБОРДИНГА ==========');
-            
-            // ПРЯМАЯ ПРОВЕРКА DOM - читаем значения напрямую из кнопок
-            const selectedActivityBtn = document.querySelector('[data-activity].btn-primary');
-            const selectedGoalBtn = document.querySelector('[data-goal].btn-primary');
-            
-            console.log('[ONBOARDING] Проверка DOM элементов:');
-            console.log('  - selectedActivityBtn:', selectedActivityBtn);
-            console.log('  - selectedGoalBtn:', selectedGoalBtn);
-            
-            if (selectedActivityBtn) {
-                const activityFromDOM = selectedActivityBtn.dataset.activity;
-                console.log('  - activity из DOM:', activityFromDOM);
-                // Обновляем formData из DOM, если там есть значение
-                if (activityFromDOM) {
-                    this.formData.activity = activityFromDOM;
-                    console.log('  - formData.activity обновлен из DOM:', this.formData.activity);
-                }
-            }
-            
-            if (selectedGoalBtn) {
-                const goalFromDOM = selectedGoalBtn.dataset.goal;
-                console.log('  - goal из DOM:', goalFromDOM);
-                // Обновляем formData из DOM, если там есть значение
-                if (goalFromDOM) {
-                    this.formData.goal = goalFromDOM;
-                    console.log('  - formData.goal обновлен из DOM:', this.formData.goal);
-                }
-            }
-            
-            console.log('[ONBOARDING] Полные данные формы:', JSON.stringify(this.formData, null, 2));
-            console.log('[ONBOARDING] Тип данных:', typeof this.formData, Array.isArray(this.formData));
-            console.log('[ONBOARDING] Ключи формы:', Object.keys(this.formData));
-            console.log('[ONBOARDING] Значения полей:');
-            console.log('  - dateOfBirth:', this.formData.dateOfBirth);
-            console.log('  - gender:', this.formData.gender);
-            console.log('  - height:', this.formData.height, typeof this.formData.height);
-            console.log('  - weight:', this.formData.weight, typeof this.formData.weight);
-            console.log('  - activity:', this.formData.activity, typeof this.formData.activity);
-            console.log('  - goal:', this.formData.goal, typeof this.formData.goal);
-            
-            // Рассчитываем возраст
-            if (this.formData.dateOfBirth) {
-                this.formData.age = Helpers.getAge(this.formData.dateOfBirth);
-                console.log('[ONBOARDING] Рассчитан возраст:', this.formData.age);
-            }
-
-            // Проверяем, что все обязательные поля заполнены
-            const errors = [];
-            if (!this.formData.dateOfBirth && !this.formData.age) {
-                errors.push('Дата рождения не указана');
-            }
-            if (!this.formData.gender) {
-                errors.push('Пол не указан');
-            }
-            if (!this.formData.height || this.formData.height <= 0) {
-                errors.push('Рост не указан или равен 0');
-            }
-            if (!this.formData.weight || this.formData.weight <= 0) {
-                errors.push('Вес не указан или равен 0');
-            }
-            if (!this.formData.activity) {
-                errors.push('Уровень активности не указан');
-            }
-            if (!this.formData.goal) {
-                errors.push('Цель не указана');
-            }
-            
-            if (errors.length > 0) {
-                console.error('[ONBOARDING] Ошибки валидации:', errors);
-                const errorMsg = 'Не заполнены поля: ' + errors.join(', ');
-                this.showError(errorMsg);
-                // Прокручиваем к началу формы
-                const screen = document.getElementById('onboarding-screen');
-                if (screen) {
-                    screen.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-                throw new Error(errorMsg);
-            }
-            
-            // Скрываем ошибки, если все в порядке
-            this.hideError();
-
-            console.log('[ONBOARDING] Все поля заполнены, сохраняем данные...');
-            console.log('[ONBOARDING] Данные формы:', this.formData);
-            console.log('[ONBOARDING] Тип данных формы:', typeof this.formData);
-            console.log('[ONBOARDING] Ключи формы:', Object.keys(this.formData));
-            
-            // Создаем чистый объект для сохранения (без прототипов) с явным преобразованием типов
-            const cleanData = {
-                dateOfBirth: String(this.formData.dateOfBirth || ''),
-                age: Number(this.formData.age || 0),
-                gender: String(this.formData.gender || ''),
-                height: Number(this.formData.height || 0),
-                weight: Number(this.formData.weight || 0),
-                activity: String(this.formData.activity || ''),
-                goal: String(this.formData.goal || '')
+            // Собираем данные из формы в формате API
+            const profileData = {
+                birth_date: this.formData.dateOfBirth || '',
+                gender: this.formData.gender || '',
+                height_cm: parseInt(this.formData.height) || 0,
+                weight_kg: parseInt(this.formData.weight) || 0
             };
             
-            // Проверяем, что все обязательные поля заполнены еще раз
-            if (!cleanData.dateOfBirth) {
-                throw new Error('Дата рождения не указана');
-            }
-            if (!cleanData.gender) {
-                throw new Error('Пол не указан');
-            }
-            if (!cleanData.height || cleanData.height <= 0) {
-                throw new Error('Рост не указан');
-            }
-            if (!cleanData.weight || cleanData.weight <= 0) {
-                throw new Error('Вес не указан');
-            }
-            if (!cleanData.activity) {
-                throw new Error('Уровень активности не указан');
-            }
-            if (!cleanData.goal) {
-                throw new Error('Цель не указана');
-            }
-            
-            // Проверяем еще раз через DOM, если cleanData пустой
-            if (!cleanData.activity || cleanData.activity === 'undefined' || cleanData.activity === 'null' || cleanData.activity.trim() === '') {
-                const activityFromDOM = selectedActivityBtn ? selectedActivityBtn.dataset.activity : null;
-                if (activityFromDOM) {
-                    cleanData.activity = activityFromDOM;
-                } else {
-                    if (nextBtn) {
-                        nextBtn.disabled = false;
-                        nextBtn.textContent = 'Завершить';
-                    }
-                    return;
-                }
-            }
-            
-            if (!cleanData.goal || cleanData.goal === 'undefined' || cleanData.goal === 'null' || cleanData.goal.trim() === '') {
-                const goalFromDOM = selectedGoalBtn ? selectedGoalBtn.dataset.goal : null;
-                if (goalFromDOM) {
-                    cleanData.goal = goalFromDOM;
-                } else {
-                    if (nextBtn) {
-                        nextBtn.disabled = false;
-                        nextBtn.textContent = 'Завершить';
-                    }
-                    return;
-                }
-            }
-            
-            // Сохраняем данные на сервер
+            // Отправляем POST /api/profile
             if (typeof apiClient === 'undefined') {
-                if (nextBtn) {
-                    nextBtn.disabled = false;
-                    nextBtn.textContent = 'Завершить';
-                }
-                this.showServiceUnavailable();
-                return;
+                throw new Error('SERVICE_UNAVAILABLE');
             }
             
-            try {
-                await apiClient.saveProfile(cleanData);
-                
-                // Сохраняем в localStorage как кэш
-                try {
-                    localStorage.setItem('klyro_user_data', JSON.stringify(cleanData));
-                } catch (e) {
-                    // Игнорируем ошибки localStorage
-                }
-                
-                // Обновляем AppContext
-                appContext.userData = cleanData;
-                appContext.notifyListeners('userData', cleanData);
-
-                this.hapticFeedback('medium');
-
-                // Показываем Dashboard
-                hideAllScreens();
-                navigation.show();
-                dashboardScreen.show();
-                navigation.switchTab('home');
-            } catch (saveError) {
-                // При любой ошибке сохранения показываем нейтральный экран
-                this.showServiceUnavailable();
-            } finally {
-                // Всегда восстанавливаем кнопку
-                if (nextBtn) {
-                    nextBtn.disabled = false;
-                    nextBtn.textContent = 'Завершить';
-                }
-            }
+            // Получаем сохранённый профиль
+            const savedProfile = await apiClient.saveProfile(profileData);
+            
+            // Обновляем AppContext
+            appContext.userData = savedProfile;
+            appContext.notifyListeners('userData', savedProfile);
+            
+            this.hapticFeedback('medium');
+            
+            // Переходим в Dashboard
+            hideAllScreens();
+            navigation.show();
+            dashboardScreen.show();
+            navigation.switchTab('home');
         } catch (error) {
-            // Кнопка уже восстановлена в finally блоке выше
             // При любой ошибке показываем нейтральный экран
             this.showServiceUnavailable();
+        } finally {
+            if (nextBtn) {
+                nextBtn.disabled = false;
+                nextBtn.textContent = 'Завершить';
+            }
         }
     }
 

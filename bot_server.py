@@ -55,16 +55,13 @@ def init_db():
         # Это предотвращает гонки условий при параллельной инициализации worker'ов
         cur.execute("""
             CREATE TABLE IF NOT EXISTS profiles (
-                telegram_user_id BIGINT PRIMARY KEY,
-                birth_date VARCHAR(10),
-                age INTEGER,
-                gender VARCHAR(10),
-                height INTEGER,
-                weight DECIMAL(5,2),
-                activity VARCHAR(20),
-                goal VARCHAR(20),
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                telegram_user_id TEXT PRIMARY KEY,
+                birth_date DATE NOT NULL,
+                gender TEXT CHECK (gender IN ('male','female')) NOT NULL,
+                height_cm INTEGER NOT NULL,
+                weight_kg INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP DEFAULT now()
             )
         """)
         conn.commit()
@@ -154,28 +151,12 @@ def health():
 def get_profile():
     """
     Получить профиль пользователя
-    Требует: telegram_user_id в query параметрах или initData в headers
+    Требует: telegram_user_id в query параметрах
+    Возвращает: 200 + profile JSON если есть, 404 если нет
     """
     try:
-        # Получаем telegram_user_id из query параметров
         telegram_user_id = request.args.get('telegram_user_id')
-        
-        # Если не передан напрямую, пробуем извлечь из initData (опционально, для валидации)
         if not telegram_user_id:
-            init_data = request.headers.get('X-Telegram-Init-Data')
-            if init_data:
-                bot_token = os.environ.get('BOT_TOKEN', '')
-                if bot_token:
-                    is_valid, user_id = validate_telegram_init_data(init_data, bot_token)
-                    if is_valid:
-                        telegram_user_id = str(user_id)
-        
-        if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
-        
-        try:
-            telegram_user_id = int(telegram_user_id)
-        except (ValueError, TypeError):
             return {'error': 'Service unavailable'}, 500
         
         # Загружаем профиль из БД
@@ -184,11 +165,11 @@ def get_profile():
         try:
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute("""
-                SELECT telegram_user_id, birth_date, age, gender, height, weight, 
-                       activity, goal, updated_at, created_at
+                SELECT telegram_user_id, birth_date, gender, height_cm, weight_kg, 
+                       created_at, updated_at
                 FROM profiles
                 WHERE telegram_user_id = %s
-            """, (telegram_user_id,))
+            """, (str(telegram_user_id),))
             
             row = cur.fetchone()
             cur.close()
@@ -196,13 +177,11 @@ def get_profile():
             if row:
                 # Преобразуем в JSON-совместимый формат
                 profile = {
-                    'dateOfBirth': row['birth_date'],
-                    'age': row['age'],
+                    'telegram_user_id': row['telegram_user_id'],
+                    'birth_date': row['birth_date'].isoformat() if row['birth_date'] else None,
                     'gender': row['gender'],
-                    'height': int(row['height']) if row['height'] else None,
-                    'weight': float(row['weight']) if row['weight'] else None,
-                    'activity': row['activity'],
-                    'goal': row['goal']
+                    'height_cm': int(row['height_cm']),
+                    'weight_kg': int(row['weight_kg'])
                 }
                 return jsonify(profile), 200
             else:
@@ -219,45 +198,37 @@ def get_profile():
 @app.route('/api/profile', methods=['POST'])
 def save_profile():
     """
-    Сохранить или обновить профиль пользователя
+    Сохранить или обновить профиль пользователя (upsert)
     Требует: telegram_user_id и profile данные в JSON body
+    Возвращает: сохранённый профиль
     """
     try:
         data = request.json
         if not data:
             return {'error': 'Service unavailable'}, 500
         
-        # Получаем telegram_user_id из body
         telegram_user_id = data.get('telegram_user_id')
-        
-        # Если не передан, пробуем извлечь из initData (опционально, для валидации)
         if not telegram_user_id:
-            init_data = request.headers.get('X-Telegram-Init-Data')
-            if init_data:
-                bot_token = os.environ.get('BOT_TOKEN', '')
-                if bot_token:
-                    is_valid, user_id = validate_telegram_init_data(init_data, bot_token)
-                    if is_valid:
-                        telegram_user_id = user_id
+            return {'error': 'Service unavailable'}, 500
         
-        if not telegram_user_id:
+        # Валидация и извлечение данных профиля
+        birth_date = data.get('birth_date') or data.get('dateOfBirth')
+        gender = data.get('gender')
+        height_cm = data.get('height_cm') or data.get('height')
+        weight_kg = data.get('weight_kg') or data.get('weight')
+        
+        # Проверка обязательных полей
+        if not birth_date or not gender or not height_cm or not weight_kg:
+            return {'error': 'Service unavailable'}, 500
+        
+        if gender not in ('male', 'female'):
             return {'error': 'Service unavailable'}, 500
         
         try:
-            telegram_user_id = int(telegram_user_id)
+            height_cm = int(height_cm)
+            weight_kg = int(weight_kg)
         except (ValueError, TypeError):
             return {'error': 'Service unavailable'}, 500
-        
-        # Извлекаем данные профиля
-        profile_data = {
-            'birth_date': data.get('dateOfBirth') or data.get('birthDate'),
-            'age': data.get('age'),
-            'gender': data.get('gender'),
-            'height': data.get('height'),
-            'weight': data.get('weight'),
-            'activity': data.get('activity'),
-            'goal': data.get('goal')
-        }
         
         # Сохраняем в БД
         conn = get_db_connection()
@@ -267,38 +238,52 @@ def save_profile():
             # Используем INSERT ... ON CONFLICT для upsert
             cur.execute("""
                 INSERT INTO profiles (
-                    telegram_user_id, birth_date, age, gender, height, weight, activity, goal, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    telegram_user_id, birth_date, gender, height_cm, weight_kg, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, now())
                 ON CONFLICT (telegram_user_id) 
                 DO UPDATE SET
                     birth_date = EXCLUDED.birth_date,
-                    age = EXCLUDED.age,
                     gender = EXCLUDED.gender,
-                    height = EXCLUDED.height,
-                    weight = EXCLUDED.weight,
-                    activity = EXCLUDED.activity,
-                    goal = EXCLUDED.goal,
-                    updated_at = CURRENT_TIMESTAMP
+                    height_cm = EXCLUDED.height_cm,
+                    weight_kg = EXCLUDED.weight_kg,
+                    updated_at = now()
             """, (
-                telegram_user_id,
-                profile_data['birth_date'],
-                profile_data['age'],
-                profile_data['gender'],
-                profile_data['height'],
-                profile_data['weight'],
-                profile_data['activity'],
-                profile_data['goal']
+                str(telegram_user_id),
+                birth_date,
+                gender,
+                height_cm,
+                weight_kg
             ))
             
             conn.commit()
+            
+            # Загружаем сохранённый профиль
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("""
+                SELECT telegram_user_id, birth_date, gender, height_cm, weight_kg, 
+                       created_at, updated_at
+                FROM profiles
+                WHERE telegram_user_id = %s
+            """, (str(telegram_user_id),))
+            
+            row = cur.fetchone()
             cur.close()
             
-            return {'status': 'ok', 'telegram_user_id': telegram_user_id}, 200
+            if row:
+                profile = {
+                    'telegram_user_id': row['telegram_user_id'],
+                    'birth_date': row['birth_date'].isoformat() if row['birth_date'] else None,
+                    'gender': row['gender'],
+                    'height_cm': int(row['height_cm']),
+                    'weight_kg': int(row['weight_kg'])
+                }
+                return jsonify(profile), 200
+            else:
+                return {'error': 'Service unavailable'}, 500
         finally:
             conn.close()
             
     except Exception as e:
-        # Логируем для сервера, но не возвращаем технические детали клиенту
         print(f"Ошибка при сохранении профиля: {e}")
         import traceback
         traceback.print_exc()

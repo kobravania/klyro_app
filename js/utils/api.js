@@ -87,7 +87,7 @@ class ApiClient {
     /**
      * Сохранить профиль пользователя на сервер
      * @param {Object} profileData Данные профиля
-     * @returns {Promise<boolean>} true если успешно сохранено
+     * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
         const telegramUserId = this.getTelegramUserId();
@@ -129,7 +129,7 @@ class ApiClient {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            return true;
+            return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
             if (error.name === 'AbortError') {
