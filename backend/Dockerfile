@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копирование кода backend
 COPY bot_server.py .
+COPY gunicorn_config.py .
 COPY data/ ./data/
 
 # Создание пользователя для безопасности
@@ -29,7 +30,7 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
-# Запуск через gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "bot_server:app"]
+# Запуск через gunicorn с конфигурацией для инициализации БД
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--config", "gunicorn_config.py", "bot_server:app"]
 
 

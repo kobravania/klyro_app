@@ -130,11 +130,8 @@ def validate_telegram_init_data(init_data, bot_token):
         print(f"Ошибка валидации initData: {e}")
         return False, None
 
-# FAIL-FAST: Инициализируем БД ПЕРЕД запуском сервера
-# Если не удалось - процесс завершается
-print("Инициализация базы данных...")
-init_db()
-print("✓ База данных готова")
+# Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
+# Это предотвращает гонки условий при параллельной инициализации worker'ов
 
 def add_no_cache_headers(response):
     """Добавляет заголовки для предотвращения кэширования"""
