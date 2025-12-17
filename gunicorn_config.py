@@ -11,6 +11,11 @@ def when_ready(server):
     Выполняется ОДИН РАЗ в master процессе перед запуском worker'ов
     """
     # Импортируем функцию инициализации здесь, чтобы избежать циклических импортов
+    # Добавляем текущую директорию в путь для импорта
+    import sys
+    if '/app' not in sys.path:
+        sys.path.insert(0, '/app')
+    
     from bot_server import init_db
     
     print("Инициализация базы данных...")
