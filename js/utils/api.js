@@ -118,9 +118,16 @@ class ApiClient {
             });
 
             if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-                console.error('[API] Ошибка при сохранении профиля:', error);
-                throw new Error(error.error || 'Failed to save profile');
+                let errorMessage = 'Failed to save profile';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || `Server error: ${response.status}`;
+                    console.error('[API] Ошибка при сохранении профиля:', errorData);
+                } catch (e) {
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                    console.error('[API] Не удалось распарсить ответ об ошибке:', e);
+                }
+                throw new Error(errorMessage);
             }
 
             const result = await response.json();

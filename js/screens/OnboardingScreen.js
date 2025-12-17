@@ -733,11 +733,18 @@ class OnboardingScreen {
                 console.error('[ONBOARDING] Stack trace:', saveError.stack);
                 
                 // Показываем более детальное сообщение об ошибке
-                let errorMsg = 'Ошибка при сохранении данных';
-                if (saveError.message.includes('JSON')) {
-                    errorMsg = 'Ошибка при обработке данных. Попробуйте еще раз или перезагрузите приложение.';
-                } else if (saveError.message) {
-                    errorMsg = 'Ошибка: ' + saveError.message;
+                let errorMsg = 'Ошибка при сохранении данных на сервер';
+                
+                if (saveError.message) {
+                    if (saveError.message.includes('Failed to fetch') || saveError.message.includes('NetworkError')) {
+                        errorMsg = 'Ошибка подключения к серверу. Проверьте интернет-соединение.';
+                    } else if (saveError.message.includes('Database connection failed')) {
+                        errorMsg = 'Ошибка подключения к базе данных. Попробуйте позже.';
+                    } else if (saveError.message.includes('telegram_user_id required')) {
+                        errorMsg = 'Ошибка: не удалось определить пользователя. Перезагрузите приложение.';
+                    } else {
+                        errorMsg = 'Ошибка: ' + saveError.message;
+                    }
                 }
                 
                 this.showError(errorMsg);

@@ -247,7 +247,9 @@ def get_profile():
         return {'error': 'Invalid telegram_user_id'}, 400
     except Exception as e:
         print(f"Ошибка при получении профиля: {e}")
-        return {'error': str(e)}, 500
+        import traceback
+        traceback.print_exc()
+        return {'error': f'Database error: {str(e)}'}, 500
 
 @app.route('/api/profile', methods=['POST'])
 def save_profile():
@@ -333,7 +335,9 @@ def save_profile():
         return {'error': 'Invalid telegram_user_id'}, 400
     except Exception as e:
         print(f"Ошибка при сохранении профиля: {e}")
-        return {'error': str(e)}, 500
+        import traceback
+        traceback.print_exc()
+        return {'error': f'Database error: {str(e)}'}, 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
