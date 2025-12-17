@@ -51,41 +51,25 @@ def init_db():
     
     try:
         cur = conn.cursor()
-        # Проверяем, существует ли таблица
+        # Используем IF NOT EXISTS для атомарной проверки и создания
+        # Это предотвращает гонки условий при параллельной инициализации worker'ов
         cur.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'profiles'
+            CREATE TABLE IF NOT EXISTS profiles (
+                telegram_user_id BIGINT PRIMARY KEY,
+                birth_date VARCHAR(10),
+                age INTEGER,
+                gender VARCHAR(10),
+                height INTEGER,
+                weight DECIMAL(5,2),
+                activity VARCHAR(20),
+                goal VARCHAR(20),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        table_exists = cur.fetchone()[0]
-        
-        if not table_exists:
-            cur.execute("""
-                CREATE TABLE profiles (
-                    telegram_user_id BIGINT PRIMARY KEY,
-                    birth_date VARCHAR(10),
-                    age INTEGER,
-                    gender VARCHAR(10),
-                    height INTEGER,
-                    weight DECIMAL(5,2),
-                    activity VARCHAR(20),
-                    goal VARCHAR(20),
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            conn.commit()
-            print("✓ Таблица profiles создана")
-        else:
-            print("✓ Таблица profiles уже существует")
-        
+        conn.commit()
+        print("✓ Таблица profiles инициализирована")
         cur.close()
-    except psycopg2_errors.DuplicateTable:
-        # Таблица уже существует, это нормально
-        conn.rollback()
-        print("✓ Таблица profiles уже существует (duplicate)")
     except Exception as e:
         conn.rollback()
         print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
