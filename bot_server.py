@@ -146,6 +146,10 @@ def index():
 # Маршруты для статических файлов
 @app.route('/<path:path>')
 def serve_static(path):
+    # Пропускаем API маршруты
+    if path.startswith('api/'):
+        return {'error': 'Not found'}, 404
+    
     # Проверяем, что файл существует
     if os.path.exists(path) and os.path.isfile(path):
         response = send_from_directory('.', path)
