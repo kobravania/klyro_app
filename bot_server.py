@@ -191,17 +191,18 @@ def get_profile():
     Требует: telegram_user_id в query параметрах или initData в headers
     """
     try:
-        # Получаем telegram_user_id из query параметров или из initData
+        # Получаем telegram_user_id из query параметров
         telegram_user_id = request.args.get('telegram_user_id')
         
-        # Если не передан напрямую, пробуем извлечь из initData
+        # Если не передан напрямую, пробуем извлечь из initData (опционально, для валидации)
         if not telegram_user_id:
             init_data = request.headers.get('X-Telegram-Init-Data')
             if init_data:
                 bot_token = os.environ.get('BOT_TOKEN', '')
-                is_valid, user_id = validate_telegram_init_data(init_data, bot_token)
-                if is_valid:
-                    telegram_user_id = str(user_id)
+                if bot_token:
+                    is_valid, user_id = validate_telegram_init_data(init_data, bot_token)
+                    if is_valid:
+                        telegram_user_id = str(user_id)
         
         if not telegram_user_id:
             return {'error': 'telegram_user_id required'}, 400
@@ -259,16 +260,18 @@ def save_profile():
         if not data:
             return {'error': 'JSON body required'}, 400
         
-        # Получаем telegram_user_id
+        # Получаем telegram_user_id из body
         telegram_user_id = data.get('telegram_user_id')
+        
+        # Если не передан, пробуем извлечь из initData (опционально, для валидации)
         if not telegram_user_id:
-            # Пробуем извлечь из initData
             init_data = request.headers.get('X-Telegram-Init-Data')
             if init_data:
                 bot_token = os.environ.get('BOT_TOKEN', '')
-                is_valid, user_id = validate_telegram_init_data(init_data, bot_token)
-                if is_valid:
-                    telegram_user_id = user_id
+                if bot_token:
+                    is_valid, user_id = validate_telegram_init_data(init_data, bot_token)
+                    if is_valid:
+                        telegram_user_id = user_id
         
         if not telegram_user_id:
             return {'error': 'telegram_user_id required'}, 400
