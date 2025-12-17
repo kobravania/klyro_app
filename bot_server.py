@@ -154,6 +154,7 @@ def get_profile():
     Требует: telegram_user_id в query параметрах
     Возвращает: 200 + profile JSON если есть, 404 если нет
     """
+    print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
     try:
         telegram_user_id = request.args.get('telegram_user_id')
         if not telegram_user_id:
@@ -203,8 +204,10 @@ def save_profile():
     Возвращает: 200 если данные сохранены (даже если частично)
     Backend игнорирует лишние поля, принимает только нужные
     """
+    print(f"[API] POST /api/profile - запрос получен")
     try:
         data = request.json
+        print(f"[API] POST /api/profile - данные: {data}")
         if not data:
             return {'error': 'Service unavailable'}, 500
         
