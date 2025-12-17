@@ -222,7 +222,6 @@ def save_profile():
     Сохранить или обновить профиль пользователя
     Требует: telegram_user_id и profile данные в JSON body
     """
-    print(f"[API] POST /api/profile - запрос получен")
     try:
         data = request.json
         if not data:

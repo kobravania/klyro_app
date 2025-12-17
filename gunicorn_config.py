@@ -5,17 +5,14 @@ Gunicorn конфигурация для Klyro backend
 import os
 import sys
 
-# Добавляем путь к модулю
-sys.path.insert(0, os.path.dirname(__file__))
-
-# Импортируем функцию инициализации
-from bot_server import init_db
-
 def when_ready(server):
     """
     Hook, вызываемый когда gunicorn готов принимать соединения
     Выполняется ОДИН РАЗ в master процессе перед запуском worker'ов
     """
+    # Импортируем функцию инициализации здесь, чтобы избежать циклических импортов
+    from bot_server import init_db
+    
     print("Инициализация базы данных...")
     try:
         init_db()
