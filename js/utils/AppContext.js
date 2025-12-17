@@ -167,10 +167,32 @@ class AppContext {
      * Проверить, есть ли полный профиль
      */
     hasCompleteProfile() {
-        if (!this.userData) return false;
+        if (!this.userData) {
+            console.log('[CONTEXT] hasCompleteProfile: userData отсутствует');
+            return false;
+        }
+        
         const hasDate = !!(this.userData.dateOfBirth || this.userData.age);
         const hasHeight = !!this.userData.height && this.userData.height > 0;
-        return hasDate && hasHeight;
+        const hasGender = !!this.userData.gender;
+        const hasWeight = !!this.userData.weight && this.userData.weight > 0;
+        const hasActivity = !!this.userData.activity;
+        const hasGoal = !!this.userData.goal;
+        
+        const isComplete = hasDate && hasHeight && hasGender && hasWeight && hasActivity && hasGoal;
+        
+        console.log('[CONTEXT] hasCompleteProfile проверка:', {
+            hasDate,
+            hasHeight,
+            hasGender,
+            hasWeight,
+            hasActivity,
+            hasGoal,
+            isComplete,
+            userData: this.userData
+        });
+        
+        return isComplete;
     }
 
     /**

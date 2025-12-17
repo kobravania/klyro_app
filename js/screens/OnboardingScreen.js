@@ -706,10 +706,24 @@ class OnboardingScreen {
                 await storage.setItem('klyro_user_data', cleanData);
                 console.log('[ONBOARDING] ✅ Данные сохранены через storage');
                 
+                // Проверяем, что данные действительно сохранились
+                const checkData = await storage.getItem('klyro_user_data');
+                if (checkData) {
+                    try {
+                        const parsedCheck = JSON.parse(checkData);
+                        console.log('[ONBOARDING] ✅ Проверка сохранения: данные найдены в storage:', parsedCheck);
+                    } catch (e) {
+                        console.error('[ONBOARDING] ❌ Ошибка при проверке сохраненных данных:', e);
+                    }
+                } else {
+                    console.error('[ONBOARDING] ❌ ОШИБКА: Данные не найдены в storage после сохранения!');
+                }
+                
                 // Теперь обновляем AppContext
                 appContext.userData = cleanData;
                 appContext.notifyListeners('userData', cleanData);
                 console.log('[ONBOARDING] ✅ AppContext обновлен');
+                console.log('[ONBOARDING] hasCompleteProfile после сохранения:', appContext.hasCompleteProfile());
                 
             } catch (saveError) {
                 console.error('[ONBOARDING] ❌ Ошибка при сохранении:', saveError);
