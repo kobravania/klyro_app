@@ -14,8 +14,6 @@ from datetime import datetime
 import hashlib
 import hmac
 import urllib.parse
-import time
-import threading
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
