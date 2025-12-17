@@ -108,17 +108,32 @@ class ApiClient {
 
         const url = `${this.baseUrl}/api/profile`;
 
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload)
-        });
+        // Добавляем таймаут для запроса
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
 
-        if (!response.ok) {
-            throw new Error('SERVICE_UNAVAILABLE');
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error('SERVICE_UNAVAILABLE');
+            }
+
+            return true;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('SERVICE_UNAVAILABLE');
+            }
+            throw error;
         }
-
-        return true;
     }
 }
 

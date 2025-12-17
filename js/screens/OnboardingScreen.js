@@ -780,24 +780,9 @@ class OnboardingScreen {
                 nextBtn.textContent = 'Завершить';
             }
         } catch (error) {
-            // Восстанавливаем кнопку
-            if (nextBtn) {
-                nextBtn.disabled = false;
-                nextBtn.textContent = 'Завершить';
-            }
-            
-            // Проверяем тип ошибки
-            if (error.message === 'SERVICE_UNAVAILABLE' || error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                // Сервер недоступен - показываем нейтральный экран
-                this.showServiceUnavailable();
-            } else if (error.message.includes('Не все поля')) {
-                // Ошибка валидации - показываем только валидационное сообщение без технических деталей
-                const validationMsg = error.message.replace('Не все поля сохранились: ', '');
-                this.showValidationError(validationMsg);
-            } else {
-                // Любая другая ошибка - нейтральный экран
-                this.showServiceUnavailable();
-            }
+            // Кнопка уже восстановлена в finally блоке выше
+            // При любой ошибке показываем нейтральный экран
+            this.showServiceUnavailable();
         }
     }
 
