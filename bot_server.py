@@ -152,7 +152,6 @@ def health():
 
 @app.route('/api/profile', methods=['GET'])
 def get_profile():
-    print(f"[API] GET /api/profile - запрос получен")
     """
     Получить профиль пользователя
     Требует: telegram_user_id в query параметрах или initData в headers
@@ -226,7 +225,7 @@ def save_profile():
     try:
         data = request.json
         if not data:
-            return {'error': 'JSON body required'}, 400
+            return {'error': 'Service unavailable'}, 500
         
         # Получаем telegram_user_id из body
         telegram_user_id = data.get('telegram_user_id')
