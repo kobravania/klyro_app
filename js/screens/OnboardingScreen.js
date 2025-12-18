@@ -494,20 +494,6 @@ class OnboardingScreen {
         }
         
         try {
-            // Проверяем, что все обязательные поля заполнены
-            if (!this.formData.dateOfBirth) {
-                throw new Error('Дата рождения не указана');
-            }
-            if (!this.formData.gender) {
-                throw new Error('Пол не указан');
-            }
-            if (!this.formData.height || this.formData.height <= 0) {
-                throw new Error('Рост не указан');
-            }
-            if (!this.formData.weight || this.formData.weight <= 0) {
-                throw new Error('Вес не указан');
-            }
-            
             // Собираем данные из формы в формате API
             const profileData = {
                 birth_date: String(this.formData.dateOfBirth).trim(),
@@ -516,46 +502,17 @@ class OnboardingScreen {
                 weight_kg: parseInt(this.formData.weight)
             };
             
-            // Отправляем POST /api/profile (не делаем выводов по ответу)
             if (typeof apiClient === 'undefined') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
-            
-            // Отправляем POST и ждём успешного ответа
-            try {
-                await apiClient.saveProfile(profileData);
-            } catch (e) {
-                // Если POST упал - это ошибка
+
+            // СТРОГО ПО ТЗ: POST /api/profile возвращает сохранённый профиль.
+            const savedProfile = await apiClient.saveProfile(profileData);
+            if (!savedProfile || !savedProfile.telegram_user_id) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
-            
-            // Небольшая задержка для гарантии сохранения в БД
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            // Вызываем GET /api/profile (источник истины) с несколькими попытками
-            let savedProfile = null;
-            for (let attempt = 0; attempt < 3; attempt++) {
-                try {
-                    savedProfile = await apiClient.getProfile();
-                    if (savedProfile) {
-                        break;
-                    }
-                } catch (e) {
-                    // Игнорируем ошибки, пробуем ещё раз
-                }
-                if (attempt < 2) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-            }
-            
-            if (!savedProfile) {
-                // GET вернул 404 после нескольких попыток - профиль не создан
-                throw new Error('SERVICE_UNAVAILABLE');
-            }
-            
-            // GET вернул 200 - профиль создан, обновляем state
-            appContext.userData = savedProfile;
-            appContext.notifyListeners('userData', savedProfile);
+
+            await appContext.setUserData(savedProfile);
             
             this.hapticFeedback('medium');
             

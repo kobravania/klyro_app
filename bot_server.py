@@ -50,25 +50,31 @@ def init_db():
     conn = get_db_connection()
     
     try:
+        # ВАЖНО: init_db может быть вызван конкурентно (gunicorn, рестарты).
+        # Используем advisory lock, чтобы создание таблицы было строго одиночным.
+        conn.autocommit = True
         cur = conn.cursor()
-        # Используем IF NOT EXISTS для атомарной проверки и создания
-        # Это предотвращает гонки условий при параллельной инициализации worker'ов
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS profiles (
-                telegram_user_id TEXT PRIMARY KEY,
-                birth_date DATE NOT NULL,
-                gender TEXT CHECK (gender IN ('male','female')) NOT NULL,
-                height_cm INTEGER NOT NULL,
-                weight_kg INTEGER NOT NULL,
-                created_at TIMESTAMP DEFAULT now(),
-                updated_at TIMESTAMP DEFAULT now()
-            )
-        """)
-        conn.commit()
+
+        # Глобальная блокировка на уровне БД (одна на весь кластер)
+        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_profiles_v1'))")
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS profiles (
+                    telegram_user_id TEXT PRIMARY KEY,
+                    birth_date DATE NOT NULL,
+                    gender TEXT CHECK (gender IN ('male','female')) NOT NULL,
+                    height_cm INTEGER NOT NULL,
+                    weight_kg INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT now(),
+                    updated_at TIMESTAMP DEFAULT now()
+                )
+            """)
+        finally:
+            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_profiles_v1'))")
+
         print("✓ Таблица profiles инициализирована")
         cur.close()
     except Exception as e:
-        conn.rollback()
         print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
         import traceback
         traceback.print_exc()
@@ -237,7 +243,7 @@ def save_profile():
         except (ValueError, TypeError):
             return {'error': 'Service unavailable'}, 500
         
-        # Сохраняем в БД (idempotent - всегда успешно, если данные валидны)
+        # Сохраняем в БД (upsert)
         conn = get_db_connection()
         
         try:
@@ -265,8 +271,15 @@ def save_profile():
             conn.commit()
             cur.close()
             
-            # Всегда возвращаем 200 если сохранение прошло успешно
-            return {'status': 'ok'}, 200
+            # ОБЯЗАТЕЛЬНЫЙ КОНТРАКТ: вернуть сохранённый профиль (источник истины)
+            profile = {
+                'telegram_user_id': str(telegram_user_id),
+                'birth_date': str(birth_date),
+                'gender': gender,
+                'height_cm': int(height_cm),
+                'weight_kg': int(weight_kg)
+            }
+            return jsonify(profile), 200
         finally:
             conn.close()
             
