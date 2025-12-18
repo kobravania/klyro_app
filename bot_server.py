@@ -181,6 +181,17 @@ def _get_telegram_user_id_from_request():
         return None
     return uid
 
+def _resolve_telegram_user_id(provided_id):
+    """
+    Правило source-of-truth для identity:
+    - Если пришёл валидный X-Telegram-Init-Data -> используем user.id из него (игнорируем provided_id).
+    - Иначе (например, локальные self-test'ы) -> используем provided_id.
+    """
+    uid = _get_telegram_user_id_from_request()
+    if uid:
+        return uid
+    return provided_id
+
 def _row_to_profile(row):
     bd = row.get('birth_date')
     if isinstance(bd, (_date, datetime)):
@@ -304,8 +315,7 @@ def get_profile():
     print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
     try:
         telegram_user_id = request.args.get('telegram_user_id')
-        if not telegram_user_id:
-            telegram_user_id = _get_telegram_user_id_from_request()
+        telegram_user_id = _resolve_telegram_user_id(telegram_user_id)
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 500
         
@@ -350,8 +360,7 @@ def save_profile():
             return {'error': 'Service unavailable'}, 500
         
         telegram_user_id = data.get('telegram_user_id')
-        if not telegram_user_id:
-            telegram_user_id = _get_telegram_user_id_from_request()
+        telegram_user_id = _resolve_telegram_user_id(telegram_user_id)
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 500
         
