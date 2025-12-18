@@ -6,25 +6,6 @@
 class ApiClient {
     constructor() {
         this.baseUrl = window.location.origin;
-        this.sessionToken = this._getSessionTokenFromUrl();
-    }
-
-    _getSessionTokenFromUrl() {
-        try {
-            const params = new URLSearchParams(window.location.search || '');
-            const t = (params.get('session') || '').trim();
-            return t || null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    _requireSession() {
-        if (!this.sessionToken) {
-            const err = new Error('AUTH_REQUIRED');
-            err.code = 'AUTH_REQUIRED';
-            throw err;
-        }
     }
 
     /**
@@ -32,12 +13,10 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        this._requireSession();
         const headers = {
             'Content-Type': 'application/json'
         };
 
-        headers['X-Session'] = this.sessionToken;
         const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
@@ -48,7 +27,8 @@ class ApiClient {
             const response = await fetch(url, {
                 method: 'GET',
                 headers: headers,
-                signal: controller.signal
+                signal: controller.signal,
+                credentials: 'include'
             });
 
             clearTimeout(timeoutId);
@@ -86,12 +66,10 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        this._requireSession();
         const headers = {
             'Content-Type': 'application/json'
         };
 
-        headers['X-Session'] = this.sessionToken;
         const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
@@ -105,7 +83,8 @@ class ApiClient {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload),
-                signal: controller.signal
+                signal: controller.signal,
+                credentials: 'include'
             });
 
             clearTimeout(timeoutId);

@@ -103,10 +103,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Нажми кнопку ниже, чтобы открыть:"
     )
     
-    # Единственный путь входа: session в query
+    # Bootstrap only: backend sets HttpOnly cookie then redirects to /
     session_token = _ensure_session_for_user(str(user_id))
     sep = '&' if '?' in WEB_APP_URL else '?'
-    webapp_url = f"{WEB_APP_URL}{sep}session={session_token}"
+    # WebApp must open through /auth/bootstrap to set cookie.
+    # Keep it on the same domain to ensure cookie is stored for subsequent opens.
+    webapp_url = f"{WEB_APP_URL.rstrip('/')}/auth/bootstrap?session={session_token}"
 
     # Создаем кнопку с WebApp
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton

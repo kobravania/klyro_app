@@ -61,7 +61,7 @@ function showActivationScreen() {
     if (existing) existing.remove();
 
     const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
-    const deepLink = `https://t.me/${botUsername}?start=from_webapp`;
+    const deepLink = `https://t.me/${botUsername}?start=activate`;
 
     const screen = document.createElement('div');
     screen.id = 'activation-screen';
@@ -105,13 +105,6 @@ async function initApp() {
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
-
-        // Backend auth: only via session from bot (/start)
-        if (!window.apiClient || !window.apiClient.sessionToken) {
-            hideLoadingScreen();
-            showActivationScreen();
-            return;
-        }
 
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();

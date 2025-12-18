@@ -273,20 +273,20 @@ fi
 
 g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile" || true)"
 if [[ "$g1" != "401" ]]; then
-  echo "[FATAL] /api/profile did not return 401 without session (got ${g1})"
+  echo "[FATAL] /api/profile did not return 401 without cookie (got ${g1})"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 
-echo "[VERIFY] /api/profile POST без session (ожидаем 401) ..."
+echo "[VERIFY] /api/profile POST без cookie (ожидаем 401) ..."
 post_body="$(cat <<JSON
 {"birth_date":"1990-01-01","gender":"male","height_cm":180,"weight_kg":80}
 JSON
 )"
 pcode="$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -X POST "${BASE_URL}/api/profile" --data "${post_body}" || true)"
 if [[ "$pcode" != "401" ]]; then
-  echo "[FATAL] /api/profile POST returned HTTP ${pcode} (expected 401 without session)"
+  echo "[FATAL] /api/profile POST returned HTTP ${pcode} (expected 401 without cookie)"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1

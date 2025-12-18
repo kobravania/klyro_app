@@ -75,6 +75,8 @@ def init_db():
                     expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
                 )
             """)
+            # Ensure TTL column exists for older deployments
+            cur.execute("ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (now() + interval '30 days')")
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -228,9 +230,9 @@ def _select_profile(conn, telegram_user_id, colmap):
     return row
 
 def _get_session_token(req):
-    # The ONLY auth: session token created by bot on /start.
-    # WebApp receives it as ?session=<uuid> and then forwards it on each API call.
-    return (req.args.get('session') or req.headers.get('X-Session') or '').strip() or None
+    # Cookie-based auth (stable for all Telegram open entrypoints)
+    token = (req.cookies.get('klyro_session') or '').strip()
+    return token or None
 
 def getTelegramUserId(req):
     """
@@ -259,6 +261,48 @@ def getTelegramUserId(req):
         if not row:
             return None
         return str(row[0])
+    finally:
+        conn.close()
+
+@app.route('/auth/bootstrap')
+def auth_bootstrap():
+    """
+    Bootstrap only:
+    - accepts ?session=<token> once
+    - validates token exists & not expired
+    - sets HttpOnly cookie klyro_session
+    - redirects to /
+    """
+    token = (request.args.get('session') or '').strip()
+    if not token:
+        return "Unauthorized", 401
+
+    conn = get_db_connection()
+    try:
+        ensure_schema_ready(conn)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM public.sessions WHERE session_token = %s AND expires_at > now()",
+            (token,)
+        )
+        ok = cur.fetchone() is not None
+        cur.close()
+        if not ok:
+            return "Unauthorized", 401
+
+        resp = Response(status=302)
+        resp.headers['Location'] = '/'
+        # 30 days
+        resp.set_cookie(
+            'klyro_session',
+            token,
+            max_age=30 * 24 * 60 * 60,
+            httponly=True,
+            secure=True,
+            samesite='None',
+            path='/'
+        )
+        return resp
     finally:
         conn.close()
 
