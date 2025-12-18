@@ -12,12 +12,14 @@ class ApiClient {
      * Загрузить профиль пользователя с сервера
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
-    async getProfile() {
+    async getProfile(telegramUserId) {
         const headers = {
             'Content-Type': 'application/json'
         };
 
-        const url = `${this.baseUrl}/api/profile`;
+        const tid = String(telegramUserId || '').trim();
+        if (!tid) throw new Error('MISSING_TELEGRAM_USER_ID');
+        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -27,20 +29,13 @@ class ApiClient {
             const response = await fetch(url, {
                 method: 'GET',
                 headers: headers,
-                signal: controller.signal,
-                credentials: 'include'
+                signal: controller.signal
             });
 
             clearTimeout(timeoutId);
 
             if (response.status === 404) {
                 return null;
-            }
-
-            if (response.status === 401) {
-                const err = new Error('AUTH_REQUIRED');
-                err.code = 'AUTH_REQUIRED';
-                throw err;
             }
 
             if (!response.ok) {
@@ -50,9 +45,6 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            if (error.code === 'AUTH_REQUIRED') {
-                throw error;
-            }
             if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || (error.message && error.message.includes('Failed to fetch'))) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -65,12 +57,14 @@ class ApiClient {
      * @param {Object} profileData Данные профиля
      * @returns {Promise<Object>} Сохранённый профиль
      */
-    async saveProfile(profileData) {
+    async saveProfile(telegramUserId, profileData) {
         const headers = {
             'Content-Type': 'application/json'
         };
 
-        const payload = { ...profileData };
+        const tid = String(telegramUserId || '').trim();
+        if (!tid) throw new Error('MISSING_TELEGRAM_USER_ID');
+        const payload = { telegram_user_id: tid, ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
 
@@ -83,17 +77,10 @@ class ApiClient {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload),
-                signal: controller.signal,
-                credentials: 'include'
+                signal: controller.signal
             });
 
             clearTimeout(timeoutId);
-
-            if (response.status === 401) {
-                const err = new Error('AUTH_REQUIRED');
-                err.code = 'AUTH_REQUIRED';
-                throw err;
-            }
 
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');
@@ -102,9 +89,6 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            if (error.code === 'AUTH_REQUIRED') {
-                throw error;
-            }
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }

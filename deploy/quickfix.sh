@@ -265,28 +265,29 @@ if [[ "$code" != "200" ]]; then
   exit 1
 fi
 
-echo "[VERIFY] Checking /api/profile auth (session) ..."
+echo "[VERIFY] Checking /api/profile contract (no auth) ..."
 BASE_URL="http://${DOMAIN_HOST}"
 if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
   BASE_URL="https://${DOMAIN_HOST}"
 fi
 
-g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile" || true)"
-if [[ "$g1" != "401" ]]; then
-  echo "[FATAL] /api/profile did not return 401 without cookie (got ${g1})"
+g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile?telegram_user_id=999000111222" || true)"
+if [[ "$g1" != "404" && "$g1" != "200" ]]; then
+  echo "[FATAL] /api/profile GET returned HTTP ${g1} (expected 200 or 404)"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 
-echo "[VERIFY] /api/profile POST без cookie (ожидаем 401) ..."
+echo "[VERIFY] /api/profile POST (expects 200 + profile json) ..."
 post_body="$(cat <<JSON
-{"birth_date":"1990-01-01","gender":"male","height_cm":180,"weight_kg":80}
+{"telegram_user_id":"999000111222","birth_date":"1990-01-01","gender":"male","height_cm":180,"weight_kg":80}
 JSON
 )"
-pcode="$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -X POST "${BASE_URL}/api/profile" --data "${post_body}" || true)"
-if [[ "$pcode" != "401" ]]; then
-  echo "[FATAL] /api/profile POST returned HTTP ${pcode} (expected 401 without cookie)"
+pcode="$(curl -k -s -o /tmp/klyro_profile_post.json -w '%{http_code}' -H 'Content-Type: application/json' -X POST "${BASE_URL}/api/profile" --data "${post_body}" || true)"
+if [[ "$pcode" != "200" ]]; then
+  echo "[FATAL] /api/profile POST returned HTTP ${pcode}"
+  cat /tmp/klyro_profile_post.json || true
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1

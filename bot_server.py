@@ -45,7 +45,7 @@ def get_db_connection():
         sys.exit(1)
 
 def init_db():
-    """Инициализировать таблицы profiles/users/sessions. FAIL-FAST: выходит если не удалось."""
+    """Инициализировать таблицу profiles. FAIL-FAST: выходит если не удалось."""
     conn = get_db_connection()
     
     try:
@@ -55,29 +55,8 @@ def init_db():
         cur = conn.cursor()
 
         # Глобальная блокировка на уровне БД (одна на весь кластер)
-        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_v2'))")
+        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_profiles_v1'))")
         try:
-            # Users table (telegram_user_id comes ONLY from bot)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS public.users (
-                    telegram_user_id TEXT PRIMARY KEY,
-                    created_at TIMESTAMP DEFAULT now()
-                )
-            """)
-
-            # Sessions table: session_token is the ONLY auth for WebApp/API
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS public.sessions (
-                    session_token TEXT PRIMARY KEY,
-                    telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
-                    created_at TIMESTAMP DEFAULT now(),
-                    last_used_at TIMESTAMP DEFAULT now(),
-                    expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
-                )
-            """)
-            # Ensure TTL column exists for older deployments
-            cur.execute("ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (now() + interval '30 days')")
-
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS public.profiles (
                     telegram_user_id TEXT PRIMARY KEY,
@@ -94,18 +73,10 @@ def init_db():
             reg = cur.fetchone()[0]
             if reg is None:
                 raise RuntimeError("Таблица public.profiles не создана/не видна")
-            cur.execute("SELECT to_regclass('public.users') AS reg")
-            reg = cur.fetchone()[0]
-            if reg is None:
-                raise RuntimeError("Таблица public.users не создана/не видна")
-            cur.execute("SELECT to_regclass('public.sessions') AS reg")
-            reg = cur.fetchone()[0]
-            if reg is None:
-                raise RuntimeError("Таблица public.sessions не создана/не видна")
         finally:
-            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_v2'))")
+            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_profiles_v1'))")
 
-        print("✓ Таблицы users/sessions/profiles инициализированы")
+        print("✓ Таблица profiles инициализирована")
         cur.close()
     except Exception as e:
         print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
@@ -117,16 +88,15 @@ def init_db():
 
 def ensure_schema_ready(conn):
     """
-    Fail-fast: если схема не готова (нет таблиц users/sessions/profiles) — сервер не должен работать.
+    Fail-fast: если схема не готова (нет таблицы profiles) — сервер не должен работать.
     """
     try:
         cur = conn.cursor()
-        for t in ('public.users', 'public.sessions', 'public.profiles'):
-            cur.execute("SELECT to_regclass(%s) AS reg", (t,))
-            reg = cur.fetchone()[0]
-            if reg is None:
-                print(f"КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы {t})")
-                sys.exit(1)
+        cur.execute("SELECT to_regclass('public.profiles') AS reg")
+        reg = cur.fetchone()[0]
+        if reg is None:
+            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы public.profiles)")
+            sys.exit(1)
         cur.close()
     except Exception as e:
         print(f"КРИТИЧЕСКАЯ ОШИБКА: не удалось проверить схему БД: {e}")
@@ -229,108 +199,9 @@ def _select_profile(conn, telegram_user_id, colmap):
     cur.close()
     return row
 
-def _get_session_token(req):
-    # Cookie-based auth (stable for all Telegram open entrypoints)
-    token = (req.cookies.get('klyro_session') or '').strip()
-    return token or None
-
-def getTelegramUserId(req):
-    """
-    Единственный источник истины user_id = Telegram Bot.
-    Backend получает только session_token и находит telegram_user_id через sessions.
-    """
-    token = _get_session_token(req)
-    if not token:
-        return None
-    conn = get_db_connection()
-    try:
-        ensure_schema_ready(conn)
-        cur = conn.cursor()
-        cur.execute(
-            """
-            UPDATE public.sessions
-            SET last_used_at = now()
-            WHERE session_token = %s AND expires_at > now()
-            RETURNING telegram_user_id
-            """,
-            (token,)
-        )
-        row = cur.fetchone()
-        conn.commit()
-        cur.close()
-        if not row:
-            return None
-        return str(row[0])
-    finally:
-        conn.close()
-
-@app.route('/auth/bootstrap')
-def auth_bootstrap():
-    """
-    Bootstrap only:
-    - accepts ?session=<token> once
-    - validates token exists & not expired
-    - sets HttpOnly cookie klyro_session
-    - redirects to /
-    """
-    token = (request.args.get('session') or '').strip()
-    if not token:
-        return "Unauthorized", 401
-
-    conn = get_db_connection()
-    try:
-        ensure_schema_ready(conn)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT 1 FROM public.sessions WHERE session_token = %s AND expires_at > now()",
-            (token,)
-        )
-        ok = cur.fetchone() is not None
-        cur.close()
-        if not ok:
-            return "Unauthorized", 401
-
-        # Some Telegram mobile clients do not reliably follow 302 redirects for WebApp URLs.
-        # Return an HTML page that sets cookie and performs client-side redirect.
-        html = """<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <meta http-equiv="refresh" content="0;url=/" />
-  <title>Klyro</title>
-  <style>
-    body { margin:0; background:#0F1419; color:#EAF1F7; font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; }
-    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; }
-    .text { opacity:.8; font-size:14px; }
-  </style>
-  <script>
-    try { window.location.replace('/'); } catch (e) {}
-  </script>
-</head>
-<body><div class="wrap"><div class="text">Открываем Klyro…</div></div></body>
-</html>"""
-
-        resp = Response(html, status=200, mimetype='text/html')
-        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        resp.headers['Pragma'] = 'no-cache'
-        resp.headers['Expires'] = '0'
-        # 30 days cookie
-        resp.set_cookie(
-            'klyro_session',
-            token,
-            max_age=30 * 24 * 60 * 60,
-            httponly=True,
-            secure=True,
-            samesite='None',
-            path='/'
-        )
-        return resp
-    finally:
-        conn.close()
+def _require_telegram_user_id_from_query():
+    tid = (request.args.get('telegram_user_id') or '').strip()
+    return tid or None
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
@@ -366,10 +237,9 @@ def get_profile():
     """
     print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
     try:
-        telegram_user_id = getTelegramUserId(request)
+        telegram_user_id = _require_telegram_user_id_from_query()
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 401
-        print(f"[API] GET /api/profile - telegram_user_id={telegram_user_id}")
+            return {'error': 'Service unavailable'}, 500
         
         # Загружаем профиль из БД
         conn = get_db_connection()
@@ -407,10 +277,9 @@ def save_profile():
         if not data:
             return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = getTelegramUserId(request)
+        telegram_user_id = (data.get('telegram_user_id') or '').strip()
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 401
-        print(f"[API] POST /api/profile - telegram_user_id={telegram_user_id}")
+            return {'error': 'Service unavailable'}, 500
         
         # Извлекаем данные профиля (игнорируем лишние поля)
         birth_date = data.get('birth_date') or data.get('dateOfBirth')
