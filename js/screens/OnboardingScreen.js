@@ -339,6 +339,16 @@ class OnboardingScreen {
     }
 
     show() {
+        // Если профиль уже загружен из сервера — онбординг показывать нельзя.
+        // Это защищает от циклов “сохранили → что-то дернуло show() → снова шаг 1”.
+        if (window.appContext && typeof window.appContext.hasProfile === 'function' && window.appContext.hasProfile()) {
+            if (typeof hideAllScreens === 'function') hideAllScreens();
+            if (window.navigation && typeof window.navigation.show === 'function') window.navigation.show();
+            if (window.dashboardScreen && typeof window.dashboardScreen.show === 'function') window.dashboardScreen.show();
+            if (window.navigation && typeof window.navigation.switchTab === 'function') window.navigation.switchTab('home');
+            return;
+        }
+
         const screen = document.getElementById('onboarding-screen');
         if (!screen) {
             this.createHTML();
