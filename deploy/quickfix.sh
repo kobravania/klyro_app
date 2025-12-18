@@ -73,7 +73,55 @@ DOMAIN_HOST="${DOMAIN_HOST%%/*}"
 NGINX_AVAILABLE="/etc/nginx/sites-available/klyro"
 NGINX_ENABLED="/etc/nginx/sites-enabled/klyro"
 
-cat > "$NGINX_AVAILABLE" <<EOF
+CERT_DIR="/etc/letsencrypt/live/${DOMAIN_HOST}"
+FULLCHAIN="${CERT_DIR}/fullchain.pem"
+PRIVKEY="${CERT_DIR}/privkey.pem"
+
+if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
+  # HTTPS available -> force https and terminate TLS here (Telegram uses https)
+  cat > "$NGINX_AVAILABLE" <<EOF
+server {
+  listen 80;
+  server_name ${DOMAIN_HOST};
+  return 301 https://\$host\$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  server_name ${DOMAIN_HOST};
+
+  ssl_certificate     ${FULLCHAIN};
+  ssl_certificate_key ${PRIVKEY};
+
+  # Telegram Mini App must not be cached aggressively
+  add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+  add_header Pragma "no-cache" always;
+  add_header Expires "0" always;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 60s;
+    proxy_connect_timeout 10s;
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
+}
+EOF
+else
+  # No certs -> serve plain HTTP (still usable for local debug)
+  cat > "$NGINX_AVAILABLE" <<EOF
 server {
   listen 80;
   server_name ${DOMAIN_HOST};
@@ -104,6 +152,7 @@ server {
   }
 }
 EOF
+fi
 
 ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
 
