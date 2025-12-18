@@ -15,6 +15,7 @@ from datetime import datetime
 import hashlib
 import hmac
 import urllib.parse
+from functools import lru_cache
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
@@ -104,6 +105,43 @@ def ensure_schema_ready(conn):
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+@lru_cache(maxsize=1)
+def _profiles_column_map():
+    """
+    Определяет реальные имена колонок в public.profiles.
+    Мы НЕ меняем схему существующей БД; просто адаптируемся:
+    - height_cm может называться height
+    - weight_kg может называться weight
+    """
+    conn = get_db_connection()
+    try:
+        ensure_schema_ready(conn)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'profiles'
+        """)
+        cols = {r[0] for r in cur.fetchall()}
+        cur.close()
+
+        height_col = 'height_cm' if 'height_cm' in cols else ('height' if 'height' in cols else None)
+        weight_col = 'weight_kg' if 'weight_kg' in cols else ('weight' if 'weight' in cols else None)
+
+        if not height_col or not weight_col:
+            # Fail-fast: без обязательных полей профиля работать нельзя
+            print(f"КРИТИЧЕСКАЯ ОШИБКА: profiles не содержит необходимых колонок. Найдено: {sorted(cols)}")
+            sys.exit(1)
+
+        return {
+            'height': height_col,
+            'weight': weight_col,
+            'has_created_at': 'created_at' in cols,
+            'has_updated_at': 'updated_at' in cols,
+        }
+    finally:
+        conn.close()
 
 def validate_telegram_init_data(init_data, bot_token):
     """
@@ -199,13 +237,25 @@ def get_profile():
         
         try:
             ensure_schema_ready(conn)
+            colmap = _profiles_column_map()
             cur = conn.cursor(cursor_factory=RealDictCursor)
-            cur.execute("""
-                SELECT telegram_user_id, birth_date, gender, height_cm, weight_kg, 
-                       created_at, updated_at
-                FROM public.profiles
-                WHERE telegram_user_id = %s
-            """, (str(telegram_user_id),))
+            select_cols = [
+                "telegram_user_id",
+                "birth_date",
+                "gender",
+                f"{colmap['height']} AS height_value",
+                f"{colmap['weight']} AS weight_value",
+            ]
+            # created_at/updated_at могут отсутствовать в старой схеме
+            if colmap.get('has_created_at'):
+                select_cols.append("created_at")
+            if colmap.get('has_updated_at'):
+                select_cols.append("updated_at")
+
+            cur.execute(
+                f"SELECT {', '.join(select_cols)} FROM public.profiles WHERE telegram_user_id = %s",
+                (str(telegram_user_id),)
+            )
             
             row = cur.fetchone()
             cur.close()
@@ -216,8 +266,8 @@ def get_profile():
                     'telegram_user_id': row['telegram_user_id'],
                     'birth_date': row['birth_date'].isoformat() if row['birth_date'] else None,
                     'gender': row['gender'],
-                    'height_cm': int(row['height_cm']),
-                    'weight_kg': int(row['weight_kg'])
+                    'height_cm': int(row['height_value']),
+                    'weight_kg': int(row['weight_value'])
                 }
                 return jsonify(profile), 200
             else:
@@ -277,26 +327,40 @@ def save_profile():
         
         try:
             ensure_schema_ready(conn)
+            colmap = _profiles_column_map()
             cur = conn.cursor()
             # Используем INSERT ... ON CONFLICT для upsert
-            cur.execute("""
-                INSERT INTO public.profiles (
-                    telegram_user_id, birth_date, gender, height_cm, weight_kg, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, now())
-                ON CONFLICT (telegram_user_id) 
-                DO UPDATE SET
-                    birth_date = EXCLUDED.birth_date,
-                    gender = EXCLUDED.gender,
-                    height_cm = EXCLUDED.height_cm,
-                    weight_kg = EXCLUDED.weight_kg,
-                    updated_at = now()
-            """, (
-                str(telegram_user_id),
-                birth_date,
-                gender,
-                height_cm,
-                weight_kg
-            ))
+            height_col = colmap['height']
+            weight_col = colmap['weight']
+
+            # updated_at может отсутствовать в старой схеме — тогда не трогаем
+            has_updated = colmap.get('has_updated_at', False)
+            insert_cols = ["telegram_user_id", "birth_date", "gender", height_col, weight_col]
+            insert_vals = ["%s", "%s", "%s", "%s", "%s"]
+            params = [str(telegram_user_id), birth_date, gender, height_cm, weight_kg]
+
+            if has_updated:
+                insert_cols.append("updated_at")
+                insert_vals.append("now()")
+
+            update_sets = [
+                "birth_date = EXCLUDED.birth_date",
+                "gender = EXCLUDED.gender",
+                f"{height_col} = EXCLUDED.{height_col}",
+                f"{weight_col} = EXCLUDED.{weight_col}",
+            ]
+            if has_updated:
+                update_sets.append("updated_at = now()")
+
+            cur.execute(
+                f"""
+                INSERT INTO public.profiles ({', '.join(insert_cols)})
+                VALUES ({', '.join(insert_vals)})
+                ON CONFLICT (telegram_user_id)
+                DO UPDATE SET {', '.join(update_sets)}
+                """,
+                tuple(params)
+            )
             
             conn.commit()
             cur.close()
