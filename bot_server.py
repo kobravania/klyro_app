@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import urllib.parse
 from functools import lru_cache
+from datetime import date as _date
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
@@ -283,10 +284,18 @@ def get_profile():
             cur.close()
             
             if row:
+                bd = row.get('birth_date')
+                # В старой схеме birth_date может быть TEXT -> тогда это уже строка YYYY-MM-DD
+                if isinstance(bd, (_date, datetime)):
+                    birth_date_out = bd.isoformat()
+                elif bd is None:
+                    birth_date_out = None
+                else:
+                    birth_date_out = str(bd)
                 # Преобразуем в JSON-совместимый формат
                 profile = {
                     'telegram_user_id': row['telegram_user_id'],
-                    'birth_date': row['birth_date'].isoformat() if row['birth_date'] else None,
+                    'birth_date': birth_date_out,
                     'gender': row['gender'],
                     'height_cm': int(row['height_value']),
                     'weight_kg': int(row['weight_value'])
