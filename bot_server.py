@@ -202,16 +202,40 @@ def _get_session_id(req):
     sid = (req.headers.get('X-Klyro-Session') or '').strip()
     return sid or None
 
+@lru_cache(maxsize=1)
+def _sessions_key_column():
+    """
+    Compatibility: older DB schema uses session_token, newer uses session_id.
+    Detect which column exists and use it for lookups.
+    """
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='sessions'
+              AND column_name IN ('session_token','session_id')
+            ORDER BY CASE column_name WHEN 'session_token' THEN 0 ELSE 1 END
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        cur.close()
+        return (row[0] if row else 'session_token')
+    finally:
+        conn.close()
+
 def _telegram_user_id_from_session(session_id: str):
     conn = get_db_connection()
     try:
         ensure_schema_ready(conn)
+        key_col = _sessions_key_column()
         cur = conn.cursor()
         cur.execute(
-            """
+            f"""
             UPDATE public.sessions
             SET last_used_at = now()
-            WHERE session_id = %s AND expires_at > now()
+            WHERE {key_col} = %s AND expires_at > now()
             RETURNING telegram_user_id
             """,
             (session_id,)
