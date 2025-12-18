@@ -104,9 +104,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Create/ensure user + session in DB; WebApp opens ONLY with session_token
     session_token = _ensure_session_for_user(str(user_id))
-    webapp_url = WEB_APP_URL
-    sep = '&' if '?' in webapp_url else '?'
-    webapp_url = f"{webapp_url}{sep}session_token={session_token}"
+    # IMPORTANT: Telegram WebApp may drop/normalize query params in some clients.
+    # Use URL fragment for the token; frontend will read it and pass via headers.
+    webapp_url = f"{WEB_APP_URL}#session_token={session_token}"
 
     # Создаем кнопку с WebApp
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
