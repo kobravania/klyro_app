@@ -163,27 +163,24 @@ def _normalize_telegram_user_id(raw_id, colmap):
         return int(str(raw_id))
     return str(raw_id)
 
-def _get_telegram_user_id_from_request():
+def getTelegramUserId(req):
     """
-    Надёжный источник telegram_user_id: валидируем initData из Telegram WebApp.
-    Возвращает user_id или None.
+    Единственный источник identity:
+    - initData ТОЛЬКО из headers['X-Telegram-Init-Data']
+    - валидируем подпись
+    - возвращаем user.id как строку
     """
-    # Primary transport: header (preferred)
-    init_data = request.headers.get('X-Telegram-Init-Data', '') or ''
-    # Fallback transport (still initData): query param for cases where proxy/WebView strips custom headers
-    if not init_data:
-        init_data = request.args.get('init_data', '') or ''
+    init_data = req.headers.get('X-Telegram-Init-Data', '') or ''
     if not init_data:
         return None
     bot_token = os.environ.get('BOT_TOKEN')
     if not bot_token:
-        # Fail-fast: без BOT_TOKEN нельзя валидировать initData
         print("КРИТИЧЕСКАЯ ОШИБКА: отсутствует BOT_TOKEN для валидации Telegram initData")
         sys.exit(1)
     ok, uid = validate_telegram_init_data(init_data, bot_token)
-    if not ok or not uid:
+    if not ok or uid is None:
         return None
-    return uid
+    return str(uid)
 
 def _row_to_profile(row):
     bd = row.get('birth_date')
@@ -309,7 +306,7 @@ def get_profile():
     """
     print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
     try:
-        telegram_user_id = _get_telegram_user_id_from_request()
+        telegram_user_id = getTelegramUserId(request)
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 401
         
@@ -349,7 +346,7 @@ def save_profile():
         if not data:
             return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = _get_telegram_user_id_from_request()
+        telegram_user_id = getTelegramUserId(request)
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 401
         
