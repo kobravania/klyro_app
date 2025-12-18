@@ -26,6 +26,10 @@ if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
 
 def _get_db_connection():
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        return psycopg2.connect(db_url)
+
     required_vars = ['POSTGRES_HOST', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD']
     missing = [v for v in required_vars if not os.environ.get(v)]
     if missing:
