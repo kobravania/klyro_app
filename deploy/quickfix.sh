@@ -50,7 +50,7 @@ until curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; do
   sleep 2
 done
 deadline=$((SECONDS+90))
-until curl -fsS http://127.0.0.1:5000/health >/dev/null 2>&1; do
+until docker-compose -f "$COMPOSE_FILE" exec -T backend curl -fsS http://localhost:5000/health >/dev/null 2>&1; do
   if (( SECONDS > deadline )); then
     echo "[FATAL] Backend healthcheck failed on :5000"
     exit 1
