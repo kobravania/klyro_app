@@ -58,9 +58,12 @@ def _ensure_session_for_user(telegram_user_id: str) -> str:
                 created_at TIMESTAMP DEFAULT now()
             )
         """)
+        # IMPORTANT: DB may already have an existing sessions table from older deploys.
+        # Older schema used session_token column; newer used session_id.
+        # We must not break existing DB; detect column name dynamically and write accordingly.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS public.sessions (
-                session_id TEXT PRIMARY KEY,
+                session_token TEXT PRIMARY KEY,
                 telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
                 created_at TIMESTAMP DEFAULT now(),
                 last_used_at TIMESTAMP DEFAULT now(),
@@ -68,13 +71,25 @@ def _ensure_session_for_user(telegram_user_id: str) -> str:
             )
         """)
         cur.execute("ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (now() + interval '30 days')")
+
+        # detect session key column
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='sessions'
+              AND column_name IN ('session_token','session_id')
+            ORDER BY CASE column_name WHEN 'session_token' THEN 0 ELSE 1 END
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        session_key_col = row[0] if row else 'session_token'
         cur.execute(
             "INSERT INTO public.users (telegram_user_id) VALUES (%s) ON CONFLICT (telegram_user_id) DO NOTHING",
             (telegram_user_id,)
         )
         session_id = str(uuid.uuid4())
         cur.execute(
-            "INSERT INTO public.sessions (session_id, telegram_user_id) VALUES (%s, %s)",
+            f"INSERT INTO public.sessions ({session_key_col}, telegram_user_id) VALUES (%s, %s)",
             (session_id, telegram_user_id)
         )
         conn.commit()
