@@ -54,6 +54,18 @@ function hideLoadingScreen() {
 
 function showOpenViaBotScreen() {
     hideAllScreens();
+    // IMPORTANT: Activation screen must be static: hide app navigation/FAB and stop.
+    if (window.navigation && typeof window.navigation.hide === 'function') {
+        try { window.navigation.hide(); } catch (e) {}
+    }
+    try {
+        const nav = document.getElementById('bottom-nav');
+        if (nav) nav.style.display = 'none';
+    } catch (e) {}
+    try {
+        const fab = document.getElementById('fab-add-food');
+        if (fab) fab.classList.add('hidden');
+    } catch (e) {}
     const app = document.getElementById('app');
     if (!app) return;
 

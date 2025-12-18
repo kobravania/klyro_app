@@ -36,6 +36,10 @@ if systemctl list-unit-files | grep -q '^klyro\.service'; then
   systemctl stop klyro.service >/dev/null 2>&1 || true
   systemctl disable klyro.service >/dev/null 2>&1 || true
 fi
+if systemctl list-unit-files | grep -q '^klyro-bot\.service'; then
+  systemctl stop klyro-bot >/dev/null 2>&1 || true
+  systemctl disable klyro-bot >/dev/null 2>&1 || true
+fi
 
 echo "[4/6] Building & starting docker-compose stack..."
 # BuildKit sometimes fails on small VPS with: "DeadlineExceeded: context deadline exceeded"
