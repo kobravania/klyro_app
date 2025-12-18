@@ -369,6 +369,7 @@ def get_profile():
         telegram_user_id = getTelegramUserId(request)
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 401
+        print(f"[API] GET /api/profile - telegram_user_id={telegram_user_id}")
         
         # Загружаем профиль из БД
         conn = get_db_connection()
@@ -409,6 +410,7 @@ def save_profile():
         telegram_user_id = getTelegramUserId(request)
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 401
+        print(f"[API] POST /api/profile - telegram_user_id={telegram_user_id}")
         
         # Извлекаем данные профиля (игнорируем лишние поля)
         birth_date = data.get('birth_date') or data.get('dateOfBirth')

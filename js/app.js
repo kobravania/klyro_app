@@ -61,7 +61,7 @@ function showActivationScreen() {
     if (existing) existing.remove();
 
     const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
-    const deepLink = `https://t.me/${botUsername}?start=activate`;
+    const deepLink = `https://t.me/${botUsername}?start=webapp`;
 
     const screen = document.createElement('div');
     screen.id = 'activation-screen';
@@ -72,14 +72,23 @@ function showActivationScreen() {
         <div class="screen-content">
             <h1 class="screen-title">Активация</h1>
             <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                Чтобы использовать Klyro, сначала активируй его через бота
+                Чтобы продолжить, активируйте приложение через бота
             </p>
-            <a class="btn btn-primary btn-block" href="${deepLink}" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
-                🔵 Перейти к боту
-            </a>
+            <button class="btn btn-primary btn-block" id="activation-open-bot" style="display:flex; align-items:center; justify-content:center;">
+                Открыть через Telegram
+            </button>
         </div>
     `;
     app.appendChild(screen);
+
+    const btn = document.getElementById('activation-open-bot');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            try {
+                window.open(deepLink, '_blank');
+            } catch (e) {}
+        });
+    }
 }
 
 // ============================================

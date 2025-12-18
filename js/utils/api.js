@@ -89,6 +89,12 @@ class ApiClient {
 
             clearTimeout(timeoutId);
 
+            if (response.status === 401) {
+                const err = new Error('AUTH_REQUIRED');
+                err.code = 'AUTH_REQUIRED';
+                throw err;
+            }
+
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -96,6 +102,9 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
+            if (error.code === 'AUTH_REQUIRED') {
+                throw error;
+            }
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
