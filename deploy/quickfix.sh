@@ -201,7 +201,8 @@ if [[ "$code" != "200" ]]; then
 fi
 
 echo "[VERIFY] Checking /api/profile (GET 404 then POST 200 with profile JSON then GET 200) ..."
-SELFTEST_ID="selftest_${DOMAIN_HOST//./_}"
+# telegram_user_id в существующей БД может быть BIGINT -> selftest делаем числовым
+SELFTEST_ID="999000111222"
 BASE_URL="http://${DOMAIN_HOST}"
 if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
   BASE_URL="https://${DOMAIN_HOST}"

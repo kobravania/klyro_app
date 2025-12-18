@@ -126,6 +126,19 @@ def _profiles_column_map():
         cols = {r[0] for r in cur.fetchall()}
         cur.close()
 
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT data_type
+            FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='profiles' AND column_name='telegram_user_id'
+        """)
+        row = cur.fetchone()
+        cur.close()
+        if not row:
+            print("КРИТИЧЕСКАЯ ОШИБКА: profiles.telegram_user_id колонка не найдена")
+            sys.exit(1)
+        telegram_user_id_type = row[0]  # e.g. 'bigint' or 'text'
+
         height_col = 'height_cm' if 'height_cm' in cols else ('height' if 'height' in cols else None)
         weight_col = 'weight_kg' if 'weight_kg' in cols else ('weight' if 'weight' in cols else None)
 
@@ -135,6 +148,7 @@ def _profiles_column_map():
             sys.exit(1)
 
         return {
+            'telegram_user_id_type': telegram_user_id_type,
             'height': height_col,
             'weight': weight_col,
             'has_created_at': 'created_at' in cols,
@@ -238,6 +252,14 @@ def get_profile():
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
+            # telegram_user_id может быть BIGINT в существующей схеме
+            if colmap.get('telegram_user_id_type') == 'bigint':
+                try:
+                    telegram_user_id = int(str(telegram_user_id))
+                except Exception:
+                    return {'error': 'Service unavailable'}, 500
+            else:
+                telegram_user_id = str(telegram_user_id)
             cur = conn.cursor(cursor_factory=RealDictCursor)
             select_cols = [
                 "telegram_user_id",
@@ -254,7 +276,7 @@ def get_profile():
 
             cur.execute(
                 f"SELECT {', '.join(select_cols)} FROM public.profiles WHERE telegram_user_id = %s",
-                (str(telegram_user_id),)
+                (telegram_user_id,)
             )
             
             row = cur.fetchone()
@@ -328,6 +350,13 @@ def save_profile():
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
+            if colmap.get('telegram_user_id_type') == 'bigint':
+                try:
+                    telegram_user_id = int(str(telegram_user_id))
+                except Exception:
+                    return {'error': 'Service unavailable'}, 500
+            else:
+                telegram_user_id = str(telegram_user_id)
             cur = conn.cursor()
             # Используем INSERT ... ON CONFLICT для upsert
             height_col = colmap['height']
@@ -337,7 +366,7 @@ def save_profile():
             has_updated = colmap.get('has_updated_at', False)
             insert_cols = ["telegram_user_id", "birth_date", "gender", height_col, weight_col]
             insert_vals = ["%s", "%s", "%s", "%s", "%s"]
-            params = [str(telegram_user_id), birth_date, gender, height_cm, weight_kg]
+            params = [telegram_user_id, birth_date, gender, height_cm, weight_kg]
 
             if has_updated:
                 insert_cols.append("updated_at")
