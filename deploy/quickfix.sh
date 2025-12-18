@@ -45,6 +45,40 @@ export COMPOSE_DOCKER_CLI_BUILD=0
 # Ensure stable compose project name (prevents accidental new volumes/network)
 export COMPOSE_PROJECT_NAME=klyro
 
+# Postgres persistence hard guarantee:
+# Older deployments could have created multiple volumes (e.g. <project>_klyro_postgres_data).
+# Now we pin the volume name to klyro_postgres_data; migrate data automatically if needed.
+echo "[4/6] Ensuring postgres volume is stable..."
+TARGET_VOL="klyro_postgres_data"
+if ! docker volume inspect "$TARGET_VOL" >/dev/null 2>&1; then
+  # Find candidates that look like old compose-managed volumes
+  candidates="$(docker volume ls -q | grep -E 'klyro_postgres_data$' | grep -v "^${TARGET_VOL}$" || true)"
+  if [[ -n "$candidates" ]]; then
+    # Pick the most recently created candidate
+    best=""
+    best_ts=0
+    while IFS= read -r v; do
+      [[ -z "$v" ]] && continue
+      created="$(docker volume inspect -f '{{.CreatedAt}}' "$v" 2>/dev/null || true)"
+      # date -d works on Ubuntu
+      ts="$(date -d "$created" +%s 2>/dev/null || echo 0)"
+      if (( ts > best_ts )); then
+        best_ts=$ts
+        best="$v"
+      fi
+    done <<< "$candidates"
+    if [[ -n "$best" ]]; then
+      echo "[4/6] Migrating postgres volume ${best} -> ${TARGET_VOL} ..."
+      docker volume create "$TARGET_VOL" >/dev/null
+      # Copy contents via a throwaway container (tar pipeline)
+      docker run --rm \
+        -v "${best}:/from:ro" \
+        -v "${TARGET_VOL}:/to" \
+        alpine sh -c "cd /from && tar cf - . | (cd /to && tar xpf -)" >/dev/null 2>&1 || true
+    fi
+  fi
+fi
+
 # Pre-pull base images to reduce build flakiness
 docker-compose -f "$COMPOSE_FILE" pull --ignore-pull-failures || true
 
