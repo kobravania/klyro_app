@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Klyro one-shot self-healing deploy:
+# - pull latest code
+# - ensure docker-compose stack is up
+# - avoid conflicts with legacy systemd service (klyro.service)
+# - configure system nginx to proxy subdomain to docker frontend and /api/ to backend
+
+PROJECT_DIR="${PROJECT_DIR:-/root/klyro}"
+COMPOSE_FILE="${COMPOSE_FILE:-$PROJECT_DIR/docker-compose.yml}"
+
+if [[ ! -d "$PROJECT_DIR" ]]; then
+  echo "[FATAL] Project dir not found: $PROJECT_DIR"
+  exit 1
+fi
+
+cd "$PROJECT_DIR"
+
+echo "[1/6] Updating code..."
+git fetch origin main >/dev/null 2>&1 || true
+git pull --ff-only origin main
+
+echo "[2/6] Ensuring docker + compose available..."
+if ! command -v docker >/dev/null 2>&1; then
+  echo "[FATAL] docker not found"
+  exit 1
+fi
+if ! command -v docker-compose >/dev/null 2>&1; then
+  echo "[FATAL] docker-compose not found"
+  exit 1
+fi
+
+echo "[3/6] Stopping legacy systemd service (if exists)..."
+if systemctl list-unit-files | grep -q '^klyro\.service'; then
+  systemctl stop klyro.service >/dev/null 2>&1 || true
+  systemctl disable klyro.service >/dev/null 2>&1 || true
+fi
+
+echo "[4/6] Building & starting docker-compose stack..."
+docker-compose -f "$COMPOSE_FILE" up -d --build
+
+echo "[5/6] Waiting for backend health..."
+deadline=$((SECONDS+90))
+until curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; do
+  if (( SECONDS > deadline )); then
+    echo "[FATAL] Frontend did not become reachable on :8080"
+    exit 1
+  fi
+  sleep 2
+done
+deadline=$((SECONDS+90))
+until curl -fsS http://127.0.0.1:5000/health >/dev/null 2>&1; do
+  if (( SECONDS > deadline )); then
+    echo "[FATAL] Backend healthcheck failed on :5000"
+    exit 1
+  fi
+  sleep 2
+done
+
+echo "[6/6] Configuring system nginx reverse-proxy..."
+
+# DOMAIN env may contain scheme; derive host
+DOMAIN_RAW="${DOMAIN:-${WEB_APP_URL:-}}"
+if [[ -z "$DOMAIN_RAW" ]]; then
+  # fallback to sslip domain used in this project
+  DOMAIN_RAW="https://klyro.69-67-173-216.sslip.io"
+fi
+DOMAIN_HOST="${DOMAIN_RAW#http://}"
+DOMAIN_HOST="${DOMAIN_HOST#https://}"
+DOMAIN_HOST="${DOMAIN_HOST%%/*}"
+
+NGINX_AVAILABLE="/etc/nginx/sites-available/klyro"
+NGINX_ENABLED="/etc/nginx/sites-enabled/klyro"
+
+cat > "$NGINX_AVAILABLE" <<EOF
+server {
+  listen 80;
+  server_name ${DOMAIN_HOST};
+
+  # Telegram Mini App must not be cached aggressively
+  add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+  add_header Pragma "no-cache" always;
+  add_header Expires "0" always;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 60s;
+    proxy_connect_timeout 10s;
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
+}
+EOF
+
+ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+
+# disable default site if present to avoid conflicts
+if [[ -e /etc/nginx/sites-enabled/default ]]; then
+  rm -f /etc/nginx/sites-enabled/default || true
+fi
+
+nginx -t
+systemctl reload nginx
+
+echo "[OK] Klyro is deployed. Open: https://${DOMAIN_HOST}"
+
+
