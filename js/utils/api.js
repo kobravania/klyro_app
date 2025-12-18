@@ -12,8 +12,16 @@ class ApiClient {
     async resolveIdentity() {
         if (this._resolvedTelegramUserId) return this._resolvedTelegramUserId;
 
-        const initData = await this._waitForInitData(1500);
-        const fallbackId = await this._waitForTelegramUserId(1500);
+        // 1) Самый надёжный источник (особенно на iOS): user.id внутри initData
+        const initData = await this._waitForInitData(5000);
+        const fromInitData = this._extractTelegramUserIdFromInitData(initData || '');
+        if (fromInitData) {
+            this._resolvedTelegramUserId = String(fromInitData);
+            return this._resolvedTelegramUserId;
+        }
+
+        // 2) Fallback: initDataUnsafe.user.id (или если initData временно пустой)
+        const fallbackId = await this._waitForTelegramUserId(5000);
 
         const headers = { 'Content-Type': 'application/json' };
         if (initData) headers['X-Telegram-Init-Data'] = initData;
@@ -54,7 +62,7 @@ class ApiClient {
         return null;
     }
 
-    async _waitForInitData(timeoutMs = 1500) {
+    async _waitForInitData(timeoutMs = 5000) {
         const start = Date.now();
         while (Date.now() - start < timeoutMs) {
             const initData = this.getInitData();
@@ -116,7 +124,7 @@ class ApiClient {
             throw new Error('SERVICE_UNAVAILABLE');
         }
 
-        const initData = await this._waitForInitData(1500);
+        const initData = await this._waitForInitData(5000);
         const headers = {
             'Content-Type': 'application/json'
         };
@@ -171,7 +179,7 @@ class ApiClient {
             throw new Error('SERVICE_UNAVAILABLE');
         }
 
-        const initData = await this._waitForInitData(1500);
+        const initData = await this._waitForInitData(5000);
         const headers = {
             'Content-Type': 'application/json'
         };
