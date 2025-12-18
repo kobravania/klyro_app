@@ -69,8 +69,9 @@ class Calculations {
         
         // Получаем возраст
         let age = null;
-        if (userData.dateOfBirth) {
-            const birthDate = new Date(userData.dateOfBirth);
+        const birth = userData.dateOfBirth || userData.birth_date || userData.birthDate;
+        if (birth) {
+            const birthDate = new Date(birth);
             const today = new Date();
             age = today.getFullYear() - birthDate.getFullYear();
             const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -81,12 +82,15 @@ class Calculations {
             age = userData.age;
         }
         
-        if (!age || !userData.gender || !userData.height || !userData.weight) {
+        const height = userData.height_cm ?? userData.height;
+        const weight = userData.weight_kg ?? userData.weight;
+
+        if (!age || !userData.gender || !height || !weight) {
             return 0;
         }
         
         // Рассчитываем BMR
-        const bmr = this.calculateBMR(userData.weight, userData.height, age, userData.gender);
+        const bmr = this.calculateBMR(Number(weight), Number(height), age, userData.gender);
         
         // Рассчитываем TDEE
         const tdee = this.calculateTDEE(bmr, userData.activity || 'low');

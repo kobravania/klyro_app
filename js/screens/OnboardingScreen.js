@@ -354,12 +354,26 @@ class OnboardingScreen {
         // Сбрасываем локальное состояние формы при каждом показе онбординга,
         // чтобы не было “как будто всё заполнено”, если до этого был сбой.
         this.formData = {};
-        document.querySelectorAll('#onboarding-screen .btn.btn-primary').forEach(b => {
+        // Сбрасываем выбранные кнопки (gender/activity/goal), но не трогаем primary CTA-кнопку "Далее"
+        document.querySelectorAll('#onboarding-screen [data-gender], #onboarding-screen [data-activity], #onboarding-screen [data-goal]').forEach(b => {
             b.classList.remove('btn-primary');
-            if (!b.classList.contains('btn-secondary')) {
-                b.classList.add('btn-secondary');
-            }
+            if (!b.classList.contains('btn-secondary')) b.classList.add('btn-secondary');
         });
+        const dateInput = document.getElementById('onboarding-date');
+        if (dateInput) dateInput.value = '';
+
+        const heightInput = document.getElementById('onboarding-height');
+        const heightDisplay = document.getElementById('height-display');
+        if (heightInput && heightDisplay) {
+            heightInput.value = '170';
+            heightDisplay.textContent = '170';
+        }
+        const weightInput = document.getElementById('onboarding-weight');
+        const weightDisplay = document.getElementById('weight-display');
+        if (weightInput && weightDisplay) {
+            weightInput.value = '70';
+            weightDisplay.textContent = '70.0';
+        }
 
         this.currentStep = 1;
         this.updateStep();
