@@ -64,6 +64,27 @@ async function initApp() {
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
+
+        // Детерминированно ждём telegram_user_id (на iOS initDataUnsafe.user иногда появляется не сразу)
+        const waitForTelegramIdentity = async () => {
+            const start = Date.now();
+            while (Date.now() - start < 1500) {
+                try {
+                    if (window.apiClient && typeof window.apiClient.getTelegramUserId === 'function') {
+                        const id = window.apiClient.getTelegramUserId();
+                        if (id) return true;
+                    }
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 50));
+            }
+            return false;
+        };
+        const hasIdentity = await waitForTelegramIdentity();
+        if (!hasIdentity) {
+            hideLoadingScreen();
+            showServiceUnavailable();
+            return;
+        }
         
         // Загружаем данные
         try {
@@ -114,7 +135,7 @@ function showTemporaryOnboarding() {
             <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
                 Для начала работы заполните профиль
             </p>
-            <button class="btn btn-primary btn-block" onclick="location.reload()">
+            <button class="btn btn-primary btn-block" onclick="window.initApp && window.initApp()">
                 Начать
             </button>
         </div>
@@ -230,9 +251,14 @@ function showServiceUnavailable() {
                 <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
                     Попробуйте позже
                 </p>
-                <button class="btn btn-primary" onclick="location.reload()" style="min-width: 200px;">
-                    Обновить
-                </button>
+                <div style="display:flex; gap: var(--spacing-md); justify-content:center; flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="window.initApp && window.initApp()" style="min-width: 200px;">
+                        Повторить
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.Telegram?.WebApp?.close?.()" style="min-width: 200px;">
+                        Закрыть
+                    </button>
+                </div>
             </div>
         </div>
     `;
