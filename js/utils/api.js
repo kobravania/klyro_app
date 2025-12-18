@@ -62,6 +62,12 @@ class ApiClient {
                 return null;
             }
 
+            if (response.status === 401) {
+                const err = new Error('AUTH_REQUIRED');
+                err.code = 'AUTH_REQUIRED';
+                throw err;
+            }
+
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -69,7 +75,10 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || error.message.includes('Failed to fetch')) {
+            if (error.code === 'AUTH_REQUIRED') {
+                throw error;
+            }
+            if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || (error.message && error.message.includes('Failed to fetch'))) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
             throw error;

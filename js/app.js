@@ -60,6 +60,17 @@ async function initApp() {
     console.log('[APP] Инициализация приложения...');
     
     showLoadingScreen();
+
+    // Явные состояния приложения
+    let appState = 'loading'; // 'loading' | 'no_profile' | 'has_profile' | 'error'
+
+    // Единственная точка решения: есть ли профиль
+    async function loadProfile() {
+        console.log('[APP] loadProfile(): GET /api/profile...');
+        const profile = await apiClient.getProfile(); // null on 404, throws on 401/500
+        console.log('[APP] loadProfile(): received', profile ? '200' : '404');
+        return profile; // Profile | null
+    }
     
     try {
         // Инициализируем Telegram WebApp
@@ -72,35 +83,44 @@ async function initApp() {
             showServiceUnavailable();
             return;
         }
-        
-        // Загружаем данные
+
+        // Загружаем локальные данные (без профиля)
+        await appContext.loadData();
+
+        // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
         try {
-            await appContext.loadData();
-        } catch (error) {
-            // Сервер недоступен - показываем нейтральный экран
-            hideLoadingScreen();
-            showServiceUnavailable();
-            return;
+            const profile = await loadProfile();
+            if (profile) {
+                appState = 'has_profile';
+                await appContext.setUserData(profile);
+            } else {
+                appState = 'no_profile';
+                await appContext.setUserData(null);
+            }
+        } catch (e) {
+            console.log('[APP] loadProfile(): error', e && (e.code || e.message || String(e)));
+            appState = 'error';
         }
-        
-        // Скрываем экран загрузки
+
+        console.log('[APP] decision:', appState);
+
         hideLoadingScreen();
-        
-        // Проверяем наличие профиля (строгая логика: если userData есть - профиль есть)
-        if (appContext.hasProfile()) {
-            // Профиль есть (200) - показываем Dashboard
+
+        if (appState === 'has_profile') {
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
-        } else {
-            // Профиля нет (404) - показываем онбординг
-            navigation.hide();
-            if (typeof onboardingScreen !== 'undefined') {
-                onboardingScreen.show();
-            } else {
-                showTemporaryOnboarding();
-            }
+            return;
         }
+
+        if (appState === 'no_profile') {
+            navigation.hide();
+            onboardingScreen.show();
+            return;
+        }
+
+        // 401/500
+        showServiceUnavailable();
     } catch (error) {
         hideLoadingScreen();
         showServiceUnavailable();

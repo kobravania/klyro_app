@@ -34,27 +34,10 @@ class AppContext {
 
     /**
      * Загрузка всех данных из хранилища
-     * Единственный источник истины = сервер (PostgreSQL)
+     * Профиль НЕ загружается здесь: единственная точка решения — loadProfile() в app.js
      */
     async loadData() {
-        // Загружаем профиль с СЕРВЕРА (источник истины)
-        if (typeof apiClient === 'undefined') {
-            throw new Error('SERVICE_UNAVAILABLE');
-        }
-        
-        try {
-            const userData = await apiClient.getProfile();
-            // Если профиль найден (200) - устанавливаем его
-            // Если профиль не найден (404) - userData будет null, это нормально
-            this.userData = userData;
-        } catch (error) {
-            // Если сервер недоступен - выбрасываем ошибку дальше
-            if (error.message === 'SERVICE_UNAVAILABLE') {
-                throw error;
-            }
-            // Для других ошибок - считаем что профиля нет
-            this.userData = null;
-        }
+        // Профиль решается в app.js через loadProfile() и кладётся через setUserData().
 
         // Загружаем дневник
         const diaryStr = await storage.getItem('klyro_diary');
@@ -92,6 +75,11 @@ class AppContext {
      * Обновить данные пользователя
      */
     async setUserData(userData) {
+        if (userData === null) {
+            this.userData = null;
+            this.notifyListeners('userData', null);
+            return;
+        }
         if (!userData || typeof userData !== 'object' || Array.isArray(userData)) {
             throw new Error('userData должен быть объектом');
         }
@@ -105,14 +93,6 @@ class AppContext {
      */
     getUserData() {
         return this.userData;
-    }
-
-    /**
-     * Проверить, есть ли профиль
-     * Профиль есть если userData не null
-     */
-    hasProfile() {
-        return this.userData !== null && this.userData !== undefined;
     }
 
     /**
