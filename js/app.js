@@ -101,65 +101,52 @@ async function initApp() {
     showLoadingScreen();
 
     // Явные состояния приложения
-    let appState = 'loading'; // 'loading' | 'no_profile' | 'has_profile' | 'error'
-
-    // Единственная точка решения: есть ли профиль
-    async function loadProfile(telegramUserId) {
-        console.log('[APP] loadProfile(): GET /api/profile...');
-        const profile = await apiClient.getProfile(telegramUserId); // null on 404, throws on 500
-        console.log('[APP] loadProfile(): received', profile ? '200' : '404');
-        return profile; // Profile | null
-    }
+    let appState = 'loading'; // loading -> (200 dashboard | 404 onboarding | 401 activation | 500 error)
     
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
-
-        // CANONICAL: единственный источник идентификации = initDataUnsafe.user.id
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-        const telegramUserId = tgUser && (tgUser.id !== undefined && tgUser.id !== null) ? String(tgUser.id) : null;
-        if (!telegramUserId) {
-            hideLoadingScreen();
-            showOpenViaBotScreen();
-            return;
-        }
 
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
         try {
-            const profile = await loadProfile(telegramUserId);
+            console.log('[APP] GET /api/profile...');
+            const profile = await apiClient.getProfile();
             if (profile) {
-                appState = 'has_profile';
+                appState = 'dashboard';
                 await appContext.setUserData(profile);
             } else {
-                appState = 'no_profile';
+                appState = 'onboarding';
                 await appContext.setUserData(null);
             }
         } catch (e) {
             console.log('[APP] loadProfile(): error', e && (e.code || e.message || String(e)));
-            appState = 'error';
+            appState = (e && e.code === 'AUTH_REQUIRED') ? 'activation' : 'error';
         }
 
         console.log('[APP] decision:', appState);
 
         hideLoadingScreen();
 
-        if (appState === 'has_profile') {
+        if (appState === 'dashboard') {
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
             return;
         }
 
-        if (appState === 'no_profile') {
+        if (appState === 'onboarding') {
             navigation.hide();
             onboardingScreen.show();
             return;
         }
 
-        // 500 -> error
+        if (appState === 'activation') {
+            showOpenViaBotScreen();
+            return;
+        }
         showServiceUnavailable();
     } catch (error) {
         hideLoadingScreen();

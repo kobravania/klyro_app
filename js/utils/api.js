@@ -8,18 +8,27 @@ class ApiClient {
         this.baseUrl = window.location.origin;
     }
 
+    getSessionId() {
+        try {
+            const sid = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+            const s = String(sid || '').trim();
+            return s || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     /**
      * Загрузить профиль пользователя с сервера
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
-    async getProfile(telegramUserId) {
+    async getProfile() {
+        const sessionId = this.getSessionId();
         const headers = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...(sessionId ? { 'X-Klyro-Session': sessionId } : {})
         };
-
-        const tid = String(telegramUserId || '').trim();
-        if (!tid) throw new Error('MISSING_TELEGRAM_USER_ID');
-        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
+        const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -38,6 +47,12 @@ class ApiClient {
                 return null;
             }
 
+            if (response.status === 401) {
+                const err = new Error('AUTH_REQUIRED');
+                err.code = 'AUTH_REQUIRED';
+                throw err;
+            }
+
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -45,6 +60,7 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
+            if (error.code === 'AUTH_REQUIRED') throw error;
             if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || (error.message && error.message.includes('Failed to fetch'))) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -57,14 +73,13 @@ class ApiClient {
      * @param {Object} profileData Данные профиля
      * @returns {Promise<Object>} Сохранённый профиль
      */
-    async saveProfile(telegramUserId, profileData) {
+    async saveProfile(profileData) {
+        const sessionId = this.getSessionId();
         const headers = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...(sessionId ? { 'X-Klyro-Session': sessionId } : {})
         };
-
-        const tid = String(telegramUserId || '').trim();
-        if (!tid) throw new Error('MISSING_TELEGRAM_USER_ID');
-        const payload = { telegram_user_id: tid, ...profileData };
+        const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
 
@@ -82,6 +97,12 @@ class ApiClient {
 
             clearTimeout(timeoutId);
 
+            if (response.status === 401) {
+                const err = new Error('AUTH_REQUIRED');
+                err.code = 'AUTH_REQUIRED';
+                throw err;
+            }
+
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -89,6 +110,7 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
+            if (error.code === 'AUTH_REQUIRED') throw error;
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }

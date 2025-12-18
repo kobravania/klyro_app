@@ -51,9 +51,5 @@ echo "📊 Статус бота:"
 systemctl status klyro-bot --no-pager -l
 
 echo "✅ Бот настроен и запущен!"
-echo "💡 Теперь настройте Menu Button в @BotFather:"
-echo "   1. Откройте @BotFather"
-echo "   2. /mybots → выберите @klyro_nutrition_bot"
-echo "   3. Bot Settings → Menu Button → Edit"
-echo "   4. URL: https://klyro.69-67-173-216.sslip.io"
+echo "💡 В @BotFather отключите кнопку открытия WebApp (значение: /empty)."
 

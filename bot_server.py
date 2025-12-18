@@ -45,7 +45,7 @@ def get_db_connection():
         sys.exit(1)
 
 def init_db():
-    """Инициализировать таблицу profiles. FAIL-FAST: выходит если не удалось."""
+    """Инициализировать таблицы profiles/users/sessions. FAIL-FAST: выходит если не удалось."""
     conn = get_db_connection()
     
     try:
@@ -55,8 +55,28 @@ def init_db():
         cur = conn.cursor()
 
         # Глобальная блокировка на уровне БД (одна на весь кластер)
-        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_profiles_v1'))")
+        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_v2'))")
         try:
+            # Users table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.users (
+                    telegram_user_id TEXT PRIMARY KEY,
+                    created_at TIMESTAMP DEFAULT now()
+                )
+            """)
+
+            # Sessions table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.sessions (
+                    session_id TEXT PRIMARY KEY,
+                    telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT now(),
+                    last_used_at TIMESTAMP DEFAULT now(),
+                    expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
+                )
+            """)
+            cur.execute("ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (now() + interval '30 days')")
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS public.profiles (
                     telegram_user_id TEXT PRIMARY KEY,
@@ -74,9 +94,9 @@ def init_db():
             if reg is None:
                 raise RuntimeError("Таблица public.profiles не создана/не видна")
         finally:
-            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_profiles_v1'))")
+            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_v2'))")
 
-        print("✓ Таблица profiles инициализирована")
+        print("✓ Таблицы users/sessions/profiles инициализированы")
         cur.close()
     except Exception as e:
         print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
@@ -88,15 +108,16 @@ def init_db():
 
 def ensure_schema_ready(conn):
     """
-    Fail-fast: если схема не готова (нет таблицы profiles) — сервер не должен работать.
+    Fail-fast: если схема не готова (нет таблиц users/sessions/profiles) — сервер не должен работать.
     """
     try:
         cur = conn.cursor()
-        cur.execute("SELECT to_regclass('public.profiles') AS reg")
-        reg = cur.fetchone()[0]
-        if reg is None:
-            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы public.profiles)")
-            sys.exit(1)
+        for t in ('public.users', 'public.sessions', 'public.profiles'):
+            cur.execute("SELECT to_regclass(%s) AS reg", (t,))
+            reg = cur.fetchone()[0]
+            if reg is None:
+                print(f"КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы {t})")
+                sys.exit(1)
         cur.close()
     except Exception as e:
         print(f"КРИТИЧЕСКАЯ ОШИБКА: не удалось проверить схему БД: {e}")
@@ -176,6 +197,34 @@ def _row_to_profile(row):
         'weight_kg': int(row['weight_value'])
     }
 
+def _get_session_id(req):
+    # Session comes from Telegram deep link startapp and is available as start_param on frontend.
+    sid = (req.headers.get('X-Klyro-Session') or '').strip()
+    return sid or None
+
+def _telegram_user_id_from_session(session_id: str):
+    conn = get_db_connection()
+    try:
+        ensure_schema_ready(conn)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            UPDATE public.sessions
+            SET last_used_at = now()
+            WHERE session_id = %s AND expires_at > now()
+            RETURNING telegram_user_id
+            """,
+            (session_id,)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        if not row:
+            return None
+        return str(row[0])
+    finally:
+        conn.close()
+
 def _select_profile(conn, telegram_user_id, colmap):
     cur = conn.cursor(cursor_factory=RealDictCursor)
     select_cols = [
@@ -237,9 +286,12 @@ def get_profile():
     """
     print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
     try:
-        telegram_user_id = _require_telegram_user_id_from_query()
+        session_id = _get_session_id(request)
+        if not session_id:
+            return {'error': 'Unauthorized'}, 401
+        telegram_user_id = _telegram_user_id_from_session(session_id)
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
+            return {'error': 'Unauthorized'}, 401
         
         # Загружаем профиль из БД
         conn = get_db_connection()
@@ -277,9 +329,12 @@ def save_profile():
         if not data:
             return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = (data.get('telegram_user_id') or '').strip()
+        session_id = _get_session_id(request)
+        if not session_id:
+            return {'error': 'Unauthorized'}, 401
+        telegram_user_id = _telegram_user_id_from_session(session_id)
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
+            return {'error': 'Unauthorized'}, 401
         
         # Извлекаем данные профиля (игнорируем лишние поля)
         birth_date = data.get('birth_date') or data.get('dateOfBirth')

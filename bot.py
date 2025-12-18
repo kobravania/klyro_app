@@ -5,6 +5,8 @@ Telegram бот для Klyro
 """
 import os
 import logging
+import uuid
+import psycopg2
 from telegram import Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
 
@@ -19,6 +21,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 # URL для WebApp (не webhook!)
 WEB_APP_URL = os.environ.get('WEB_APP_URL') or os.environ.get('DOMAIN') or 'https://klyro.69-67-173-216.sslip.io'
+BOT_USERNAME = (os.environ.get('BOT_USERNAME') or os.environ.get('KLYRO_BOT_USERNAME') or 'klyro_nutrition_bot').strip()
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
@@ -26,6 +29,59 @@ if not BOT_TOKEN:
 logger.info(f"Bot starting...")
 logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
 logger.info(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
+logger.info(f"BOT_USERNAME: {BOT_USERNAME}")
+
+def _get_db_connection():
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        return psycopg2.connect(db_url)
+
+    required_vars = ['POSTGRES_HOST', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD']
+    missing = [v for v in required_vars if not os.environ.get(v)]
+    if missing:
+        raise ValueError(f"Missing env vars: {', '.join(missing)}")
+    return psycopg2.connect(
+        host=os.environ.get('POSTGRES_HOST'),
+        port=os.environ.get('POSTGRES_PORT', '5432'),
+        database=os.environ.get('POSTGRES_DB'),
+        user=os.environ.get('POSTGRES_USER'),
+        password=os.environ.get('POSTGRES_PASSWORD')
+    )
+
+def _ensure_session_for_user(telegram_user_id: str) -> str:
+    conn = _get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.users (
+                telegram_user_id TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT now()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.sessions (
+                session_id TEXT PRIMARY KEY,
+                telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT now(),
+                last_used_at TIMESTAMP DEFAULT now(),
+                expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
+            )
+        """)
+        cur.execute("ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (now() + interval '30 days')")
+        cur.execute(
+            "INSERT INTO public.users (telegram_user_id) VALUES (%s) ON CONFLICT (telegram_user_id) DO NOTHING",
+            (telegram_user_id,)
+        )
+        session_id = str(uuid.uuid4())
+        cur.execute(
+            "INSERT INTO public.sessions (session_id, telegram_user_id) VALUES (%s, %s)",
+            (session_id, telegram_user_id)
+        )
+        conn.commit()
+        cur.close()
+        return session_id
+    finally:
+        conn.close()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start - FAIL FAST"""
@@ -41,23 +97,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("❌ Ошибка конфигурации бота. Обратитесь к администратору.")
         return
     
-    welcome_text = (
-        "Теперь ты можешь открывать Klyro из меню или списка чатов\n\n"
-        "Нажми кнопку ниже, чтобы открыть:"
-    )
-    
-    # Canonical TMA: no server sessions/cookies. Just open the WebApp URL.
-    webapp_url = WEB_APP_URL.rstrip('/')
+    welcome_text = "Нажми кнопку ниже, чтобы открыть Klyro:"
+
+    # ONLY entry: create session and open via startapp deep link
+    session_id = _ensure_session_for_user(str(user_id))
+    startapp_link = f"https://t.me/{BOT_USERNAME}?startapp={session_id}"
 
     # Создаем кнопку с WebApp
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     
-    keyboard = [[
-        InlineKeyboardButton(
-            text="🚀 ОТКРЫТЬ KLYRO",
-            web_app=WebAppInfo(url=webapp_url)
-        )
-    ]]
+    keyboard = [[InlineKeyboardButton(text="🚀 ОТКРЫТЬ KLYRO", url=startapp_link)]]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     

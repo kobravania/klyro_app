@@ -96,22 +96,6 @@ class AppContext {
     }
 
     /**
-     * Проверить, что профиль заполнен (для расчётов, НЕ для роутинга).
-     * Источник истины = сервер, но на клиенте нам нужно понимать,
-     * можем ли мы считать калории/макросы.
-     */
-    hasCompleteProfile() {
-        if (!this.userData) return false;
-
-        const birth = this.userData.birth_date || this.userData.birthDate || this.userData.dateOfBirth;
-        const gender = this.userData.gender;
-        const height = this.userData.height_cm ?? this.userData.height;
-        const weight = this.userData.weight_kg ?? this.userData.weight;
-
-        return !!(birth && gender && Number(height) > 0 && Number(weight) > 0);
-    }
-
-    /**
      * Обновить дневник
      */
     async setDiary(diary) {
@@ -152,10 +136,6 @@ class AppContext {
      * Получить целевые калории
      */
     getGoalCalories() {
-        if (!this.hasCompleteProfile()) {
-            console.warn('[CONTEXT] getGoalCalories: профиль не полный');
-            return 0;
-        }
         if (!this.userData) {
             console.warn('[CONTEXT] getGoalCalories: userData отсутствует');
             return 0;
