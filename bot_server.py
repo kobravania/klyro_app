@@ -290,9 +290,35 @@ def auth_bootstrap():
         if not ok:
             return "Unauthorized", 401
 
-        resp = Response(status=302)
-        resp.headers['Location'] = '/'
-        # 30 days
+        # Some Telegram mobile clients do not reliably follow 302 redirects for WebApp URLs.
+        # Return an HTML page that sets cookie and performs client-side redirect.
+        html = """<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta http-equiv="refresh" content="0;url=/" />
+  <title>Klyro</title>
+  <style>
+    body { margin:0; background:#0F1419; color:#EAF1F7; font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; }
+    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; }
+    .text { opacity:.8; font-size:14px; }
+  </style>
+  <script>
+    try { window.location.replace('/'); } catch (e) {}
+  </script>
+</head>
+<body><div class="wrap"><div class="text">Открываем Klyro…</div></div></body>
+</html>"""
+
+        resp = Response(html, status=200, mimetype='text/html')
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        # 30 days cookie
         resp.set_cookie(
             'klyro_session',
             token,
