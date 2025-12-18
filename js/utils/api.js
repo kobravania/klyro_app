@@ -8,24 +8,34 @@ class ApiClient {
         this.baseUrl = window.location.origin;
     }
 
+    _extractTelegramUserIdFromInitData(initData) {
+        try {
+            if (!initData) return null;
+            const params = new URLSearchParams(initData);
+            const userStr = params.get('user');
+            if (!userStr) return null;
+            const user = JSON.parse(userStr);
+            if (!user || typeof user.id === 'undefined' || user.id === null) return null;
+            return String(user.id);
+        } catch (e) {
+            return null;
+        }
+    }
+
     /**
      * Получить Telegram User ID из initData
      */
     getTelegramUserId() {
         if (window.Telegram && window.Telegram.WebApp) {
             const tg = window.Telegram.WebApp;
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                const userId = tg.initDataUnsafe.user.id;
-                console.log('[API] Telegram User ID:', userId);
-                return String(userId); // Преобразуем в строку для консистентности
-            } else {
-                console.warn('[API] initDataUnsafe.user не найден:', {
-                    hasInitDataUnsafe: !!tg.initDataUnsafe,
-                    initDataUnsafe: tg.initDataUnsafe
-                });
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && typeof tg.initDataUnsafe.user.id !== 'undefined') {
+                return String(tg.initDataUnsafe.user.id);
             }
-        } else {
-            console.warn('[API] Telegram WebApp API не найден');
+
+            // Fallback: на iOS/Telegram иногда initDataUnsafe.user может быть пустым,
+            // но tg.initData содержит user=... (JSON) — достаём id оттуда.
+            const fromInitData = this._extractTelegramUserIdFromInitData(tg.initData || '');
+            if (fromInitData) return fromInitData;
         }
         return null;
     }
@@ -48,7 +58,6 @@ class ApiClient {
     async getProfile() {
         const telegramUserId = this.getTelegramUserId();
         if (!telegramUserId) {
-            console.error('[API] getProfile: telegram_user_id не найден');
             throw new Error('SERVICE_UNAVAILABLE');
         }
 
@@ -61,8 +70,7 @@ class ApiClient {
             headers['X-Telegram-Init-Data'] = initData;
         }
 
-        const url = `${this.baseUrl}/api/profile?telegram_user_id=${telegramUserId}`;
-        console.log('[API] GET /api/profile, URL:', url);
+        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -76,24 +84,18 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
-            console.log('[API] GET /api/profile response status:', response.status);
 
             if (response.status === 404) {
-                console.log('[API] Профиль не найден (404)');
                 return null;
             }
 
             if (!response.ok) {
-                console.error('[API] GET /api/profile failed:', response.status, response.statusText);
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            const profile = await response.json();
-            console.log('[API] Профиль загружен:', profile);
-            return profile;
+            return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error('[API] GET /api/profile error:', error);
             if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || error.message.includes('Failed to fetch')) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -109,7 +111,6 @@ class ApiClient {
     async saveProfile(profileData) {
         const telegramUserId = this.getTelegramUserId();
         if (!telegramUserId) {
-            console.error('[API] saveProfile: telegram_user_id не найден');
             throw new Error('SERVICE_UNAVAILABLE');
         }
 
@@ -128,7 +129,6 @@ class ApiClient {
         };
 
         const url = `${this.baseUrl}/api/profile`;
-        console.log('[API] POST /api/profile, URL:', url, 'Payload:', payload);
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -143,20 +143,14 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
-            console.log('[API] POST /api/profile response status:', response.status);
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[API] POST /api/profile failed:', response.status, response.statusText, errorText);
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            const result = await response.json();
-            console.log('[API] Профиль сохранён:', result);
-            return result;
+            return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            console.error('[API] POST /api/profile error:', error);
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }

@@ -96,7 +96,6 @@ async function initApp() {
     } catch (error) {
         hideLoadingScreen();
         showServiceUnavailable();
-        showErrorScreen(error);
     }
 }
 
