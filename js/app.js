@@ -54,26 +54,11 @@ function hideLoadingScreen() {
 
 function showOpenViaBotScreen() {
     hideAllScreens();
-    // IMPORTANT: Activation screen must be static: hide app navigation/FAB and stop.
-    if (window.navigation && typeof window.navigation.hide === 'function') {
-        try { window.navigation.hide(); } catch (e) {}
-    }
-    try {
-        const nav = document.getElementById('bottom-nav');
-        if (nav) nav.style.display = 'none';
-    } catch (e) {}
-    try {
-        const fab = document.getElementById('fab-add-food');
-        if (fab) fab.classList.add('hidden');
-    } catch (e) {}
     const app = document.getElementById('app');
     if (!app) return;
 
     const existing = document.getElementById('open-via-bot-screen');
     if (existing) existing.remove();
-
-    const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
-    const deepLink = `https://t.me/${botUsername}?start=webapp`;
 
     const screen = document.createElement('div');
     screen.id = 'open-via-bot-screen';
@@ -82,25 +67,13 @@ function showOpenViaBotScreen() {
     screen.style.flexDirection = 'column';
     screen.innerHTML = `
         <div class="screen-content">
-            <h1 class="screen-title">Откройте через бота</h1>
+            <h1 class="screen-title">Откройте приложение через /start в боте</h1>
             <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                Откройте приложение через бота, чтобы продолжить
+                Это приложение работает только при открытии через кнопку, которую бот присылает после команды /start.
             </p>
-            <button class="btn btn-primary btn-block" id="open-via-bot-btn" style="display:flex; align-items:center; justify-content:center;">
-                Открыть через Telegram
-            </button>
         </div>
     `;
     app.appendChild(screen);
-
-    const btn = document.getElementById('open-via-bot-btn');
-    if (btn) {
-        btn.addEventListener('click', () => {
-            try {
-                window.open(deepLink, '_blank');
-            } catch (e) {}
-        });
-    }
 }
 
 // ============================================
@@ -118,6 +91,21 @@ async function initApp() {
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
+
+        // MINIMAL: app is passive. Without start_param -> show static instruction and STOP (no backend calls)
+        const sid = (() => {
+            try {
+                const s = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+                return String(s || '').trim();
+            } catch (e) {
+                return '';
+            }
+        })();
+        if (!sid) {
+            hideLoadingScreen();
+            showOpenViaBotScreen();
+            return;
+        }
 
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
