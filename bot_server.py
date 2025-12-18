@@ -59,7 +59,7 @@ def init_db():
         cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_profiles_v1'))")
         try:
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS profiles (
+                CREATE TABLE IF NOT EXISTS public.profiles (
                     telegram_user_id TEXT PRIMARY KEY,
                     birth_date DATE NOT NULL,
                     gender TEXT CHECK (gender IN ('male','female')) NOT NULL,
@@ -69,6 +69,11 @@ def init_db():
                     updated_at TIMESTAMP DEFAULT now()
                 )
             """)
+            # Детерминированная проверка схемы: таблица должна быть доступна
+            cur.execute("SELECT to_regclass('public.profiles') AS reg")
+            reg = cur.fetchone()[0]
+            if reg is None:
+                raise RuntimeError("Таблица public.profiles не создана/не видна")
         finally:
             cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_profiles_v1'))")
 
@@ -81,6 +86,24 @@ def init_db():
         sys.exit(1)
     finally:
         conn.close()
+
+def ensure_schema_ready(conn):
+    """
+    Fail-fast: если схема не готова (нет таблицы profiles) — сервер не должен работать.
+    """
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT to_regclass('public.profiles') AS reg")
+        reg = cur.fetchone()[0]
+        cur.close()
+        if reg is None:
+            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы public.profiles)")
+            sys.exit(1)
+    except Exception as e:
+        print(f"КРИТИЧЕСКАЯ ОШИБКА: не удалось проверить схему БД: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 def validate_telegram_init_data(init_data, bot_token):
     """
@@ -175,11 +198,12 @@ def get_profile():
         conn = get_db_connection()
         
         try:
+            ensure_schema_ready(conn)
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute("""
                 SELECT telegram_user_id, birth_date, gender, height_cm, weight_kg, 
                        created_at, updated_at
-                FROM profiles
+                FROM public.profiles
                 WHERE telegram_user_id = %s
             """, (str(telegram_user_id),))
             
@@ -252,10 +276,11 @@ def save_profile():
         conn = get_db_connection()
         
         try:
+            ensure_schema_ready(conn)
             cur = conn.cursor()
             # Используем INSERT ... ON CONFLICT для upsert
             cur.execute("""
-                INSERT INTO profiles (
+                INSERT INTO public.profiles (
                     telegram_user_id, birth_date, gender, height_cm, weight_kg, updated_at
                 ) VALUES (%s, %s, %s, %s, %s, now())
                 ON CONFLICT (telegram_user_id) 
