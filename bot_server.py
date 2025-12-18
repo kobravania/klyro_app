@@ -300,6 +300,18 @@ def health():
 def api_health():
     return {'status': 'ok'}, 200
 
+# Identity endpoint: returns resolved telegram_user_id (from validated initData if present)
+@app.route('/api/whoami')
+def whoami():
+    try:
+        provided = request.args.get('telegram_user_id')
+        uid = _resolve_telegram_user_id(provided)
+        if not uid:
+            return {'error': 'Service unavailable'}, 500
+        return jsonify({'telegram_user_id': str(uid)}), 200
+    except Exception:
+        return {'error': 'Service unavailable'}, 500
+
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
 # Источник истины = PostgreSQL

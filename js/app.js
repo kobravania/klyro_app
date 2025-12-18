@@ -66,23 +66,10 @@ async function initApp() {
         initTelegramWebApp();
 
         // Детерминированно ждём initData/user.id (на iOS initDataUnsafe.user иногда появляется не сразу)
-        const waitForTelegramIdentity = async () => {
-            const start = Date.now();
-            while (Date.now() - start < 1500) {
-                try {
-                    const tgInitData = window.Telegram?.WebApp?.initData;
-                    if (tgInitData && tgInitData.length > 0) return true;
-                    if (window.apiClient && typeof window.apiClient.getTelegramUserId === 'function') {
-                        const id = window.apiClient.getTelegramUserId();
-                        if (id) return true;
-                    }
-                } catch (e) {}
-                await new Promise(r => setTimeout(r, 50));
-            }
-            return false;
-        };
-        const hasIdentity = await waitForTelegramIdentity();
-        if (!hasIdentity) {
+        // Получаем identity через backend (whoami). Это устраняет iOS/Telegram race conditions.
+        try {
+            await window.apiClient.resolveIdentity();
+        } catch (e) {
             hideLoadingScreen();
             showServiceUnavailable();
             return;

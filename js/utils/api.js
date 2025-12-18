@@ -6,6 +6,36 @@
 class ApiClient {
     constructor() {
         this.baseUrl = window.location.origin;
+        this._resolvedTelegramUserId = null;
+    }
+
+    async resolveIdentity() {
+        if (this._resolvedTelegramUserId) return this._resolvedTelegramUserId;
+
+        const initData = await this._waitForInitData(1500);
+        const fallbackId = await this._waitForTelegramUserId(1500);
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (initData) headers['X-Telegram-Init-Data'] = initData;
+
+        const url = fallbackId
+            ? `${this.baseUrl}/api/whoami?telegram_user_id=${encodeURIComponent(fallbackId)}`
+            : `${this.baseUrl}/api/whoami`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        try {
+            const resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!resp.ok) throw new Error('SERVICE_UNAVAILABLE');
+            const data = await resp.json();
+            if (!data || !data.telegram_user_id) throw new Error('SERVICE_UNAVAILABLE');
+            this._resolvedTelegramUserId = String(data.telegram_user_id);
+            return this._resolvedTelegramUserId;
+        } catch (e) {
+            clearTimeout(timeoutId);
+            throw new Error('SERVICE_UNAVAILABLE');
+        }
     }
 
     async _waitForTelegramUserId(timeoutMs = 1500) {
@@ -81,7 +111,7 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const telegramUserId = await this._waitForTelegramUserId(1500);
+        const telegramUserId = await this.resolveIdentity();
         if (!telegramUserId) {
             throw new Error('SERVICE_UNAVAILABLE');
         }
@@ -136,7 +166,7 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const telegramUserId = await this._waitForTelegramUserId(1500);
+        const telegramUserId = await this.resolveIdentity();
         if (!telegramUserId) {
             throw new Error('SERVICE_UNAVAILABLE');
         }
