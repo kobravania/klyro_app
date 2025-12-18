@@ -148,6 +148,11 @@ def add_no_cache_headers(response):
 def health():
     return {'status': 'ok'}, 200
 
+# Health check (API path) - needed for reverse-proxy verification via /api/
+@app.route('/api/health')
+def api_health():
+    return {'status': 'ok'}, 200
+
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
 # Источник истины = PostgreSQL

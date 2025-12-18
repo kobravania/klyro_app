@@ -72,6 +72,7 @@ DOMAIN_HOST="${DOMAIN_HOST%%/*}"
 
 NGINX_AVAILABLE="/etc/nginx/sites-available/klyro"
 NGINX_ENABLED="/etc/nginx/sites-enabled/klyro"
+NGINX_CONFD="/etc/nginx/conf.d/klyro.conf"
 
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN_HOST}"
 FULLCHAIN="${CERT_DIR}/fullchain.pem"
@@ -156,6 +157,9 @@ fi
 
 ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
 
+# ALSO write to conf.d (some installs don't include sites-enabled)
+cp -f "$NGINX_AVAILABLE" "$NGINX_CONFD"
+
 # disable default site if present to avoid conflicts
 if [[ -e /etc/nginx/sites-enabled/default ]]; then
   rm -f /etc/nginx/sites-enabled/default || true
@@ -163,6 +167,18 @@ fi
 
 nginx -t
 systemctl reload nginx
+
+# Verify HTTPS (or HTTP if no cert) reaches backend through /api/
+echo "[VERIFY] Checking reverse-proxy /api/health ..."
+if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
+  code="$(curl -k -s -o /dev/null -w '%{http_code}' "https://${DOMAIN_HOST}/api/health" || true)"
+else
+  code="$(curl -s -o /dev/null -w '%{http_code}' "http://${DOMAIN_HOST}/api/health" || true)"
+fi
+if [[ "$code" != "200" ]]; then
+  echo "[FATAL] Reverse-proxy check failed: /api/health returned HTTP ${code}"
+  exit 1
+fi
 
 echo "[OK] Klyro is deployed. Open: https://${DOMAIN_HOST}"
 
