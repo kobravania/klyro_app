@@ -95,9 +95,9 @@ class ApiClient {
             headers['X-Telegram-Init-Data'] = initData;
         }
 
-        // Основной путь: сервер извлекает id из initData (это надёжнее, чем query),
-        // но мы оставляем query-параметр как fallback.
-        const url = `${this.baseUrl}/api/profile`;
+        // Всегда передаём telegram_user_id как fallback (даже если initData временно пуст),
+        // а initData используем для валидации на backend когда оно есть.
+        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
