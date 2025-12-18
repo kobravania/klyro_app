@@ -52,6 +52,36 @@ function hideLoadingScreen() {
     }
 }
 
+function showActivationScreen() {
+    hideAllScreens();
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    const existing = document.getElementById('activation-screen');
+    if (existing) existing.remove();
+
+    const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
+    const deepLink = `https://t.me/${botUsername}?start=from_webapp`;
+
+    const screen = document.createElement('div');
+    screen.id = 'activation-screen';
+    screen.className = 'screen active';
+    screen.style.display = 'flex';
+    screen.style.flexDirection = 'column';
+    screen.innerHTML = `
+        <div class="screen-content">
+            <h1 class="screen-title">Активация</h1>
+            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
+                Чтобы использовать Klyro, сначала активируй его через бота
+            </p>
+            <a class="btn btn-primary btn-block" href="${deepLink}" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
+                🔵 Перейти к боту
+            </a>
+        </div>
+    `;
+    app.appendChild(screen);
+}
+
 // ============================================
 // ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ
 // ============================================
@@ -76,10 +106,10 @@ async function initApp() {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
 
-        // Backend auth: only via session_token from bot (/start)
+        // Backend auth: only via session from bot (/start)
         if (!window.apiClient || !window.apiClient.sessionToken) {
             hideLoadingScreen();
-            showServiceUnavailable();
+            showActivationScreen();
             return;
         }
 
@@ -98,7 +128,7 @@ async function initApp() {
             }
         } catch (e) {
             console.log('[APP] loadProfile(): error', e && (e.code || e.message || String(e)));
-            appState = 'error';
+            appState = (e && e.code === 'AUTH_REQUIRED') ? 'auth_required' : 'error';
         }
 
         console.log('[APP] decision:', appState);
@@ -118,8 +148,12 @@ async function initApp() {
             return;
         }
 
-        // 401/500
-        showServiceUnavailable();
+        // 401 -> activation, 500 -> service unavailable
+        if (appState === 'auth_required') {
+            showActivationScreen();
+        } else {
+            showServiceUnavailable();
+        }
     } catch (error) {
         hideLoadingScreen();
         showServiceUnavailable();

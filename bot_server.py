@@ -71,7 +71,8 @@ def init_db():
                     session_token TEXT PRIMARY KEY,
                     telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
                     created_at TIMESTAMP DEFAULT now(),
-                    last_used_at TIMESTAMP DEFAULT now()
+                    last_used_at TIMESTAMP DEFAULT now(),
+                    expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
                 )
             """)
 
@@ -195,8 +196,8 @@ def _row_to_profile(row):
         birth_date_out = None
     else:
         birth_date_out = str(bd)
+    # IMPORTANT: client must not see telegram_user_id.
     return {
-        'telegram_user_id': row['telegram_user_id'],
         'birth_date': birth_date_out,
         'gender': row['gender'],
         'height_cm': int(row['height_value']),
@@ -227,8 +228,9 @@ def _select_profile(conn, telegram_user_id, colmap):
     return row
 
 def _get_session_token(req):
-    # session_token is passed in URL for WebApp and then forwarded on each API call
-    return (req.args.get('session_token') or req.headers.get('X-Session-Token') or '').strip() or None
+    # The ONLY auth: session token created by bot on /start.
+    # WebApp receives it as ?session=<uuid> and then forwards it on each API call.
+    return (req.args.get('session') or req.headers.get('X-Session') or '').strip() or None
 
 def getTelegramUserId(req):
     """
@@ -243,7 +245,12 @@ def getTelegramUserId(req):
         ensure_schema_ready(conn)
         cur = conn.cursor()
         cur.execute(
-            "UPDATE public.sessions SET last_used_at = now() WHERE session_token = %s RETURNING telegram_user_id",
+            """
+            UPDATE public.sessions
+            SET last_used_at = now()
+            WHERE session_token = %s AND expires_at > now()
+            RETURNING telegram_user_id
+            """,
             (token,)
         )
         row = cur.fetchone()

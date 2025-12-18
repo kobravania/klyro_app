@@ -265,7 +265,7 @@ if [[ "$code" != "200" ]]; then
   exit 1
 fi
 
-echo "[VERIFY] Checking /api/profile auth (session_token) ..."
+echo "[VERIFY] Checking /api/profile auth (session) ..."
 BASE_URL="http://${DOMAIN_HOST}"
 if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
   BASE_URL="https://${DOMAIN_HOST}"

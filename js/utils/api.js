@@ -11,16 +11,9 @@ class ApiClient {
 
     _getSessionTokenFromUrl() {
         try {
-            // 1) Query param (?session_token=...)
             const params = new URLSearchParams(window.location.search || '');
-            const q = (params.get('session_token') || '').trim();
-            if (q) return q;
-
-            // 2) Fragment (#session_token=...) — more reliable in Telegram clients
-            const hash = (window.location.hash || '').replace(/^#/, '');
-            const hparams = new URLSearchParams(hash);
-            const h = (hparams.get('session_token') || '').trim();
-            return h || null;
+            const t = (params.get('session') || '').trim();
+            return t || null;
         } catch (e) {
             return null;
         }
@@ -44,7 +37,7 @@ class ApiClient {
             'Content-Type': 'application/json'
         };
 
-        headers['X-Session-Token'] = this.sessionToken;
+        headers['X-Session'] = this.sessionToken;
         const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
@@ -98,7 +91,7 @@ class ApiClient {
             'Content-Type': 'application/json'
         };
 
-        headers['X-Session-Token'] = this.sessionToken;
+        headers['X-Session'] = this.sessionToken;
         const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;

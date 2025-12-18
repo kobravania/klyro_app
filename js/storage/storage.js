@@ -17,10 +17,9 @@ class StorageManager {
             this.tg.ready();
             this.tg.expand();
             
-            // Получаем Telegram User ID
-            if (this.tg.initDataUnsafe && this.tg.initDataUnsafe.user) {
-                this.telegramUserId = String(this.tg.initDataUnsafe.user.id);
-            }
+            // Telegram initData/telegram_user_id are запрещены для профиля/авторизации.
+            // Для локальных данных (дневник/активности) остаёмся на legacy keys.
+            this.telegramUserId = null;
             
             // Инициализируем CloudStorage
             this.initCloudStorage();
@@ -65,11 +64,6 @@ class StorageManager {
         
         if (legacyKeys.includes(baseKey)) {
             return baseKey;
-        }
-        
-        // Новые ключи с Telegram ID для синхронизации
-        if (this.telegramUserId) {
-            return `${baseKey}_${this.telegramUserId}`;
         }
         
         return baseKey;

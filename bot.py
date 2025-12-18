@@ -61,7 +61,8 @@ def _ensure_session_for_user(telegram_user_id: str) -> str:
                 session_token TEXT PRIMARY KEY,
                 telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
                 created_at TIMESTAMP DEFAULT now(),
-                last_used_at TIMESTAMP DEFAULT now()
+                last_used_at TIMESTAMP DEFAULT now(),
+                expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
             )
         """)
         cur.execute(
@@ -98,19 +99,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     
     welcome_text = (
-        "👋 Добро пожаловать в Klyro!\n\n"
-        "Ваш персональный помощник по питанию и фитнесу.\n\n"
-        "📊 Рассчитывайте калории\n"
-        "🎯 Отслеживайте прогресс\n"
-        "💪 Достигайте целей\n\n"
-        "Нажмите кнопку ниже, чтобы начать:"
+        "Теперь ты можешь открывать Klyro из меню или списка чатов\n\n"
+        "Нажми кнопку ниже, чтобы открыть:"
     )
     
-    # Create/ensure user + session in DB; WebApp opens ONLY with session_token
+    # Единственный путь входа: session в query
     session_token = _ensure_session_for_user(str(user_id))
-    # IMPORTANT: Telegram WebApp may drop/normalize query params in some clients.
-    # Use URL fragment for the token; frontend will read it and pass via headers.
-    webapp_url = f"{WEB_APP_URL}#session_token={session_token}"
+    sep = '&' if '?' in WEB_APP_URL else '?'
+    webapp_url = f"{WEB_APP_URL}{sep}session={session_token}"
 
     # Создаем кнопку с WebApp
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
