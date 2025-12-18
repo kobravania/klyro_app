@@ -11,6 +11,12 @@ class ApiClient {
     async _waitForTelegramUserId(timeoutMs = 1500) {
         const start = Date.now();
         while (Date.now() - start < timeoutMs) {
+            // Prefer initData parsing (most stable on iOS)
+            const initData = this.getInitData();
+            const fromInitData = this._extractTelegramUserIdFromInitData(initData || '');
+            if (fromInitData) return fromInitData;
+
+            // Fallback to initDataUnsafe.user.id
             const id = this.getTelegramUserId();
             if (id) return id;
             await new Promise(r => setTimeout(r, 50));
@@ -18,6 +24,15 @@ class ApiClient {
         return null;
     }
 
+    async _waitForInitData(timeoutMs = 1500) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            const initData = this.getInitData();
+            if (initData && initData.length > 0) return initData;
+            await new Promise(r => setTimeout(r, 50));
+        }
+        return '';
+    }
     _extractTelegramUserIdFromInitData(initData) {
         try {
             if (!initData) return null;
@@ -66,7 +81,12 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const initData = this.getInitData();
+        const telegramUserId = await this._waitForTelegramUserId(1500);
+        if (!telegramUserId) {
+            throw new Error('SERVICE_UNAVAILABLE');
+        }
+
+        const initData = await this._waitForInitData(1500);
         const headers = {
             'Content-Type': 'application/json'
         };
@@ -75,8 +95,8 @@ class ApiClient {
             headers['X-Telegram-Init-Data'] = initData;
         }
 
-        // telegram_user_id может быть недоступен на iOS (initDataUnsafe.user появляется не сразу).
-        // Сервер умеет извлекать id из X-Telegram-Init-Data, поэтому query-параметр не обязателен.
+        // Основной путь: сервер извлекает id из initData (это надёжнее, чем query),
+        // но мы оставляем query-параметр как fallback.
         const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
@@ -116,7 +136,12 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const initData = this.getInitData();
+        const telegramUserId = await this._waitForTelegramUserId(1500);
+        if (!telegramUserId) {
+            throw new Error('SERVICE_UNAVAILABLE');
+        }
+
+        const initData = await this._waitForInitData(1500);
         const headers = {
             'Content-Type': 'application/json'
         };
@@ -126,6 +151,7 @@ class ApiClient {
         }
 
         const payload = {
+            telegram_user_id: telegramUserId,
             ...profileData
         };
 

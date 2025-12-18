@@ -65,11 +65,13 @@ async function initApp() {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
 
-        // Детерминированно ждём telegram_user_id (на iOS initDataUnsafe.user иногда появляется не сразу)
+        // Детерминированно ждём initData/user.id (на iOS initDataUnsafe.user иногда появляется не сразу)
         const waitForTelegramIdentity = async () => {
             const start = Date.now();
             while (Date.now() - start < 1500) {
                 try {
+                    const tgInitData = window.Telegram?.WebApp?.initData;
+                    if (tgInitData && tgInitData.length > 0) return true;
                     if (window.apiClient && typeof window.apiClient.getTelegramUserId === 'function') {
                         const id = window.apiClient.getTelegramUserId();
                         if (id) return true;
