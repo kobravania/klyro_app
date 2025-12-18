@@ -76,9 +76,8 @@ async function initApp() {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
 
-        // Ждём initData. Backend определяет telegram_user_id ТОЛЬКО из initData.
-        const initData = await window.apiClient._waitForInitData(5000);
-        if (!initData) {
+        // Backend auth: only via session_token from bot (/start)
+        if (!window.apiClient || !window.apiClient.sessionToken) {
             hideLoadingScreen();
             showServiceUnavailable();
             return;

@@ -6,26 +6,25 @@
 class ApiClient {
     constructor() {
         this.baseUrl = window.location.origin;
+        this.sessionToken = this._getSessionTokenFromUrl();
     }
 
-    async _waitForInitData(timeoutMs = 5000) {
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const initData = this.getInitData();
-            if (initData && initData.length > 0) return initData;
-            await new Promise(r => setTimeout(r, 50));
+    _getSessionTokenFromUrl() {
+        try {
+            const params = new URLSearchParams(window.location.search || '');
+            const t = (params.get('session_token') || '').trim();
+            return t || null;
+        } catch (e) {
+            return null;
         }
-        return '';
     }
-    /**
-     * Получить initData для отправки на сервер
-     */
-    getInitData() {
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            return tg.initData || '';
+
+    _requireSession() {
+        if (!this.sessionToken) {
+            const err = new Error('AUTH_REQUIRED');
+            err.code = 'AUTH_REQUIRED';
+            throw err;
         }
-        return '';
     }
 
     /**
@@ -33,15 +32,12 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const initData = await this._waitForInitData(5000);
-        if (!initData) {
-            throw new Error('SERVICE_UNAVAILABLE');
-        }
+        this._requireSession();
         const headers = {
             'Content-Type': 'application/json'
         };
-        
-        headers['X-Telegram-Init-Data'] = initData;
+
+        headers['X-Session-Token'] = this.sessionToken;
         const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
@@ -90,15 +86,12 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const initData = await this._waitForInitData(5000);
-        if (!initData) {
-            throw new Error('SERVICE_UNAVAILABLE');
-        }
+        this._requireSession();
         const headers = {
             'Content-Type': 'application/json'
         };
-        
-        headers['X-Telegram-Init-Data'] = initData;
+
+        headers['X-Session-Token'] = this.sessionToken;
         const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;

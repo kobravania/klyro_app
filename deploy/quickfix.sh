@@ -265,41 +265,28 @@ if [[ "$code" != "200" ]]; then
   exit 1
 fi
 
-echo "[VERIFY] Checking /api/profile (GET 404 then POST 200 with profile JSON then GET 200) ..."
+echo "[VERIFY] Checking /api/profile auth (session_token) ..."
 BASE_URL="http://${DOMAIN_HOST}"
 if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
   BASE_URL="https://${DOMAIN_HOST}"
 fi
 
-# В режиме "backend only initData" selftest identity невозможен без реального Telegram initData.
-# Поэтому проверяем только доступность endpoint'ов и формат ответа на 401/404.
 g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile" || true)"
-if [[ "$g1" != "404" && "$g1" != "200" ]]; then
-  # Ожидаем 401 без initData
-  if [[ "$g1" != "401" ]]; then
-    echo "[FATAL] /api/profile GET returned HTTP ${g1}"
-    echo "[DEBUG] backend logs (last 120 lines):"
-    docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
-    exit 1
-  fi
-fi
-
-echo "[VERIFY] /api/profile требует X-Telegram-Init-Data (ожидаем 401) ..."
 if [[ "$g1" != "401" ]]; then
-  echo "[FATAL] /api/profile did not return 401 without initData (got ${g1})"
+  echo "[FATAL] /api/profile did not return 401 without session_token (got ${g1})"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 
-echo "[VERIFY] /api/profile POST без initData (ожидаем 401) ..."
+echo "[VERIFY] /api/profile POST без session_token (ожидаем 401) ..."
 post_body="$(cat <<JSON
 {"birth_date":"1990-01-01","gender":"male","height_cm":180,"weight_kg":80}
 JSON
 )"
 pcode="$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -X POST "${BASE_URL}/api/profile" --data "${post_body}" || true)"
 if [[ "$pcode" != "401" ]]; then
-  echo "[FATAL] /api/profile POST returned HTTP ${pcode} (expected 401 without initData)"
+  echo "[FATAL] /api/profile POST returned HTTP ${pcode} (expected 401 without session_token)"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1

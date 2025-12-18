@@ -5,6 +5,8 @@ Telegram бот для Klyro
 """
 import os
 import logging
+import uuid
+import psycopg2
 from telegram import Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
 
@@ -22,6 +24,56 @@ WEB_APP_URL = os.environ.get('WEB_APP_URL') or os.environ.get('DOMAIN') or 'http
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
+
+def _get_db_connection():
+    required_vars = ['POSTGRES_HOST', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD']
+    missing = [v for v in required_vars if not os.environ.get(v)]
+    if missing:
+        raise ValueError(f"Missing env vars: {', '.join(missing)}")
+    return psycopg2.connect(
+        host=os.environ.get('POSTGRES_HOST'),
+        port=os.environ.get('POSTGRES_PORT', '5432'),
+        database=os.environ.get('POSTGRES_DB'),
+        user=os.environ.get('POSTGRES_USER'),
+        password=os.environ.get('POSTGRES_PASSWORD')
+    )
+
+def _ensure_session_for_user(telegram_user_id: str) -> str:
+    """
+    Bot is the only source of truth for telegram_user_id.
+    Creates user if missing; creates a new session_token and stores mapping.
+    """
+    conn = _get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.users (
+                telegram_user_id TEXT PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT now()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.sessions (
+                session_token TEXT PRIMARY KEY,
+                telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT now(),
+                last_used_at TIMESTAMP DEFAULT now()
+            )
+        """)
+        cur.execute(
+            "INSERT INTO public.users (telegram_user_id) VALUES (%s) ON CONFLICT (telegram_user_id) DO NOTHING",
+            (telegram_user_id,)
+        )
+        session_token = str(uuid.uuid4())
+        cur.execute(
+            "INSERT INTO public.sessions (session_token, telegram_user_id) VALUES (%s, %s)",
+            (session_token, telegram_user_id)
+        )
+        conn.commit()
+        cur.close()
+        return session_token
+    finally:
+        conn.close()
 
 logger.info(f"Bot starting...")
 logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
@@ -50,13 +102,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Нажмите кнопку ниже, чтобы начать:"
     )
     
+    # Create/ensure user + session in DB; WebApp opens ONLY with session_token
+    session_token = _ensure_session_for_user(str(user_id))
+    webapp_url = WEB_APP_URL
+    sep = '&' if '?' in webapp_url else '?'
+    webapp_url = f"{webapp_url}{sep}session_token={session_token}"
+
     # Создаем кнопку с WebApp
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     
     keyboard = [[
         InlineKeyboardButton(
             text="🚀 ОТКРЫТЬ KLYRO",
-            web_app=WebAppInfo(url=WEB_APP_URL)
+            web_app=WebAppInfo(url=webapp_url)
         )
     ]]
     

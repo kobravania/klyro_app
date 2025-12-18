@@ -12,9 +12,6 @@ import psycopg2
 from psycopg2 import errors as psycopg2_errors
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
-import hashlib
-import hmac
-import urllib.parse
 from functools import lru_cache
 from datetime import date as _date
 
@@ -48,7 +45,7 @@ def get_db_connection():
         sys.exit(1)
 
 def init_db():
-    """Инициализировать таблицу profiles. FAIL-FAST: выходит если не удалось."""
+    """Инициализировать таблицы profiles/users/sessions. FAIL-FAST: выходит если не удалось."""
     conn = get_db_connection()
     
     try:
@@ -58,8 +55,26 @@ def init_db():
         cur = conn.cursor()
 
         # Глобальная блокировка на уровне БД (одна на весь кластер)
-        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_profiles_v1'))")
+        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_v2'))")
         try:
+            # Users table (telegram_user_id comes ONLY from bot)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.users (
+                    telegram_user_id TEXT PRIMARY KEY,
+                    created_at TIMESTAMP DEFAULT now()
+                )
+            """)
+
+            # Sessions table: session_token is the ONLY auth for WebApp/API
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.sessions (
+                    session_token TEXT PRIMARY KEY,
+                    telegram_user_id TEXT NOT NULL REFERENCES public.users(telegram_user_id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT now(),
+                    last_used_at TIMESTAMP DEFAULT now()
+                )
+            """)
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS public.profiles (
                     telegram_user_id TEXT PRIMARY KEY,
@@ -76,10 +91,18 @@ def init_db():
             reg = cur.fetchone()[0]
             if reg is None:
                 raise RuntimeError("Таблица public.profiles не создана/не видна")
+            cur.execute("SELECT to_regclass('public.users') AS reg")
+            reg = cur.fetchone()[0]
+            if reg is None:
+                raise RuntimeError("Таблица public.users не создана/не видна")
+            cur.execute("SELECT to_regclass('public.sessions') AS reg")
+            reg = cur.fetchone()[0]
+            if reg is None:
+                raise RuntimeError("Таблица public.sessions не создана/не видна")
         finally:
-            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_profiles_v1'))")
+            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_v2'))")
 
-        print("✓ Таблица profiles инициализирована")
+        print("✓ Таблицы users/sessions/profiles инициализированы")
         cur.close()
     except Exception as e:
         print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
@@ -91,16 +114,17 @@ def init_db():
 
 def ensure_schema_ready(conn):
     """
-    Fail-fast: если схема не готова (нет таблицы profiles) — сервер не должен работать.
+    Fail-fast: если схема не готова (нет таблиц users/sessions/profiles) — сервер не должен работать.
     """
     try:
         cur = conn.cursor()
-        cur.execute("SELECT to_regclass('public.profiles') AS reg")
-        reg = cur.fetchone()[0]
+        for t in ('public.users', 'public.sessions', 'public.profiles'):
+            cur.execute("SELECT to_regclass(%s) AS reg", (t,))
+            reg = cur.fetchone()[0]
+            if reg is None:
+                print(f"КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы {t})")
+                sys.exit(1)
         cur.close()
-        if reg is None:
-            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы public.profiles)")
-            sys.exit(1)
     except Exception as e:
         print(f"КРИТИЧЕСКАЯ ОШИБКА: не удалось проверить схему БД: {e}")
         import traceback
@@ -163,25 +187,6 @@ def _normalize_telegram_user_id(raw_id, colmap):
         return int(str(raw_id))
     return str(raw_id)
 
-def getTelegramUserId(req):
-    """
-    Единственный источник identity:
-    - initData ТОЛЬКО из headers['X-Telegram-Init-Data']
-    - валидируем подпись
-    - возвращаем user.id как строку
-    """
-    init_data = req.headers.get('X-Telegram-Init-Data', '') or ''
-    if not init_data:
-        return None
-    bot_token = os.environ.get('BOT_TOKEN')
-    if not bot_token:
-        print("КРИТИЧЕСКАЯ ОШИБКА: отсутствует BOT_TOKEN для валидации Telegram initData")
-        sys.exit(1)
-    ok, uid = validate_telegram_init_data(init_data, bot_token)
-    if not ok or uid is None:
-        return None
-    return str(uid)
-
 def _row_to_profile(row):
     bd = row.get('birth_date')
     if isinstance(bd, (_date, datetime)):
@@ -221,56 +226,34 @@ def _select_profile(conn, telegram_user_id, colmap):
     cur.close()
     return row
 
-def validate_telegram_init_data(init_data, bot_token):
+def _get_session_token(req):
+    # session_token is passed in URL for WebApp and then forwarded on each API call
+    return (req.args.get('session_token') or req.headers.get('X-Session-Token') or '').strip() or None
+
+def getTelegramUserId(req):
     """
-    Валидация Telegram WebApp initData
-    Проверяет подпись данных от Telegram
+    Единственный источник истины user_id = Telegram Bot.
+    Backend получает только session_token и находит telegram_user_id через sessions.
     """
+    token = _get_session_token(req)
+    if not token:
+        return None
+    conn = get_db_connection()
     try:
-        # Парсим init_data
-        parsed_data = urllib.parse.parse_qs(init_data)
-        
-        # Извлекаем hash и остальные данные
-        received_hash = parsed_data.get('hash', [None])[0]
-        if not received_hash:
-            return False, None
-        
-        # Создаем строку для проверки
-        data_check_string = []
-        for key in sorted(parsed_data.keys()):
-            if key != 'hash':
-                data_check_string.append(f"{key}={parsed_data[key][0]}")
-        data_check_string = '\n'.join(data_check_string)
-        
-        # Вычисляем секретный ключ
-        secret_key = hmac.new(
-            b"WebAppData",
-            bot_token.encode(),
-            hashlib.sha256
-        ).digest()
-        
-        # Вычисляем hash
-        calculated_hash = hmac.new(
-            secret_key,
-            data_check_string.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Сравниваем
-        if calculated_hash != received_hash:
-            return False, None
-        
-        # Извлекаем user_id
-        user_str = parsed_data.get('user', [None])[0]
-        if user_str:
-            user_data = json.loads(user_str)
-            telegram_user_id = user_data.get('id')
-            return True, telegram_user_id
-        
-        return False, None
-    except Exception as e:
-        print(f"Ошибка валидации initData: {e}")
-        return False, None
+        ensure_schema_ready(conn)
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE public.sessions SET last_used_at = now() WHERE session_token = %s RETURNING telegram_user_id",
+            (token,)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        if not row:
+            return None
+        return str(row[0])
+    finally:
+        conn.close()
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
