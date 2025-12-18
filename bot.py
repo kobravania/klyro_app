@@ -21,15 +21,9 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 # URL для WebApp (не webhook!)
 WEB_APP_URL = os.environ.get('WEB_APP_URL') or os.environ.get('DOMAIN') or 'https://klyro.69-67-173-216.sslip.io'
-BOT_USERNAME = (os.environ.get('BOT_USERNAME') or os.environ.get('KLYRO_BOT_USERNAME') or 'klyro_nutrition_bot').strip()
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
-
-logger.info(f"Bot starting...")
-logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
-logger.info(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
-logger.info(f"BOT_USERNAME: {BOT_USERNAME}")
 
 def _get_db_connection():
     db_url = os.environ.get('DATABASE_URL')
@@ -49,6 +43,10 @@ def _get_db_connection():
     )
 
 def _ensure_session_for_user(telegram_user_id: str) -> str:
+    """
+    Bot is the only source of truth for telegram_user_id.
+    Creates user if missing; creates a new session_token and stores mapping.
+    """
     conn = _get_db_connection()
     try:
         cur = conn.cursor()
@@ -58,9 +56,6 @@ def _ensure_session_for_user(telegram_user_id: str) -> str:
                 created_at TIMESTAMP DEFAULT now()
             )
         """)
-        # IMPORTANT: DB may already have an existing sessions table from older deploys.
-        # Older schema used session_token column; newer used session_id.
-        # We must not break existing DB; detect column name dynamically and write accordingly.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS public.sessions (
                 session_token TEXT PRIMARY KEY,
@@ -70,33 +65,24 @@ def _ensure_session_for_user(telegram_user_id: str) -> str:
                 expires_at TIMESTAMP DEFAULT (now() + interval '30 days')
             )
         """)
-        cur.execute("ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT (now() + interval '30 days')")
-
-        # detect session key column
-        cur.execute("""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_schema='public' AND table_name='sessions'
-              AND column_name IN ('session_token','session_id')
-            ORDER BY CASE column_name WHEN 'session_token' THEN 0 ELSE 1 END
-            LIMIT 1
-        """)
-        row = cur.fetchone()
-        session_key_col = row[0] if row else 'session_token'
         cur.execute(
             "INSERT INTO public.users (telegram_user_id) VALUES (%s) ON CONFLICT (telegram_user_id) DO NOTHING",
             (telegram_user_id,)
         )
-        session_id = str(uuid.uuid4())
+        session_token = str(uuid.uuid4())
         cur.execute(
-            f"INSERT INTO public.sessions ({session_key_col}, telegram_user_id) VALUES (%s, %s)",
-            (session_id, telegram_user_id)
+            "INSERT INTO public.sessions (session_token, telegram_user_id) VALUES (%s, %s)",
+            (session_token, telegram_user_id)
         )
         conn.commit()
         cur.close()
-        return session_id
+        return session_token
     finally:
         conn.close()
+
+logger.info(f"Bot starting...")
+logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
+logger.info(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start - FAIL FAST"""
@@ -112,16 +98,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("❌ Ошибка конфигурации бота. Обратитесь к администратору.")
         return
     
-    welcome_text = "Нажми кнопку ниже, чтобы открыть Klyro:"
-
-    # ONLY entry: create session and open via startapp deep link
-    session_id = _ensure_session_for_user(str(user_id))
-    startapp_link = f"https://t.me/{BOT_USERNAME}?startapp={session_id}"
+    welcome_text = (
+        "Теперь ты можешь открывать Klyro из меню или списка чатов\n\n"
+        "Нажми кнопку ниже, чтобы открыть:"
+    )
+    
+    # Bootstrap only: backend sets HttpOnly cookie then redirects to /
+    session_token = _ensure_session_for_user(str(user_id))
+    sep = '&' if '?' in WEB_APP_URL else '?'
+    # WebApp must open through /auth/bootstrap to set cookie.
+    # Keep it on the same domain to ensure cookie is stored for subsequent opens.
+    webapp_url = f"{WEB_APP_URL.rstrip('/')}/auth/bootstrap?session={session_token}"
 
     # Создаем кнопку с WebApp
     from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     
-    keyboard = [[InlineKeyboardButton(text="🚀 ОТКРЫТЬ KLYRO", url=startapp_link)]]
+    keyboard = [[
+        InlineKeyboardButton(
+            text="🚀 ОТКРЫТЬ KLYRO",
+            web_app=WebAppInfo(url=webapp_url)
+        )
+    ]]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     

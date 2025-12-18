@@ -8,26 +8,15 @@ class ApiClient {
         this.baseUrl = window.location.origin;
     }
 
-    getSessionId() {
-        try {
-            const sid = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
-            const s = String(sid || '').trim();
-            return s || null;
-        } catch (e) {
-            return null;
-        }
-    }
-
     /**
      * Загрузить профиль пользователя с сервера
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const sessionId = this.getSessionId();
         const headers = {
-            'Content-Type': 'application/json',
-            ...(sessionId ? { 'X-Klyro-Session': sessionId } : {})
+            'Content-Type': 'application/json'
         };
+
         const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
@@ -38,7 +27,8 @@ class ApiClient {
             const response = await fetch(url, {
                 method: 'GET',
                 headers: headers,
-                signal: controller.signal
+                signal: controller.signal,
+                credentials: 'include'
             });
 
             clearTimeout(timeoutId);
@@ -60,7 +50,9 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            if (error.code === 'AUTH_REQUIRED') throw error;
+            if (error.code === 'AUTH_REQUIRED') {
+                throw error;
+            }
             if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || (error.message && error.message.includes('Failed to fetch'))) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -74,11 +66,10 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const sessionId = this.getSessionId();
         const headers = {
-            'Content-Type': 'application/json',
-            ...(sessionId ? { 'X-Klyro-Session': sessionId } : {})
+            'Content-Type': 'application/json'
         };
+
         const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
@@ -92,16 +83,11 @@ class ApiClient {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload),
-                signal: controller.signal
+                signal: controller.signal,
+                credentials: 'include'
             });
 
             clearTimeout(timeoutId);
-
-            if (response.status === 401) {
-                const err = new Error('AUTH_REQUIRED');
-                err.code = 'AUTH_REQUIRED';
-                throw err;
-            }
 
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');
@@ -110,7 +96,6 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            if (error.code === 'AUTH_REQUIRED') throw error;
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }

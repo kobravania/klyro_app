@@ -52,25 +52,31 @@ function hideLoadingScreen() {
     }
 }
 
-function showOpenViaBotScreen() {
+function showActivationScreen() {
     hideAllScreens();
     const app = document.getElementById('app');
     if (!app) return;
 
-    const existing = document.getElementById('open-via-bot-screen');
+    const existing = document.getElementById('activation-screen');
     if (existing) existing.remove();
 
+    const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
+    const deepLink = `https://t.me/${botUsername}?start=activate`;
+
     const screen = document.createElement('div');
-    screen.id = 'open-via-bot-screen';
+    screen.id = 'activation-screen';
     screen.className = 'screen active';
     screen.style.display = 'flex';
     screen.style.flexDirection = 'column';
     screen.innerHTML = `
         <div class="screen-content">
-            <h1 class="screen-title">Откройте приложение через /start в боте</h1>
+            <h1 class="screen-title">Активация</h1>
             <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                Это приложение работает только при открытии через кнопку, которую бот присылает после команды /start.
+                Чтобы использовать Klyro, сначала активируй его через бота
             </p>
+            <a class="btn btn-primary btn-block" href="${deepLink}" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
+                🔵 Перейти к боту
+            </a>
         </div>
     `;
     app.appendChild(screen);
@@ -86,68 +92,61 @@ async function initApp() {
     showLoadingScreen();
 
     // Явные состояния приложения
-    let appState = 'loading'; // loading -> (200 dashboard | 404 onboarding | 401 activation | 500 error)
+    let appState = 'loading'; // 'loading' | 'no_profile' | 'has_profile' | 'error'
+
+    // Единственная точка решения: есть ли профиль
+    async function loadProfile() {
+        console.log('[APP] loadProfile(): GET /api/profile...');
+        const profile = await apiClient.getProfile(); // null on 404, throws on 401/500
+        console.log('[APP] loadProfile(): received', profile ? '200' : '404');
+        return profile; // Profile | null
+    }
     
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
-
-        // MINIMAL: app is passive. Without start_param -> show static instruction and STOP (no backend calls)
-        const sid = (() => {
-            try {
-                const s = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
-                return String(s || '').trim();
-            } catch (e) {
-                return '';
-            }
-        })();
-        if (!sid) {
-            hideLoadingScreen();
-            showOpenViaBotScreen();
-            return;
-        }
 
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
         try {
-            console.log('[APP] GET /api/profile...');
-            const profile = await apiClient.getProfile();
+            const profile = await loadProfile();
             if (profile) {
-                appState = 'dashboard';
+                appState = 'has_profile';
                 await appContext.setUserData(profile);
             } else {
-                appState = 'onboarding';
+                appState = 'no_profile';
                 await appContext.setUserData(null);
             }
         } catch (e) {
             console.log('[APP] loadProfile(): error', e && (e.code || e.message || String(e)));
-            appState = (e && e.code === 'AUTH_REQUIRED') ? 'activation' : 'error';
+            appState = (e && e.code === 'AUTH_REQUIRED') ? 'auth_required' : 'error';
         }
 
         console.log('[APP] decision:', appState);
 
         hideLoadingScreen();
 
-        if (appState === 'dashboard') {
+        if (appState === 'has_profile') {
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
             return;
         }
 
-        if (appState === 'onboarding') {
+        if (appState === 'no_profile') {
             navigation.hide();
             onboardingScreen.show();
             return;
         }
 
-        if (appState === 'activation') {
-            showOpenViaBotScreen();
-            return;
+        // 401 -> activation, 500 -> service unavailable
+        if (appState === 'auth_required') {
+            showActivationScreen();
+        } else {
+            showServiceUnavailable();
         }
-        showServiceUnavailable();
     } catch (error) {
         hideLoadingScreen();
         showServiceUnavailable();
