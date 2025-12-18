@@ -163,6 +163,24 @@ def _normalize_telegram_user_id(raw_id, colmap):
         return int(str(raw_id))
     return str(raw_id)
 
+def _get_telegram_user_id_from_request():
+    """
+    Надёжный источник telegram_user_id: валидируем initData из Telegram WebApp.
+    Возвращает user_id или None.
+    """
+    init_data = request.headers.get('X-Telegram-Init-Data', '') or ''
+    if not init_data:
+        return None
+    bot_token = os.environ.get('BOT_TOKEN')
+    if not bot_token:
+        # Fail-fast: без BOT_TOKEN нельзя валидировать initData
+        print("КРИТИЧЕСКАЯ ОШИБКА: отсутствует BOT_TOKEN для валидации Telegram initData")
+        sys.exit(1)
+    ok, uid = validate_telegram_init_data(init_data, bot_token)
+    if not ok or not uid:
+        return None
+    return uid
+
 def _row_to_profile(row):
     bd = row.get('birth_date')
     if isinstance(bd, (_date, datetime)):
@@ -287,6 +305,8 @@ def get_profile():
     try:
         telegram_user_id = request.args.get('telegram_user_id')
         if not telegram_user_id:
+            telegram_user_id = _get_telegram_user_id_from_request()
+        if not telegram_user_id:
             return {'error': 'Service unavailable'}, 500
         
         # Загружаем профиль из БД
@@ -330,6 +350,8 @@ def save_profile():
             return {'error': 'Service unavailable'}, 500
         
         telegram_user_id = data.get('telegram_user_id')
+        if not telegram_user_id:
+            telegram_user_id = _get_telegram_user_id_from_request()
         if not telegram_user_id:
             return {'error': 'Service unavailable'}, 500
         

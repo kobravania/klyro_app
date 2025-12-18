@@ -66,11 +66,6 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const telegramUserId = await this._waitForTelegramUserId(1500);
-        if (!telegramUserId) {
-            throw new Error('SERVICE_UNAVAILABLE');
-        }
-
         const initData = this.getInitData();
         const headers = {
             'Content-Type': 'application/json'
@@ -80,7 +75,9 @@ class ApiClient {
             headers['X-Telegram-Init-Data'] = initData;
         }
 
-        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
+        // telegram_user_id может быть недоступен на iOS (initDataUnsafe.user появляется не сразу).
+        // Сервер умеет извлекать id из X-Telegram-Init-Data, поэтому query-параметр не обязателен.
+        const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -119,11 +116,6 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const telegramUserId = await this._waitForTelegramUserId(1500);
-        if (!telegramUserId) {
-            throw new Error('SERVICE_UNAVAILABLE');
-        }
-
         const initData = this.getInitData();
         const headers = {
             'Content-Type': 'application/json'
@@ -134,7 +126,6 @@ class ApiClient {
         }
 
         const payload = {
-            telegram_user_id: telegramUserId,
             ...profileData
         };
 
