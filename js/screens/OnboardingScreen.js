@@ -542,7 +542,7 @@ class OnboardingScreen {
 
             // СТРОГО ПО ТЗ: POST /api/profile возвращает сохранённый профиль.
             const savedProfile = await apiClient.saveProfile(profileData);
-            if (!savedProfile || !savedProfile.telegram_user_id) {
+            if (!savedProfile) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 

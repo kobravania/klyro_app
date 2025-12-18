@@ -181,17 +181,6 @@ def _get_telegram_user_id_from_request():
         return None
     return uid
 
-def _resolve_telegram_user_id(provided_id):
-    """
-    Правило source-of-truth для identity:
-    - Если пришёл валидный X-Telegram-Init-Data -> используем user.id из него (игнорируем provided_id).
-    - Иначе (например, локальные self-test'ы) -> используем provided_id.
-    """
-    uid = _get_telegram_user_id_from_request()
-    if uid:
-        return uid
-    return provided_id
-
 def _row_to_profile(row):
     bd = row.get('birth_date')
     if isinstance(bd, (_date, datetime)):
@@ -300,18 +289,6 @@ def health():
 def api_health():
     return {'status': 'ok'}, 200
 
-# Identity endpoint: returns resolved telegram_user_id (from validated initData if present)
-@app.route('/api/whoami')
-def whoami():
-    try:
-        provided = request.args.get('telegram_user_id')
-        uid = _resolve_telegram_user_id(provided)
-        if not uid:
-            return {'error': 'Service unavailable'}, 500
-        return jsonify({'telegram_user_id': str(uid)}), 200
-    except Exception:
-        return {'error': 'Service unavailable'}, 500
-
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
 # Источник истины = PostgreSQL
@@ -326,10 +303,9 @@ def get_profile():
     """
     print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
     try:
-        telegram_user_id = request.args.get('telegram_user_id')
-        telegram_user_id = _resolve_telegram_user_id(telegram_user_id)
+        telegram_user_id = _get_telegram_user_id_from_request()
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
+            return {'error': 'Service unavailable'}, 401
         
         # Загружаем профиль из БД
         conn = get_db_connection()
@@ -371,10 +347,9 @@ def save_profile():
         if not data:
             return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = data.get('telegram_user_id')
-        telegram_user_id = _resolve_telegram_user_id(telegram_user_id)
+        telegram_user_id = _get_telegram_user_id_from_request()
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
+            return {'error': 'Service unavailable'}, 401
         
         # Извлекаем данные профиля (игнорируем лишние поля)
         birth_date = data.get('birth_date') or data.get('dateOfBirth')

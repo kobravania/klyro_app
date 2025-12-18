@@ -65,11 +65,9 @@ async function initApp() {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
 
-        // Детерминированно ждём initData/user.id (на iOS initDataUnsafe.user иногда появляется не сразу)
-        // Получаем identity через backend (whoami). Это устраняет iOS/Telegram race conditions.
-        try {
-            await window.apiClient.resolveIdentity();
-        } catch (e) {
+        // Ждём initData. Backend определяет telegram_user_id ТОЛЬКО из initData.
+        const initData = await window.apiClient._waitForInitData(5000);
+        if (!initData) {
             hideLoadingScreen();
             showServiceUnavailable();
             return;

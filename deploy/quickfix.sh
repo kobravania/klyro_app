@@ -201,45 +201,40 @@ if [[ "$code" != "200" ]]; then
 fi
 
 echo "[VERIFY] Checking /api/profile (GET 404 then POST 200 with profile JSON then GET 200) ..."
-# telegram_user_id в существующей БД может быть BIGINT -> selftest делаем числовым
-SELFTEST_ID="999000111222"
 BASE_URL="http://${DOMAIN_HOST}"
 if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
   BASE_URL="https://${DOMAIN_HOST}"
 fi
 
-# GET should be 404 initially (or 200 if previously created - that's fine)
-g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile?telegram_user_id=${SELFTEST_ID}" || true)"
+# В режиме "backend only initData" selftest identity невозможен без реального Telegram initData.
+# Поэтому проверяем только доступность endpoint'ов и формат ответа на 401/404.
+g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile" || true)"
 if [[ "$g1" != "404" && "$g1" != "200" ]]; then
-  echo "[FATAL] /api/profile GET returned HTTP ${g1}"
+  # Ожидаем 401 без initData
+  if [[ "$g1" != "401" ]]; then
+    echo "[FATAL] /api/profile GET returned HTTP ${g1}"
+    echo "[DEBUG] backend logs (last 120 lines):"
+    docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
+    exit 1
+  fi
+fi
+
+echo "[VERIFY] /api/profile требует X-Telegram-Init-Data (ожидаем 401) ..."
+if [[ "$g1" != "401" ]]; then
+  echo "[FATAL] /api/profile did not return 401 without initData (got ${g1})"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 
-# POST must return 200 + json profile with telegram_user_id
+echo "[VERIFY] /api/profile POST без initData (ожидаем 401) ..."
 post_body="$(cat <<JSON
-{"telegram_user_id":"${SELFTEST_ID}","birth_date":"1990-01-01","gender":"male","height_cm":180,"weight_kg":80}
+{"birth_date":"1990-01-01","gender":"male","height_cm":180,"weight_kg":80}
 JSON
 )"
-pcode="$(curl -k -s -o /tmp/klyro_profile_post.json -w '%{http_code}' -H 'Content-Type: application/json' -X POST "${BASE_URL}/api/profile" --data "${post_body}" || true)"
-if [[ "$pcode" != "200" ]]; then
-  echo "[FATAL] /api/profile POST returned HTTP ${pcode}"
-  cat /tmp/klyro_profile_post.json || true
-  echo "[DEBUG] backend logs (last 120 lines):"
-  docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
-  exit 1
-fi
-if ! grep -q "\"telegram_user_id\"" /tmp/klyro_profile_post.json; then
-  echo "[FATAL] /api/profile POST did not return a profile JSON"
-  cat /tmp/klyro_profile_post.json || true
-  exit 1
-fi
-
-# GET must be 200 now
-g2="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile?telegram_user_id=${SELFTEST_ID}" || true)"
-if [[ "$g2" != "200" ]]; then
-  echo "[FATAL] /api/profile GET-after-POST returned HTTP ${g2}"
+pcode="$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -X POST "${BASE_URL}/api/profile" --data "${post_body}" || true)"
+if [[ "$pcode" != "401" ]]; then
+  echo "[FATAL] /api/profile POST returned HTTP ${pcode} (expected 401 without initData)"
   echo "[DEBUG] backend logs (last 120 lines):"
   docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1

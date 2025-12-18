@@ -6,60 +6,6 @@
 class ApiClient {
     constructor() {
         this.baseUrl = window.location.origin;
-        this._resolvedTelegramUserId = null;
-    }
-
-    async resolveIdentity() {
-        if (this._resolvedTelegramUserId) return this._resolvedTelegramUserId;
-
-        // 1) Самый надёжный источник (особенно на iOS): user.id внутри initData
-        const initData = await this._waitForInitData(5000);
-        const fromInitData = this._extractTelegramUserIdFromInitData(initData || '');
-        if (fromInitData) {
-            this._resolvedTelegramUserId = String(fromInitData);
-            return this._resolvedTelegramUserId;
-        }
-
-        // 2) Fallback: initDataUnsafe.user.id (или если initData временно пустой)
-        const fallbackId = await this._waitForTelegramUserId(5000);
-
-        const headers = { 'Content-Type': 'application/json' };
-        if (initData) headers['X-Telegram-Init-Data'] = initData;
-
-        const url = fallbackId
-            ? `${this.baseUrl}/api/whoami?telegram_user_id=${encodeURIComponent(fallbackId)}`
-            : `${this.baseUrl}/api/whoami`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        try {
-            const resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (!resp.ok) throw new Error('SERVICE_UNAVAILABLE');
-            const data = await resp.json();
-            if (!data || !data.telegram_user_id) throw new Error('SERVICE_UNAVAILABLE');
-            this._resolvedTelegramUserId = String(data.telegram_user_id);
-            return this._resolvedTelegramUserId;
-        } catch (e) {
-            clearTimeout(timeoutId);
-            throw new Error('SERVICE_UNAVAILABLE');
-        }
-    }
-
-    async _waitForTelegramUserId(timeoutMs = 1500) {
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            // Prefer initData parsing (most stable on iOS)
-            const initData = this.getInitData();
-            const fromInitData = this._extractTelegramUserIdFromInitData(initData || '');
-            if (fromInitData) return fromInitData;
-
-            // Fallback to initDataUnsafe.user.id
-            const id = this.getTelegramUserId();
-            if (id) return id;
-            await new Promise(r => setTimeout(r, 50));
-        }
-        return null;
     }
 
     async _waitForInitData(timeoutMs = 5000) {
@@ -71,38 +17,6 @@ class ApiClient {
         }
         return '';
     }
-    _extractTelegramUserIdFromInitData(initData) {
-        try {
-            if (!initData) return null;
-            const params = new URLSearchParams(initData);
-            const userStr = params.get('user');
-            if (!userStr) return null;
-            const user = JSON.parse(userStr);
-            if (!user || typeof user.id === 'undefined' || user.id === null) return null;
-            return String(user.id);
-        } catch (e) {
-            return null;
-        }
-    }
-
-    /**
-     * Получить Telegram User ID из initData
-     */
-    getTelegramUserId() {
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user && typeof tg.initDataUnsafe.user.id !== 'undefined') {
-                return String(tg.initDataUnsafe.user.id);
-            }
-
-            // Fallback: на iOS/Telegram иногда initDataUnsafe.user может быть пустым,
-            // но tg.initData содержит user=... (JSON) — достаём id оттуда.
-            const fromInitData = this._extractTelegramUserIdFromInitData(tg.initData || '');
-            if (fromInitData) return fromInitData;
-        }
-        return null;
-    }
-
     /**
      * Получить initData для отправки на сервер
      */
@@ -119,23 +33,16 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const telegramUserId = await this.resolveIdentity();
-        if (!telegramUserId) {
+        const initData = await this._waitForInitData(5000);
+        if (!initData) {
             throw new Error('SERVICE_UNAVAILABLE');
         }
-
-        const initData = await this._waitForInitData(5000);
         const headers = {
             'Content-Type': 'application/json'
         };
         
-        if (initData) {
-            headers['X-Telegram-Init-Data'] = initData;
-        }
-
-        // Всегда передаём telegram_user_id как fallback (даже если initData временно пуст),
-        // а initData используем для валидации на backend когда оно есть.
-        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
+        headers['X-Telegram-Init-Data'] = initData;
+        const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -174,24 +81,16 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const telegramUserId = await this.resolveIdentity();
-        if (!telegramUserId) {
+        const initData = await this._waitForInitData(5000);
+        if (!initData) {
             throw new Error('SERVICE_UNAVAILABLE');
         }
-
-        const initData = await this._waitForInitData(5000);
         const headers = {
             'Content-Type': 'application/json'
         };
         
-        if (initData) {
-            headers['X-Telegram-Init-Data'] = initData;
-        }
-
-        const payload = {
-            telegram_user_id: telegramUserId,
-            ...profileData
-        };
+        headers['X-Telegram-Init-Data'] = initData;
+        const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
 
