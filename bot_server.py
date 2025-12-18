@@ -214,9 +214,11 @@ def _select_profile(conn, telegram_user_id, colmap):
         select_cols.append("created_at")
     if colmap.get('has_updated_at'):
         select_cols.append("updated_at")
+    # IMPORTANT: we match by telegram_user_id as TEXT to be compatible with existing DBs
+    # where the column might be BIGINT or TEXT. This avoids subtle type-mismatch issues.
     cur.execute(
-        f"SELECT {', '.join(select_cols)} FROM public.profiles WHERE telegram_user_id = %s",
-        (telegram_user_id,)
+        f"SELECT {', '.join(select_cols)} FROM public.profiles WHERE telegram_user_id::text = %s",
+        (str(telegram_user_id),)
     )
     row = cur.fetchone()
     cur.close()
@@ -317,10 +319,6 @@ def get_profile():
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
-            try:
-                telegram_user_id = _normalize_telegram_user_id(telegram_user_id, colmap)
-            except Exception:
-                return {'error': 'Service unavailable'}, 500
             row = _select_profile(conn, telegram_user_id, colmap)
             
             if row:
@@ -383,10 +381,7 @@ def save_profile():
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
-            try:
-                telegram_user_id = _normalize_telegram_user_id(telegram_user_id, colmap)
-            except Exception:
-                return {'error': 'Service unavailable'}, 500
+            telegram_user_id = str(telegram_user_id)
             cur = conn.cursor()
             # Используем INSERT ... ON CONFLICT для upsert
             height_col = colmap['height']
