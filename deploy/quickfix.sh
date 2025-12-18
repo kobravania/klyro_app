@@ -211,6 +211,8 @@ fi
 g1="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile?telegram_user_id=${SELFTEST_ID}" || true)"
 if [[ "$g1" != "404" && "$g1" != "200" ]]; then
   echo "[FATAL] /api/profile GET returned HTTP ${g1}"
+  echo "[DEBUG] backend logs (last 120 lines):"
+  docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 
@@ -223,6 +225,8 @@ pcode="$(curl -k -s -o /tmp/klyro_profile_post.json -w '%{http_code}' -H 'Conten
 if [[ "$pcode" != "200" ]]; then
   echo "[FATAL] /api/profile POST returned HTTP ${pcode}"
   cat /tmp/klyro_profile_post.json || true
+  echo "[DEBUG] backend logs (last 120 lines):"
+  docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 if ! grep -q "\"telegram_user_id\"" /tmp/klyro_profile_post.json; then
@@ -235,6 +239,8 @@ fi
 g2="$(curl -k -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/profile?telegram_user_id=${SELFTEST_ID}" || true)"
 if [[ "$g2" != "200" ]]; then
   echo "[FATAL] /api/profile GET-after-POST returned HTTP ${g2}"
+  echo "[DEBUG] backend logs (last 120 lines):"
+  docker-compose -f "$COMPOSE_FILE" logs --tail=120 backend || true
   exit 1
 fi
 
