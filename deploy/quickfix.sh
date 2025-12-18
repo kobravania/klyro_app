@@ -70,8 +70,6 @@ DOMAIN_HOST="${DOMAIN_RAW#http://}"
 DOMAIN_HOST="${DOMAIN_HOST#https://}"
 DOMAIN_HOST="${DOMAIN_HOST%%/*}"
 
-NGINX_AVAILABLE="/etc/nginx/sites-available/klyro"
-NGINX_ENABLED="/etc/nginx/sites-enabled/klyro"
 NGINX_CONFD="/etc/nginx/conf.d/00-klyro.conf"
 
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN_HOST}"
@@ -80,7 +78,7 @@ PRIVKEY="${CERT_DIR}/privkey.pem"
 
 if [[ -f "$FULLCHAIN" && -f "$PRIVKEY" ]]; then
   # HTTPS available -> force https and terminate TLS here (Telegram uses https)
-  cat > "$NGINX_AVAILABLE" <<EOF
+  cat > "$NGINX_CONFD" <<EOF
 server {
   listen 80;
   server_name ${DOMAIN_HOST};
@@ -122,7 +120,7 @@ server {
 EOF
 else
   # No certs -> serve plain HTTP (still usable for local debug)
-  cat > "$NGINX_AVAILABLE" <<EOF
+  cat > "$NGINX_CONFD" <<EOF
 server {
   listen 80;
   server_name ${DOMAIN_HOST};
@@ -155,14 +153,19 @@ server {
 EOF
 fi
 
-ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
-
-# ALSO write to conf.d (some installs don't include sites-enabled)
-cp -f "$NGINX_AVAILABLE" "$NGINX_CONFD"
-
 # disable default site if present to avoid conflicts
 if [[ -e /etc/nginx/sites-enabled/default ]]; then
   rm -f /etc/nginx/sites-enabled/default || true
+fi
+
+# Ensure we do NOT have duplicate server blocks for the same domain.
+# Previous versions wrote both to sites-enabled and conf.d, which caused:
+#   "conflicting server name ..., ignored"
+if [[ -L /etc/nginx/sites-enabled/klyro || -f /etc/nginx/sites-enabled/klyro ]]; then
+  rm -f /etc/nginx/sites-enabled/klyro || true
+fi
+if [[ -f /etc/nginx/sites-available/klyro ]]; then
+  rm -f /etc/nginx/sites-available/klyro || true
 fi
 
 # Disable any other nginx config that claims this server_name (to stop HTTPS conflicts)
@@ -170,12 +173,15 @@ echo "[6/6] Disabling conflicting nginx vhosts for ${DOMAIN_HOST} ..."
 tmp_nginx_dump="$(mktemp)"
 nginx -T > "$tmp_nginx_dump" || true
 
-conflict_files="$(grep -nR --include='*.conf' --exclude='00-klyro.conf' "server_name[[:space:]]\\+${DOMAIN_HOST}" /etc/nginx 2>/dev/null | cut -d: -f1 | sort -u || true)"
+conflict_files="$(
+  grep -nR --exclude='00-klyro.conf' "server_name[[:space:]]\\+${DOMAIN_HOST}" /etc/nginx 2>/dev/null \
+  | cut -d: -f1 | sort -u || true
+)"
 if [[ -n "${conflict_files}" ]]; then
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     # Avoid touching our own generated conf
-    if [[ "$f" == "$NGINX_CONFD" || "$f" == "$NGINX_AVAILABLE" ]]; then
+    if [[ "$f" == "$NGINX_CONFD" ]]; then
       continue
     fi
     # Only disable real files
