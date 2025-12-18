@@ -42,7 +42,8 @@ class ApiClient {
         };
         
         headers['X-Telegram-Init-Data'] = initData;
-        const url = `${this.baseUrl}/api/profile`;
+        // Also pass initData via query as transport fallback (identity still derived ONLY from initData)
+        const url = `${this.baseUrl}/api/profile?init_data=${encodeURIComponent(initData)}`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -92,7 +93,7 @@ class ApiClient {
         headers['X-Telegram-Init-Data'] = initData;
         const payload = { ...profileData };
 
-        const url = `${this.baseUrl}/api/profile`;
+        const url = `${this.baseUrl}/api/profile?init_data=${encodeURIComponent(initData)}`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();

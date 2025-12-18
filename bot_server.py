@@ -168,7 +168,11 @@ def _get_telegram_user_id_from_request():
     Надёжный источник telegram_user_id: валидируем initData из Telegram WebApp.
     Возвращает user_id или None.
     """
+    # Primary transport: header (preferred)
     init_data = request.headers.get('X-Telegram-Init-Data', '') or ''
+    # Fallback transport (still initData): query param for cases where proxy/WebView strips custom headers
+    if not init_data:
+        init_data = request.args.get('init_data', '') or ''
     if not init_data:
         return None
     bot_token = os.environ.get('BOT_TOKEN')
