@@ -52,34 +52,43 @@ function hideLoadingScreen() {
     }
 }
 
-function showActivationScreen() {
+function showOpenViaBotScreen() {
     hideAllScreens();
     const app = document.getElementById('app');
     if (!app) return;
 
-    const existing = document.getElementById('activation-screen');
+    const existing = document.getElementById('open-via-bot-screen');
     if (existing) existing.remove();
 
     const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
-    const deepLink = `https://t.me/${botUsername}?start=activate`;
+    const deepLink = `https://t.me/${botUsername}?start=webapp`;
 
     const screen = document.createElement('div');
-    screen.id = 'activation-screen';
+    screen.id = 'open-via-bot-screen';
     screen.className = 'screen active';
     screen.style.display = 'flex';
     screen.style.flexDirection = 'column';
     screen.innerHTML = `
         <div class="screen-content">
-            <h1 class="screen-title">Активация</h1>
+            <h1 class="screen-title">Откройте через бота</h1>
             <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                Чтобы использовать Klyro, сначала активируй его через бота
+                Откройте приложение через бота, чтобы продолжить
             </p>
-            <a class="btn btn-primary btn-block" href="${deepLink}" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">
-                🔵 Перейти к боту
-            </a>
+            <button class="btn btn-primary btn-block" id="open-via-bot-btn" style="display:flex; align-items:center; justify-content:center;">
+                Открыть через Telegram
+            </button>
         </div>
     `;
     app.appendChild(screen);
+
+    const btn = document.getElementById('open-via-bot-btn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            try {
+                window.open(deepLink, '_blank');
+            } catch (e) {}
+        });
+    }
 }
 
 // ============================================
@@ -95,9 +104,9 @@ async function initApp() {
     let appState = 'loading'; // 'loading' | 'no_profile' | 'has_profile' | 'error'
 
     // Единственная точка решения: есть ли профиль
-    async function loadProfile() {
+    async function loadProfile(telegramUserId) {
         console.log('[APP] loadProfile(): GET /api/profile...');
-        const profile = await apiClient.getProfile(); // null on 404, throws on 401/500
+        const profile = await apiClient.getProfile(telegramUserId); // null on 404, throws on 500
         console.log('[APP] loadProfile(): received', profile ? '200' : '404');
         return profile; // Profile | null
     }
@@ -106,12 +115,21 @@ async function initApp() {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
 
+        // CANONICAL: единственный источник идентификации = initDataUnsafe.user.id
+        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        const telegramUserId = tgUser && (tgUser.id !== undefined && tgUser.id !== null) ? String(tgUser.id) : null;
+        if (!telegramUserId) {
+            hideLoadingScreen();
+            showOpenViaBotScreen();
+            return;
+        }
+
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
         try {
-            const profile = await loadProfile();
+            const profile = await loadProfile(telegramUserId);
             if (profile) {
                 appState = 'has_profile';
                 await appContext.setUserData(profile);
@@ -121,7 +139,7 @@ async function initApp() {
             }
         } catch (e) {
             console.log('[APP] loadProfile(): error', e && (e.code || e.message || String(e)));
-            appState = (e && e.code === 'AUTH_REQUIRED') ? 'auth_required' : 'error';
+            appState = 'error';
         }
 
         console.log('[APP] decision:', appState);
@@ -141,12 +159,8 @@ async function initApp() {
             return;
         }
 
-        // 401 -> activation, 500 -> service unavailable
-        if (appState === 'auth_required') {
-            showActivationScreen();
-        } else {
-            showServiceUnavailable();
-        }
+        // 500 -> error
+        showServiceUnavailable();
     } catch (error) {
         hideLoadingScreen();
         showServiceUnavailable();
