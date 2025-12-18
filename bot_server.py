@@ -158,6 +158,48 @@ def _profiles_column_map():
     finally:
         conn.close()
 
+def _normalize_telegram_user_id(raw_id, colmap):
+    if colmap.get('telegram_user_id_type') == 'bigint':
+        return int(str(raw_id))
+    return str(raw_id)
+
+def _row_to_profile(row):
+    bd = row.get('birth_date')
+    if isinstance(bd, (_date, datetime)):
+        birth_date_out = bd.isoformat()
+    elif bd is None:
+        birth_date_out = None
+    else:
+        birth_date_out = str(bd)
+    return {
+        'telegram_user_id': row['telegram_user_id'],
+        'birth_date': birth_date_out,
+        'gender': row['gender'],
+        'height_cm': int(row['height_value']),
+        'weight_kg': int(row['weight_value'])
+    }
+
+def _select_profile(conn, telegram_user_id, colmap):
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    select_cols = [
+        "telegram_user_id",
+        "birth_date",
+        "gender",
+        f"{colmap['height']} AS height_value",
+        f"{colmap['weight']} AS weight_value",
+    ]
+    if colmap.get('has_created_at'):
+        select_cols.append("created_at")
+    if colmap.get('has_updated_at'):
+        select_cols.append("updated_at")
+    cur.execute(
+        f"SELECT {', '.join(select_cols)} FROM public.profiles WHERE telegram_user_id = %s",
+        (telegram_user_id,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    return row
+
 def validate_telegram_init_data(init_data, bot_token):
     """
     Валидация Telegram WebApp initData
@@ -253,54 +295,14 @@ def get_profile():
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
-            # telegram_user_id может быть BIGINT в существующей схеме
-            if colmap.get('telegram_user_id_type') == 'bigint':
-                try:
-                    telegram_user_id = int(str(telegram_user_id))
-                except Exception:
-                    return {'error': 'Service unavailable'}, 500
-            else:
-                telegram_user_id = str(telegram_user_id)
-            cur = conn.cursor(cursor_factory=RealDictCursor)
-            select_cols = [
-                "telegram_user_id",
-                "birth_date",
-                "gender",
-                f"{colmap['height']} AS height_value",
-                f"{colmap['weight']} AS weight_value",
-            ]
-            # created_at/updated_at могут отсутствовать в старой схеме
-            if colmap.get('has_created_at'):
-                select_cols.append("created_at")
-            if colmap.get('has_updated_at'):
-                select_cols.append("updated_at")
-
-            cur.execute(
-                f"SELECT {', '.join(select_cols)} FROM public.profiles WHERE telegram_user_id = %s",
-                (telegram_user_id,)
-            )
-            
-            row = cur.fetchone()
-            cur.close()
+            try:
+                telegram_user_id = _normalize_telegram_user_id(telegram_user_id, colmap)
+            except Exception:
+                return {'error': 'Service unavailable'}, 500
+            row = _select_profile(conn, telegram_user_id, colmap)
             
             if row:
-                bd = row.get('birth_date')
-                # В старой схеме birth_date может быть TEXT -> тогда это уже строка YYYY-MM-DD
-                if isinstance(bd, (_date, datetime)):
-                    birth_date_out = bd.isoformat()
-                elif bd is None:
-                    birth_date_out = None
-                else:
-                    birth_date_out = str(bd)
-                # Преобразуем в JSON-совместимый формат
-                profile = {
-                    'telegram_user_id': row['telegram_user_id'],
-                    'birth_date': birth_date_out,
-                    'gender': row['gender'],
-                    'height_cm': int(row['height_value']),
-                    'weight_kg': int(row['weight_value'])
-                }
-                return jsonify(profile), 200
+                return jsonify(_row_to_profile(row)), 200
             else:
                 return {'error': 'Profile not found'}, 404
         finally:
@@ -359,13 +361,10 @@ def save_profile():
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
-            if colmap.get('telegram_user_id_type') == 'bigint':
-                try:
-                    telegram_user_id = int(str(telegram_user_id))
-                except Exception:
-                    return {'error': 'Service unavailable'}, 500
-            else:
-                telegram_user_id = str(telegram_user_id)
+            try:
+                telegram_user_id = _normalize_telegram_user_id(telegram_user_id, colmap)
+            except Exception:
+                return {'error': 'Service unavailable'}, 500
             cur = conn.cursor()
             # Используем INSERT ... ON CONFLICT для upsert
             height_col = colmap['height']
@@ -403,15 +402,11 @@ def save_profile():
             conn.commit()
             cur.close()
             
-            # ОБЯЗАТЕЛЬНЫЙ КОНТРАКТ: вернуть сохранённый профиль (источник истины)
-            profile = {
-                'telegram_user_id': str(telegram_user_id),
-                'birth_date': str(birth_date),
-                'gender': gender,
-                'height_cm': int(height_cm),
-                'weight_kg': int(weight_kg)
-            }
-            return jsonify(profile), 200
+            # Возвращаем профиль, считанный из БД (реальный источник истины)
+            row = _select_profile(conn, telegram_user_id, colmap)
+            if not row:
+                return {'error': 'Service unavailable'}, 500
+            return jsonify(_row_to_profile(row)), 200
         finally:
             conn.close()
             

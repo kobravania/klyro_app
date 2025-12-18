@@ -350,7 +350,17 @@ class OnboardingScreen {
         screen.classList.add('active');
         screen.style.display = 'flex';
         screen.style.flexDirection = 'column';
-        
+
+        // Сбрасываем локальное состояние формы при каждом показе онбординга,
+        // чтобы не было “как будто всё заполнено”, если до этого был сбой.
+        this.formData = {};
+        document.querySelectorAll('#onboarding-screen .btn.btn-primary').forEach(b => {
+            b.classList.remove('btn-primary');
+            if (!b.classList.contains('btn-secondary')) {
+                b.classList.add('btn-secondary');
+            }
+        });
+
         this.currentStep = 1;
         this.updateStep();
     }
