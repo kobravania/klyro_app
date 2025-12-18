@@ -99,7 +99,9 @@ services:
   # Используется для первоначального получения и обновления сертификатов
 
 volumes:
-  klyro_postgres_data:  # Отдельный volume для Klyro, чтобы не конфликтовать
+  klyro_postgres_data:
+    # Pin volume name to avoid accidental data resets when compose project name changes.
+    name: klyro_postgres_data
     driver: local
 
 networks:

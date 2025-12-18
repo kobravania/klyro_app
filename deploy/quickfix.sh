@@ -42,6 +42,8 @@ echo "[4/6] Building & starting docker-compose stack..."
 # Force legacy builder for determinism.
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
+# Ensure stable compose project name (prevents accidental new volumes/network)
+export COMPOSE_PROJECT_NAME=klyro
 
 # Pre-pull base images to reduce build flakiness
 docker-compose -f "$COMPOSE_FILE" pull --ignore-pull-failures || true
