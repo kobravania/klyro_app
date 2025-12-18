@@ -38,7 +38,19 @@ if systemctl list-unit-files | grep -q '^klyro\.service'; then
 fi
 
 echo "[4/6] Building & starting docker-compose stack..."
-docker-compose -f "$COMPOSE_FILE" up -d --build
+# BuildKit sometimes fails on small VPS with: "DeadlineExceeded: context deadline exceeded"
+# Force legacy builder for determinism.
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+
+# Pre-pull base images to reduce build flakiness
+docker-compose -f "$COMPOSE_FILE" pull --ignore-pull-failures || true
+
+# Build+up with a single retry
+if ! docker-compose -f "$COMPOSE_FILE" up -d --build; then
+  echo "[WARN] docker-compose up --build failed once, retrying..."
+  docker-compose -f "$COMPOSE_FILE" up -d --build
+fi
 
 echo "[5/6] Waiting for backend health..."
 deadline=$((SECONDS+90))
