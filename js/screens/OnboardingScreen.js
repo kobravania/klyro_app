@@ -548,9 +548,14 @@ class OnboardingScreen {
                     <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
                         Попробуйте позже
                     </p>
-                    <button class="btn btn-primary" onclick="location.reload()" style="min-width: 200px;">
-                        Обновить
-                    </button>
+                    <div style="display:flex; gap: var(--spacing-md); justify-content:center; flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="window.initApp && window.initApp()" style="min-width: 200px;">
+                            Повторить
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.Telegram?.WebApp?.close?.()" style="min-width: 200px;">
+                            Закрыть
+                        </button>
+                    </div>
                 </div>
             </div>
         `;

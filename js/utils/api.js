@@ -8,6 +8,16 @@ class ApiClient {
         this.baseUrl = window.location.origin;
     }
 
+    async _waitForTelegramUserId(timeoutMs = 1500) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
+            const id = this.getTelegramUserId();
+            if (id) return id;
+            await new Promise(r => setTimeout(r, 50));
+        }
+        return null;
+    }
+
     _extractTelegramUserIdFromInitData(initData) {
         try {
             if (!initData) return null;
@@ -56,7 +66,7 @@ class ApiClient {
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
     async getProfile() {
-        const telegramUserId = this.getTelegramUserId();
+        const telegramUserId = await this._waitForTelegramUserId(1500);
         if (!telegramUserId) {
             throw new Error('SERVICE_UNAVAILABLE');
         }
@@ -109,7 +119,7 @@ class ApiClient {
      * @returns {Promise<Object>} Сохранённый профиль
      */
     async saveProfile(profileData) {
-        const telegramUserId = this.getTelegramUserId();
+        const telegramUserId = await this._waitForTelegramUserId(1500);
         if (!telegramUserId) {
             throw new Error('SERVICE_UNAVAILABLE');
         }
