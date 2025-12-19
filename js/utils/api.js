@@ -9,16 +9,27 @@ class ApiClient {
     }
 
     /**
-     * Получить session_id из start_param
+     * Получить session_id из start_param или из URL
      * Единственный источник session_id = Telegram.WebApp.initDataUnsafe.start_param
+     * Fallback: извлекаем из URL параметра startapp
      */
     getSessionId() {
         try {
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 const initDataUnsafe = tg.initDataUnsafe || {};
-                return initDataUnsafe.start_param || '';
+                if (initDataUnsafe.start_param) {
+                    return initDataUnsafe.start_param;
+                }
             }
+            
+            // Fallback: извлекаем из URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const startapp = urlParams.get('startapp');
+            if (startapp) {
+                return startapp;
+            }
+            
             return '';
         } catch (e) {
             return '';

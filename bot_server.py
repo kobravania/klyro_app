@@ -302,10 +302,17 @@ def get_profile():
     Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если нет сессии
     """
     print(f"[API] GET /api/profile - запрос получен")
+    print(f"[API] Headers: {dict(request.headers)}")
     try:
+        session_id = _get_session_id_from_request(request)
+        print(f"[API] Session ID из заголовка: {session_id}")
+        
         telegram_user_id = _get_telegram_user_id_from_request(request)
+        print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
+        
         if not telegram_user_id:
             # Нет сессии → 401
+            print("[API] GET /api/profile: нет сессии или сессия невалидна → 401")
             return {'error': 'Unauthorized'}, 401
         
         # Загружаем профиль из БД
@@ -337,10 +344,17 @@ def save_profile():
     Возвращает: 200 + сохранённый профиль, 401 если нет сессии
     """
     print(f"[API] POST /api/profile - запрос получен")
+    print(f"[API] Headers: {dict(request.headers)}")
     try:
+        session_id = _get_session_id_from_request(request)
+        print(f"[API] Session ID из заголовка: {session_id}")
+        
         telegram_user_id = _get_telegram_user_id_from_request(request)
+        print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
+        
         if not telegram_user_id:
             # Нет сессии → 401
+            print("[API] POST /api/profile: нет сессии или сессия невалидна → 401")
             return {'error': 'Unauthorized'}, 401
         
         data = request.json

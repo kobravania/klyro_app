@@ -8,7 +8,7 @@ import logging
 import uuid
 import psycopg2
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Настройка логирования
@@ -125,20 +125,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text("❌ Ошибка конфигурации бота.")
             return
         
-        startapp_link = f"https://t.me/{bot_username}?startapp={session_id}"
-        
         welcome_text = (
             "Нажми кнопку ниже, чтобы открыть Klyro:"
         )
         
-        # Создаем кнопку-ссылку на startapp (не WebApp кнопку!)
-        # Пользователь откроет Mini App через startapp, и session_id будет в initDataUnsafe.start_param
+        # Создаем WebApp кнопку с startapp параметром
+        # Telegram автоматически передаст startapp=<session_id> в initDataUnsafe.start_param
+        # при открытии Mini App через эту кнопку
+        webapp_url = f"{WEB_APP_URL.rstrip('/')}?startapp={session_id}"
+        
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton
         
         keyboard = [[
             InlineKeyboardButton(
                 text="🚀 ОТКРЫТЬ KLYRO",
-                url=startapp_link
+                web_app=WebAppInfo(url=webapp_url)
             )
         ]]
         
