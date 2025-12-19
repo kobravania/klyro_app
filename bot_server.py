@@ -226,30 +226,31 @@ def _validate_init_data(init_data_str):
         return None
     
     try:
-        print(f"[DEBUG] initData (первые 200 символов): {init_data_str[:200]}...")
+        # Парсим initData вручную, сохраняя оригинальные значения
+        # initData приходит как query string: key1=value1&key2=value2&hash=...
+        pairs = init_data_str.split('&')
+        params = {}
+        hash_value = None
         
-        # Парсим initData используя parse_qsl для сохранения оригинальных значений
-        # parse_qsl сохраняет URL-encoded значения как есть
-        data = dict(urllib.parse.parse_qsl(init_data_str, keep_blank_values=True))
-        
-        # Извлекаем hash и удаляем из данных
-        hash_value = data.pop('hash', None)
-        
-        print(f"[DEBUG] Параметры: {list(data.keys())}")
-        print(f"[DEBUG] Hash: {hash_value[:32] if hash_value else 'None'}...")
+        for pair in pairs:
+            if '=' not in pair:
+                continue
+            key, value = pair.split('=', 1)  # split только по первому =
+            if key == 'hash':
+                hash_value = value
+            else:
+                # Сохраняем оригинальное значение как есть (URL-encoded)
+                params[key] = value
         
         if not hash_value:
-            print("[DEBUG] Hash не найден")
             return None
         
         # Формируем data_check_string: ключи сортируются, разделитель = \n
-        # Используем значения как есть (parse_qsl сохраняет оригинальные URL-encoded значения)
+        # Используем оригинальные URL-encoded значения
         data_check_string = '\n'.join(
-            f"{key}={value}" 
-            for key, value in sorted(data.items())
+            f"{key}={params[key]}" 
+            for key in sorted(params.keys())
         )
-        
-        print(f"[DEBUG] data_check_string (полная): {data_check_string}")
         
         # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
         secret_key = hmac.new(
@@ -267,28 +268,14 @@ def _validate_init_data(init_data_str):
         
         # Проверяем подпись (constant-time сравнение)
         if not hmac.compare_digest(hash_value, expected_hash):
-            print(f"Валидация initData: неверная подпись")
-            print(f"  Получен hash: {hash_value[:32]}...")
-            print(f"  Ожидался hash: {expected_hash[:32]}...")
-            print(f"  data_check_string (первые 200 символов): {data_check_string[:200]}...")
-            print(f"  Параметры: {list(params.keys())}")
-            print(f"  BOT_TOKEN (первые/последние 10): {BOT_TOKEN[:10]}...{BOT_TOKEN[-10:]}")
             return None
         
-        # Извлекаем user из initData
-        # parse_qsl может декодировать значения, поэтому пробуем декодировать если нужно
-        user_str = data.get('user')
-        if not user_str:
+        # Извлекаем user из initData (нужно декодировать URL-encoded значение)
+        user_encoded = params.get('user')
+        if not user_encoded:
             return None
         
-        # Пробуем декодировать, если нужно
-        try:
-            user_decoded = urllib.parse.unquote(user_str)
-            if user_decoded != user_str:
-                user_str = user_decoded
-        except:
-            pass
-        
+        user_str = urllib.parse.unquote(user_encoded)
         user_data = json.loads(user_str)
         telegram_user_id = user_data.get('id')
         
@@ -308,17 +295,12 @@ def _get_telegram_user_id_from_request(req):
     Извлекает telegram_user_id из X-Telegram-Init-Data header.
     """
     init_data = req.headers.get('X-Telegram-Init-Data')
-    print(f"[DEBUG] _get_telegram_user_id_from_request: init_data присутствует: {init_data is not None}")
     if not init_data:
-        print("[DEBUG] _get_telegram_user_id_from_request: init_data отсутствует")
         return None
     
-    print(f"[DEBUG] _get_telegram_user_id_from_request: вызываем _validate_init_data")
-    # Telegram.WebApp.initData уже содержит правильные URL-encoded значения
+    # Telegram.WebApp.initData содержит URL-encoded значения
     # Используем их как есть для валидации
-    result = _validate_init_data(init_data)
-    print(f"[DEBUG] _get_telegram_user_id_from_request: результат валидации: {result}")
-    return result
+    return _validate_init_data(init_data)
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
