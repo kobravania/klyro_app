@@ -311,8 +311,12 @@ def _get_telegram_user_id_from_request(req):
     Извлекает telegram_user_id из X-Telegram-Init-Data header.
     """
     init_data = req.headers.get('X-Telegram-Init-Data')
+    print(f"[DEBUG] X-Telegram-Init-Data header присутствует: {init_data is not None}")
     if not init_data:
+        print("[DEBUG] X-Telegram-Init-Data header отсутствует или пустой")
         return None
+    
+    print(f"[DEBUG] X-Telegram-Init-Data (первые 100 символов): {init_data[:100] if len(init_data) > 100 else init_data}...")
     
     # Если initData приходит в заголовке, он может быть дополнительно URL-encoded
     # Пробуем декодировать один раз (на случай двойного encoding)
@@ -320,8 +324,12 @@ def _get_telegram_user_id_from_request(req):
         decoded = urllib.parse.unquote(init_data)
         # Если декодирование изменило строку, используем декодированную версию
         if decoded != init_data:
+            print(f"[DEBUG] initData был декодирован (длина до: {len(init_data)}, после: {len(decoded)})")
             init_data = decoded
-    except:
+        else:
+            print("[DEBUG] initData не требовал декодирования")
+    except Exception as e:
+        print(f"[DEBUG] Ошибка при декодировании initData: {e}")
         pass  # Если не получилось декодировать, используем оригинал
     
     return _validate_init_data(init_data)
