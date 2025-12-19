@@ -203,15 +203,13 @@ def _select_profile(conn, telegram_user_id, colmap):
     cur.close()
     return row
 
-def _validate_init_data(init_data_str, use_encoded_values=True):
+def _validate_init_data(init_data_str):
     """
     Wallet-like: валидирует Telegram initData через HMAC-SHA256.
     Возвращает telegram_user_id если валидация успешна, иначе None.
     
-    Args:
-        init_data_str: строка initData (может быть URL-encoded или декодированной)
-        use_encoded_values: если True, пытается использовать URL-encoded значения
-                           (для валидации нужны оригинальные значения)
+    Согласно документации Telegram, для валидации нужно использовать
+    оригинальные URL-encoded значения из initData как есть.
     """
     if not init_data_str:
         return None
@@ -228,7 +226,8 @@ def _validate_init_data(init_data_str, use_encoded_values=True):
         return None
     
     try:
-        # Парсим initData вручную
+        # Парсим initData, сохраняя оригинальные значения
+        # initData приходит как query string: key1=value1&key2=value2&hash=...
         pairs = init_data_str.split('&')
         params = {}
         hash_value = None
@@ -240,26 +239,14 @@ def _validate_init_data(init_data_str, use_encoded_values=True):
             if key == 'hash':
                 hash_value = value
             else:
+                # Сохраняем оригинальное значение как есть (URL-encoded или декодированное)
                 params[key] = value
         
         if not hash_value:
             return None
         
-        # ВАЖНО: для валидации нужно использовать оригинальные URL-encoded значения
-        # Если значения уже декодированы браузером, нужно их закодировать обратно
-        if use_encoded_values:
-            # Пробуем закодировать значения обратно (если они были декодированы)
-            encoded_params = {}
-            for key, value in params.items():
-                # Если значение содержит символы, которые должны быть закодированы,
-                # значит оно уже декодировано - кодируем обратно
-                if any(c in value for c in ['{', '}', '[', ']', ':', ',', '"', ' ']):
-                    encoded_params[key] = urllib.parse.quote(value, safe='')
-                else:
-                    encoded_params[key] = value
-            params = encoded_params
-        
         # Формируем data_check_string: ключи сортируются, разделитель = \n
+        # Используем значения как есть (Telegram подписывает оригинальные значения)
         data_check_string = '\n'.join(
             f"{key}={params[key]}" 
             for key in sorted(params.keys())
@@ -284,7 +271,8 @@ def _validate_init_data(init_data_str, use_encoded_values=True):
             print(f"[DEBUG] Валидация initData: hash не совпадает")
             print(f"  Получен: {hash_value[:32]}...")
             print(f"  Ожидался: {expected_hash[:32]}...")
-            print(f"  data_check_string (первые 150 символов): {data_check_string[:150]}...")
+            print(f"  data_check_string (первые 200 символов): {data_check_string[:200]}...")
+            print(f"  Параметры: {list(params.keys())}")
             return None
         
         # Извлекаем user из initData
@@ -321,30 +309,11 @@ def _get_telegram_user_id_from_request(req):
     """
     init_data = req.headers.get('X-Telegram-Init-Data')
     if not init_data:
-        print("[DEBUG] X-Telegram-Init-Data header отсутствует")
         return None
     
-    print(f"[DEBUG] X-Telegram-Init-Data присутствует (длина: {len(init_data)})")
-    print(f"[DEBUG] Первые 150 символов: {init_data[:150]}...")
-    
-    # ВАЖНО: для валидации нужно использовать оригинальные URL-encoded значения
-    # Попробуем оба варианта:
-    # 1. Считаем, что значения уже декодированы браузером - кодируем обратно
-    print("[DEBUG] Попытка валидации с use_encoded_values=True")
-    result = _validate_init_data(init_data, use_encoded_values=True)
-    if result:
-        print(f"[DEBUG] Валидация успешна (вариант 1), telegram_user_id: {result}")
-        return result
-    
-    # 2. Считаем, что значения уже в правильном формате (URL-encoded)
-    print("[DEBUG] Попытка валидации с use_encoded_values=False")
-    result = _validate_init_data(init_data, use_encoded_values=False)
-    if result:
-        print(f"[DEBUG] Валидация успешна (вариант 2), telegram_user_id: {result}")
-        return result
-    
-    print("[DEBUG] Оба варианта валидации не прошли")
-    return None
+    # Telegram.WebApp.initData уже содержит правильные URL-encoded значения
+    # Используем их как есть для валидации
+    return _validate_init_data(init_data)
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
