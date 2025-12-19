@@ -317,7 +317,7 @@ def get_profile():
     try:
         telegram_user_id = _get_telegram_user_id_from_request(request)
         if not telegram_user_id:
-            return {'error': 'Profile not found'}, 404
+            return {'error': 'Service unavailable'}, 500
         
         # Загружаем профиль из БД
         conn = get_db_connection()
