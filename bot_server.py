@@ -317,12 +317,17 @@ def _get_telegram_user_id_from_request(req):
     Извлекает telegram_user_id из X-Telegram-Init-Data header.
     """
     init_data = req.headers.get('X-Telegram-Init-Data')
+    print(f"[DEBUG] _get_telegram_user_id_from_request: init_data присутствует: {init_data is not None}")
     if not init_data:
+        print("[DEBUG] _get_telegram_user_id_from_request: init_data отсутствует")
         return None
     
+    print(f"[DEBUG] _get_telegram_user_id_from_request: вызываем _validate_init_data")
     # Telegram.WebApp.initData уже содержит правильные URL-encoded значения
     # Используем их как есть для валидации
-    return _validate_init_data(init_data)
+    result = _validate_init_data(init_data)
+    print(f"[DEBUG] _get_telegram_user_id_from_request: результат валидации: {result}")
+    return result
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
