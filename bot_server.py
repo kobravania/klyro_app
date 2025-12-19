@@ -208,10 +208,8 @@ def _validate_init_data(init_data_str):
     Wallet-like: валидирует Telegram initData через HMAC-SHA256.
     Возвращает telegram_user_id если валидация успешна, иначе None.
     
-    Согласно официальной документации Telegram:
-    - Используем parse_qsl для парсинга (автоматически декодирует значения)
-    - Браузер декодирует URL-encoded значения при передаче в HTTP заголовке
-    - Используем декодированные значения для формирования data_check_string
+    Согласно официальной документации Telegram, для валидации нужно использовать
+    оригинальные URL-encoded значения из initData как есть.
     """
     if not init_data_str:
         return None
@@ -220,27 +218,34 @@ def _validate_init_data(init_data_str):
     if not BOT_TOKEN:
         return None
     
-    # Очистка BOT_TOKEN от пробелов и кавычек
     BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
     if not BOT_TOKEN:
         return None
     
     try:
-        # Парсим initData используя parse_qsl (как в официальной документации)
-        # parse_qsl автоматически декодирует URL-encoded значения
-        # Это правильно, т.к. браузер декодирует значения при передаче в заголовке
-        params = dict(urllib.parse.parse_qsl(init_data_str, keep_blank_values=True))
+        # Парсим initData вручную, сохраняя оригинальные URL-encoded значения
+        pairs = init_data_str.split('&')
+        params = {}
+        hash_value = None
         
-        # Извлекаем hash и удаляем из параметров
-        hash_value = params.pop('hash', None)
+        for pair in pairs:
+            if '=' not in pair:
+                continue
+            key, value = pair.split('=', 1)
+            if key == 'hash':
+                hash_value = value
+            else:
+                # Сохраняем оригинальное значение как есть (URL-encoded)
+                params[key] = value
+        
         if not hash_value:
             return None
         
         # Формируем data_check_string: ключи сортируются, разделитель = \n
-        # Используем декодированные значения (как их декодировал браузер)
+        # Используем оригинальные URL-encoded значения
         data_check_string = '\n'.join(
-            f"{key}={value}" 
-            for key, value in sorted(params.items())
+            f"{key}={params[key]}" 
+            for key in sorted(params.keys())
         )
         
         # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
@@ -261,76 +266,7 @@ def _validate_init_data(init_data_str):
         if not hmac.compare_digest(hash_value, expected_hash):
             return None
         
-        # Извлекаем user из initData (уже декодирован parse_qsl)
-        user_str = params.get('user')
-        if not user_str:
-            return None
-        
-        user_data = json.loads(user_str)
-        telegram_user_id = user_data.get('id')
-        
-        if telegram_user_id is None:
-            return None
-        
-        return str(telegram_user_id)
-    except Exception as e:
-        return None
-
-def _validate_init_data_encoded(init_data_str):
-    """
-    Валидация initData с оригинальными URL-encoded значениями.
-    Используется когда браузер НЕ декодирует значения при передаче в заголовке.
-    """
-    if not init_data_str:
-        return None
-    
-    BOT_TOKEN = os.environ.get('BOT_TOKEN')
-    if not BOT_TOKEN:
-        return None
-    BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
-    if not BOT_TOKEN:
-        return None
-    
-    try:
-        # Парсим вручную, сохраняя оригинальные URL-encoded значения
-        pairs = init_data_str.split('&')
-        params = {}
-        hash_value = None
-        
-        for pair in pairs:
-            if '=' not in pair:
-                continue
-            key, value = pair.split('=', 1)
-            if key == 'hash':
-                hash_value = value
-            else:
-                params[key] = value
-        
-        if not hash_value:
-            return None
-        
-        # Формируем data_check_string с оригинальными URL-encoded значениями
-        data_check_string = '\n'.join(
-            f"{key}={params[key]}" 
-            for key in sorted(params.keys())
-        )
-        
-        secret_key = hmac.new(
-            b"WebAppData",
-            BOT_TOKEN.encode('utf-8'),
-            hashlib.sha256
-        ).digest()
-        
-        expected_hash = hmac.new(
-            secret_key,
-            data_check_string.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-        
-        if not hmac.compare_digest(hash_value, expected_hash):
-            return None
-        
-        # Извлекаем user (нужно декодировать)
+        # Извлекаем user из initData (нужно декодировать URL-encoded значение)
         user_encoded = params.get('user')
         if not user_encoded:
             return None
@@ -350,23 +286,77 @@ def _get_telegram_user_id_from_request(req):
     """
     Wallet-like: единственный источник истины = валидированный initData.
     Извлекает telegram_user_id из X-Telegram-Init-Data header.
+    
+    Telegram.WebApp.initData содержит URL-encoded значения.
+    При передаче в HTTP заголовке браузер может декодировать их.
+    Пробуем оба варианта: сначала с оригинальными значениями, потом с декодированными.
     """
     init_data = req.headers.get('X-Telegram-Init-Data')
     if not init_data:
         return None
     
-    # Пробуем оба варианта:
-    # 1. Браузер декодировал значения (используем parse_qsl)
+    # Вариант 1: Браузер НЕ декодировал значения (используем оригинальные URL-encoded)
     result = _validate_init_data(init_data)
     if result:
         return result
     
-    # 2. Браузер НЕ декодировал значения (используем оригинальные URL-encoded)
-    result = _validate_init_data_encoded(init_data)
-    if result:
-        return result
-    
-    return None
+    # Вариант 2: Браузер декодировал значения (нужно закодировать обратно)
+    # Если значения уже декодированы, пробуем их закодировать обратно
+    try:
+        # Парсим декодированные значения
+        params = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        hash_value = params.pop('hash', None)
+        if not hash_value:
+            return None
+        
+        # Кодируем значения обратно для валидации
+        encoded_params = {}
+        for key, value in params.items():
+            # Кодируем значение обратно в URL-encoded формат
+            encoded_params[key] = urllib.parse.quote(value, safe='')
+        
+        # Формируем data_check_string с закодированными значениями
+        data_check_string = '\n'.join(
+            f"{key}={encoded_params[key]}" 
+            for key in sorted(encoded_params.keys())
+        )
+        
+        BOT_TOKEN = os.environ.get('BOT_TOKEN')
+        if not BOT_TOKEN:
+            return None
+        BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
+        if not BOT_TOKEN:
+            return None
+        
+        secret_key = hmac.new(
+            b"WebAppData",
+            BOT_TOKEN.encode('utf-8'),
+            hashlib.sha256
+        ).digest()
+        
+        expected_hash = hmac.new(
+            secret_key,
+            data_check_string.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(hash_value, expected_hash):
+            return None
+        
+        # Извлекаем user (уже декодирован)
+        user_str = params.get('user')
+        if not user_str:
+            return None
+        
+        user_data = json.loads(user_str)
+        telegram_user_id = user_data.get('id')
+        
+        if telegram_user_id is None:
+            return None
+        
+        return str(telegram_user_id)
+    except:
+        return None
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
