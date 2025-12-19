@@ -48,6 +48,9 @@ export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
 # Ensure stable compose project name (prevents accidental new volumes/network)
 export COMPOSE_PROJECT_NAME=klyro
+# Force rebuild backend to ensure latest code is used
+echo "[4.1/6] Forcing rebuild of backend container..."
+docker-compose build --no-cache backend || true
 
 # Postgres persistence hard guarantee:
 # Older deployments could have created multiple volumes (e.g. <project>_klyro_postgres_data).
