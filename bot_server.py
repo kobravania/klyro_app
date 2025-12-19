@@ -281,6 +281,10 @@ def _validate_init_data(init_data_str, use_encoded_values=True):
         
         # Проверяем подпись (constant-time сравнение)
         if not hmac.compare_digest(hash_value, expected_hash):
+            print(f"[DEBUG] Валидация initData: hash не совпадает")
+            print(f"  Получен: {hash_value[:32]}...")
+            print(f"  Ожидался: {expected_hash[:32]}...")
+            print(f"  data_check_string (первые 150 символов): {data_check_string[:150]}...")
             return None
         
         # Извлекаем user из initData
@@ -317,20 +321,29 @@ def _get_telegram_user_id_from_request(req):
     """
     init_data = req.headers.get('X-Telegram-Init-Data')
     if not init_data:
+        print("[DEBUG] X-Telegram-Init-Data header отсутствует")
         return None
+    
+    print(f"[DEBUG] X-Telegram-Init-Data присутствует (длина: {len(init_data)})")
+    print(f"[DEBUG] Первые 150 символов: {init_data[:150]}...")
     
     # ВАЖНО: для валидации нужно использовать оригинальные URL-encoded значения
     # Попробуем оба варианта:
     # 1. Считаем, что значения уже декодированы браузером - кодируем обратно
+    print("[DEBUG] Попытка валидации с use_encoded_values=True")
     result = _validate_init_data(init_data, use_encoded_values=True)
     if result:
+        print(f"[DEBUG] Валидация успешна (вариант 1), telegram_user_id: {result}")
         return result
     
     # 2. Считаем, что значения уже в правильном формате (URL-encoded)
+    print("[DEBUG] Попытка валидации с use_encoded_values=False")
     result = _validate_init_data(init_data, use_encoded_values=False)
     if result:
+        print(f"[DEBUG] Валидация успешна (вариант 2), telegram_user_id: {result}")
         return result
     
+    print("[DEBUG] Оба варианта валидации не прошли")
     return None
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
@@ -370,6 +383,7 @@ def get_profile():
     try:
         telegram_user_id = _get_telegram_user_id_from_request(request)
         if not telegram_user_id:
+            print("[API] GET /api/profile: telegram_user_id не получен из initData")
             return {'error': 'Service unavailable'}, 500
         
         # Загружаем профиль из БД
