@@ -15,6 +15,9 @@ from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 from functools import lru_cache
 from datetime import date as _date
+import hmac
+import hashlib
+import urllib.parse
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
@@ -217,67 +220,98 @@ def _select_profile(conn, telegram_user_id, colmap):
     cur.close()
     return row
 
-def _get_session_id_from_request(req):
+def _validate_init_data(init_data_str, bot_token):
     """
-    Извлекает session_id из заголовка X-Klyro-Session.
-    Единственный источник истины для аутентификации.
+    Валидирует Telegram initData по HMAC-SHA256.
+    Возвращает True если валидна, False иначе.
     """
-    return req.headers.get('X-Klyro-Session')
+    if not init_data_str or not bot_token:
+        return False
+    
+    try:
+        # Парсим initData
+        parsed = urllib.parse.parse_qsl(init_data_str)
+        data_dict = dict(parsed)
+        
+        # Извлекаем hash
+        received_hash = data_dict.pop('hash', '')
+        if not received_hash:
+            return False
+        
+        # Формируем data_check_string
+        data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data_dict.items()))
+        
+        # Вычисляем секретный ключ
+        secret_key = hmac.new(
+            key=b"WebAppData",
+            msg=bot_token.encode(),
+            digestmod=hashlib.sha256
+        ).digest()
+        
+        # Вычисляем ожидаемый hash
+        expected_hash = hmac.new(
+            key=secret_key,
+            msg=data_check_string.encode(),
+            digestmod=hashlib.sha256
+        ).hexdigest()
+        
+        return hmac.compare_digest(received_hash, expected_hash)
+    except Exception as e:
+        print(f"[INITDATA] Ошибка валидации: {e}")
+        return False
 
-def _get_telegram_user_id_from_session(session_id):
+def _get_telegram_user_id_from_init_data(init_data_str):
     """
-    Получает telegram_user_id из таблицы sessions по session_id.
-    Проверяет, что сессия не истекла.
-    Возвращает telegram_user_id или None.
+    Извлекает telegram_user_id из валидированного initData.
+    Возвращает user_id или None.
     """
-    if not session_id:
+    if not init_data_str:
         return None
     
-    conn = get_db_connection()
     try:
-        ensure_schema_ready(conn)
-        cur = conn.cursor()
+        parsed = urllib.parse.parse_qsl(init_data_str)
+        data_dict = dict(parsed)
         
-        # Проверяем, существует ли сессия и не истекла ли она
-        # Также проверяем, какая колонка для session_id существует (session_token или session_id)
-        cur.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = 'sessions'
-            AND column_name IN ('session_id', 'session_token')
-        """)
-        session_col_name_row = cur.fetchone()
-        session_col_name = session_col_name_row[0] if session_col_name_row else 'session_id'
+        # Парсим user JSON
+        user_str = data_dict.get('user', '')
+        if not user_str:
+            return None
         
-        cur.execute(f"""
-            SELECT telegram_user_id
-            FROM public.sessions
-            WHERE {session_col_name} = %s AND expires_at > now()
-        """, (session_id,))
+        user_data = json.loads(user_str)
+        user_id = user_data.get('id')
         
-        row = cur.fetchone()
-        cur.close()
-        
-        if row:
-            print(f"[SESSION] Найдена сессия {session_id} для user_id {row[0]}")
-            return str(row[0])
-        print(f"[SESSION] Сессия {session_id} не найдена или истекла")
+        if user_id:
+            return str(user_id)
         return None
     except Exception as e:
-        print(f"Ошибка при получении user_id из сессии: {e}")
+        print(f"[INITDATA] Ошибка извлечения user_id: {e}")
         return None
-    finally:
-        conn.close()
 
 def _get_telegram_user_id_from_request(req):
     """
-    Единственный источник истины = сессия из X-Klyro-Session.
-    Нет сессии → None (вернет 401)
+    Единственный источник истины = initData из X-Telegram-Init-Data.
+    Валидирует initData и извлекает user_id.
+    Нет initData или невалидна → None (вернет 401)
     """
-    session_id = _get_session_id_from_request(req)
-    if not session_id:
+    init_data_str = req.headers.get('X-Telegram-Init-Data')
+    if not init_data_str:
         return None
     
-    return _get_telegram_user_id_from_session(session_id)
+    bot_token = os.environ.get('BOT_TOKEN')
+    if not bot_token:
+        print("[INITDATA] BOT_TOKEN не установлен")
+        return None
+    
+    # Валидируем initData
+    if not _validate_init_data(init_data_str, bot_token):
+        print("[INITDATA] Валидация не пройдена")
+        return None
+    
+    # Извлекаем user_id
+    user_id = _get_telegram_user_id_from_init_data(init_data_str)
+    if user_id:
+        print(f"[INITDATA] Валидация пройдена, user_id: {user_id}")
+    return user_id
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
@@ -309,25 +343,16 @@ def api_health():
 def get_profile():
     """
     Получить профиль пользователя
-    Session-based: telegram_user_id из сессии (X-Klyro-Session)
-    Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если нет сессии
+    InitData-based: telegram_user_id из валидированного initData (X-Telegram-Init-Data)
+    Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если initData невалидна
     """
     print(f"[API] GET /api/profile - запрос получен")
     
-    # СТРОГАЯ ПРОВЕРКА: нет сессии → 401 (не 500)
-    session_id = request.headers.get('X-Klyro-Session')
-    print(f"[API] Session ID из заголовка: {session_id}")
-    
-    if not session_id:
-        print("[API] GET /api/profile: нет заголовка X-Klyro-Session → 401")
-        return jsonify({'error': 'unauthorized'}), 401
-    
-    # Проверяем сессию в БД
-    telegram_user_id = _get_telegram_user_id_from_session(session_id)
-    print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
+    # СТРОГАЯ ПРОВЕРКА: нет initData или невалидна → 401 (не 500)
+    telegram_user_id = _get_telegram_user_id_from_request(request)
     
     if not telegram_user_id:
-        print("[API] GET /api/profile: сессия не найдена или истекла → 401")
+        print("[API] GET /api/profile: initData отсутствует или невалидна → 401")
         return jsonify({'error': 'unauthorized'}), 401
     
     # Загружаем профиль из БД
@@ -338,9 +363,14 @@ def get_profile():
         row = _select_profile(conn, telegram_user_id, colmap)
         
         if row:
+            print(f"[API] GET /api/profile: профиль найден для user_id {telegram_user_id} → 200")
             return jsonify(_row_to_profile(row)), 200
         else:
-            return {'error': 'Profile not found'}, 404
+            print(f"[API] GET /api/profile: профиль не найден для user_id {telegram_user_id} → 404")
+            return jsonify({'error': 'Profile not found'}), 404
+    except Exception as e:
+        print(f"[API] GET /api/profile: ошибка БД для user_id {telegram_user_id}: {e}")
+        return jsonify({'error': 'Service unavailable'}), 500
     finally:
         conn.close()
 
@@ -348,25 +378,16 @@ def get_profile():
 def save_profile():
     """
     Сохранить или обновить профиль пользователя (upsert, idempotent)
-    Session-based: telegram_user_id из сессии (X-Klyro-Session)
-    Возвращает: 200 + сохранённый профиль, 401 если нет сессии
+    InitData-based: telegram_user_id из валидированного initData (X-Telegram-Init-Data)
+    Возвращает: 200 + сохранённый профиль, 401 если initData невалидна
     """
     print(f"[API] POST /api/profile - запрос получен")
     
-    # СТРОГАЯ ПРОВЕРКА: нет сессии → 401 (не 500)
-    session_id = request.headers.get('X-Klyro-Session')
-    print(f"[API] Session ID из заголовка: {session_id}")
-    
-    if not session_id:
-        print("[API] POST /api/profile: нет заголовка X-Klyro-Session → 401")
-        return jsonify({'error': 'unauthorized'}), 401
-    
-    # Проверяем сессию в БД
-    telegram_user_id = _get_telegram_user_id_from_session(session_id)
-    print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
+    # СТРОГАЯ ПРОВЕРКА: нет initData или невалидна → 401 (не 500)
+    telegram_user_id = _get_telegram_user_id_from_request(request)
     
     if not telegram_user_id:
-        print("[API] POST /api/profile: сессия не найдена или истекла → 401")
+        print("[API] POST /api/profile: initData отсутствует или невалидна → 401")
         return jsonify({'error': 'unauthorized'}), 401
     
     data = request.json

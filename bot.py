@@ -22,11 +22,6 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 # URL для WebApp
 WEB_APP_URL = os.environ.get('WEB_APP_URL') or os.environ.get('DOMAIN') or 'https://klyro.69-67-173-216.sslip.io'
-# БД для сессий
-POSTGRES_HOST = os.environ.get('POSTGRES_HOST', 'postgres')
-POSTGRES_DB = os.environ.get('POSTGRES_DB', 'klyro')
-POSTGRES_USER = os.environ.get('POSTGRES_USER', 'klyro')
-POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD')
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не установлен в переменных окружения!")
@@ -35,69 +30,10 @@ logger.info(f"Bot starting...")
 logger.info(f"WEB_APP_URL: {WEB_APP_URL}")
 logger.info(f"BOT_TOKEN present: {bool(BOT_TOKEN)}")
 
-def get_db_connection():
-    """Получить подключение к базе данных"""
-    return psycopg2.connect(
-        host=POSTGRES_HOST,
-        port=os.environ.get('POSTGRES_PORT', '5432'),
-        database=POSTGRES_DB,
-        user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD
-    )
 
-def _ensure_session_for_user(telegram_user_id):
-    """
-    Создает или обновляет сессию для пользователя.
-    Возвращает session_id.
-    """
-    conn = get_db_connection()
-    try:
-        # Генерируем новый session_id
-        session_id = str(uuid.uuid4())
-        expires_at = datetime.now() + timedelta(days=30)  # Сессия на 30 дней
-        
-        cur = conn.cursor()
-        
-        # Проверяем, какая колонка используется (session_id или session_token)
-        cur.execute("""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public' 
-            AND table_name = 'sessions' 
-            AND column_name IN ('session_id', 'session_token')
-        """)
-        col_row = cur.fetchone()
-        session_col = col_row[0] if col_row else 'session_id'
-        
-        # Удаляем старые сессии пользователя
-        cur.execute(f"""
-            DELETE FROM public.sessions
-            WHERE telegram_user_id = %s
-        """, (str(telegram_user_id),))
-        
-        # Создаем новую сессию
-        cur.execute(f"""
-            INSERT INTO public.sessions ({session_col}, telegram_user_id, expires_at)
-            VALUES (%s, %s, %s)
-            ON CONFLICT ({session_col}) DO UPDATE
-            SET telegram_user_id = EXCLUDED.telegram_user_id,
-                expires_at = EXCLUDED.expires_at
-        """, (session_id, str(telegram_user_id), expires_at))
-        
-        conn.commit()
-        cur.close()
-        
-        logger.info(f"Создана сессия {session_id} для пользователя {telegram_user_id}")
-        return session_id
-    except Exception as e:
-        logger.error(f"Ошибка при создании сессии: {e}")
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик команды /start - создает сессию и отправляет кнопку с startapp"""
+    """Обработчик команды /start - отправляет кнопку с WebApp"""
     user = update.effective_user
     if not user:
         logger.error("Получена команда /start без пользователя")
@@ -114,37 +50,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     
     try:
-        # Создаем сессию для пользователя
-        session_id = _ensure_session_for_user(telegram_user_id)
-        
-        # Формируем startapp ссылку
-        bot_username = context.bot.username
-        if not bot_username:
-            logger.error("Не удалось получить username бота")
-            if update.message:
-                await update.message.reply_text("❌ Ошибка конфигурации бота.")
-            return
-        
         welcome_text = (
             "Нажми кнопку ниже, чтобы открыть Klyro:"
         )
         
-        # Создаем WebApp кнопку
-        # startapp параметр передается через специальный формат URL для WebApp
-        # Формат: https://t.me/<bot_username>?startapp=<session_id>
-        # Но для WebApp кнопки нужно использовать прямой URL Mini App
-        # session_id будет передан через startapp ссылку, которую пользователь откроет
-        webapp_url = WEB_APP_URL.rstrip('/')
+        # Создаем WebApp кнопку с прямым URL (без startapp)
+        webapp_url = f"{WEB_APP_URL.rstrip('/')}/?source=telegram"
         
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-        
-        # Используем обычную ссылку на startapp, чтобы start_param был доступен
-        startapp_link = f"https://t.me/{bot_username}?startapp={session_id}"
         
         keyboard = [[
             InlineKeyboardButton(
                 text="🚀 ОТКРЫТЬ KLYRO",
-                url=startapp_link
+                web_app=WebAppInfo(url=webapp_url)
             )
         ]]
         
@@ -156,14 +74,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 welcome_text,
                 reply_markup=reply_markup
             )
-            logger.info(f"✅ Сообщение отправлено пользователю {telegram_user_id} с сессией {session_id}")
+            logger.info(f"✅ Сообщение отправлено пользователю {telegram_user_id}")
         elif update.callback_query:
             await update.callback_query.answer()
             await update.callback_query.message.reply_text(
                 welcome_text,
                 reply_markup=reply_markup
             )
-            logger.info(f"✅ Сообщение отправлено через callback_query пользователю {telegram_user_id} с сессией {session_id}")
+            logger.info(f"✅ Сообщение отправлено через callback_query пользователю {telegram_user_id}")
         else:
             logger.error(f"❌ update.message и update.callback_query равны None для пользователя {telegram_user_id}")
             raise ValueError("Не удалось определить способ отправки сообщения")
@@ -204,6 +122,15 @@ def main() -> None:
     except Exception as e:
         logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось зарегистрировать обработчики: {e}")
         raise
+    
+    # Устанавливаем Menu Button с прямым URL (без startapp)
+    try:
+        webapp_url = f"{WEB_APP_URL.rstrip('/')}/?source=telegram"
+        menu_button = MenuButtonWebApp(text="Klyro", web_app=WebAppInfo(url=webapp_url))
+        application.bot.set_chat_menu_button(menu_button=menu_button)
+        logger.info(f"✅ Menu Button установлен: {webapp_url}")
+    except Exception as e:
+        logger.warning(f"Не удалось установить Menu Button: {e}")
     
     # Запускаем бота - FAIL FAST при любой ошибке
     logger.info("Запуск polling...")

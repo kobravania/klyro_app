@@ -1,6 +1,6 @@
 /**
  * API клиент для работы с сервером
- * Session-based: только через X-Klyro-Session header
+ * InitData-based: только через X-Telegram-Init-Data header
  */
 
 class ApiClient {
@@ -15,9 +15,9 @@ class ApiClient {
     async _waitForInitData(maxWaitMs = 5000) {
         const startTime = Date.now();
         while (Date.now() - startTime < maxWaitMs) {
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+            if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
-                if (tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
+                if (tg.initData && tg.initData.length > 0) {
                     return true;
                 }
             }
@@ -27,16 +27,14 @@ class ApiClient {
     }
 
     /**
-     * Получить session_id из start_param
-     * Единственный источник session_id = Telegram.WebApp.initDataUnsafe.start_param
+     * Получить initData строку
+     * Единственный источник = Telegram.WebApp.initData
      */
-    getSessionId() {
+    getInitData() {
         try {
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
-                const initDataUnsafe = tg.initDataUnsafe || {};
-                const sessionId = initDataUnsafe.start_param || '';
-                return sessionId;
+                return tg.initData || '';
             }
             return '';
         } catch (e) {
@@ -56,14 +54,14 @@ class ApiClient {
             throw new Error('AUTH_REQUIRED');
         }
 
-        const sessionId = this.getSessionId();
-        if (!sessionId) {
+        const initData = this.getInitData();
+        if (!initData) {
             throw new Error('AUTH_REQUIRED');
         }
 
         const headers = {
             'Content-Type': 'application/json',
-            'X-Klyro-Session': sessionId
+            'X-Telegram-Init-Data': initData
         };
 
         const url = `${this.baseUrl}/api/profile`;
@@ -115,14 +113,14 @@ class ApiClient {
             throw new Error('AUTH_REQUIRED');
         }
 
-        const sessionId = this.getSessionId();
-        if (!sessionId) {
+        const initData = this.getInitData();
+        if (!initData) {
             throw new Error('AUTH_REQUIRED');
         }
 
         const headers = {
             'Content-Type': 'application/json',
-            'X-Klyro-Session': sessionId
+            'X-Telegram-Init-Data': initData
         };
 
         const payload = { ...profileData };
