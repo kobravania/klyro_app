@@ -239,17 +239,28 @@ def _get_telegram_user_id_from_session(session_id):
         cur = conn.cursor()
         
         # Проверяем, существует ли сессия и не истекла ли она
+        # Также проверяем, какая колонка для session_id существует (session_token или session_id)
         cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'sessions'
+            AND column_name IN ('session_id', 'session_token')
+        """)
+        session_col_name_row = cur.fetchone()
+        session_col_name = session_col_name_row[0] if session_col_name_row else 'session_id'
+        
+        cur.execute(f"""
             SELECT telegram_user_id
             FROM public.sessions
-            WHERE session_id = %s AND expires_at > now()
+            WHERE {session_col_name} = %s AND expires_at > now()
         """, (session_id,))
         
         row = cur.fetchone()
         cur.close()
         
         if row:
+            print(f"[SESSION] Найдена сессия {session_id} для user_id {row[0]}")
             return str(row[0])
+        print(f"[SESSION] Сессия {session_id} не найдена или истекла")
         return None
     except Exception as e:
         print(f"Ошибка при получении user_id из сессии: {e}")
