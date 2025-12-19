@@ -276,25 +276,24 @@ def _validate_init_data(init_data_str):
     except Exception as e:
         return None
 
-def _get_telegram_user_id_from_request(req):
+def _validate_init_data_encoded(init_data_str):
     """
-    Wallet-like: единственный источник истины = валидированный initData.
-    Извлекает telegram_user_id из X-Telegram-Init-Data header.
+    Валидация initData с оригинальными URL-encoded значениями.
+    Используется когда браузер НЕ декодирует значения при передаче в заголовке.
     """
-    init_data = req.headers.get('X-Telegram-Init-Data')
-    if not init_data:
+    if not init_data_str:
         return None
     
-    # Пробуем оба варианта:
-    # 1. Браузер декодировал значения (используем parse_qsl)
-    result = _validate_init_data(init_data)
-    if result:
-        return result
+    BOT_TOKEN = os.environ.get('BOT_TOKEN')
+    if not BOT_TOKEN:
+        return None
+    BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
+    if not BOT_TOKEN:
+        return None
     
-    # 2. Браузер НЕ декодировал значения (используем оригинальные URL-encoded)
-    # Парсим вручную, сохраняя оригинальные значения
     try:
-        pairs = init_data.split('&')
+        # Парсим вручную, сохраняя оригинальные URL-encoded значения
+        pairs = init_data_str.split('&')
         params = {}
         hash_value = None
         
@@ -308,13 +307,6 @@ def _get_telegram_user_id_from_request(req):
                 params[key] = value
         
         if not hash_value:
-            return None
-        
-        BOT_TOKEN = os.environ.get('BOT_TOKEN')
-        if not BOT_TOKEN:
-            return None
-        BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
-        if not BOT_TOKEN:
             return None
         
         # Формируем data_check_string с оригинальными URL-encoded значениями
@@ -353,6 +345,28 @@ def _get_telegram_user_id_from_request(req):
         return str(telegram_user_id)
     except:
         return None
+
+def _get_telegram_user_id_from_request(req):
+    """
+    Wallet-like: единственный источник истины = валидированный initData.
+    Извлекает telegram_user_id из X-Telegram-Init-Data header.
+    """
+    init_data = req.headers.get('X-Telegram-Init-Data')
+    if not init_data:
+        return None
+    
+    # Пробуем оба варианта:
+    # 1. Браузер декодировал значения (используем parse_qsl)
+    result = _validate_init_data(init_data)
+    if result:
+        return result
+    
+    # 2. Браузер НЕ декодировал значения (используем оригинальные URL-encoded)
+    result = _validate_init_data_encoded(init_data)
+    if result:
+        return result
+    
+    return None
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
