@@ -226,6 +226,8 @@ def _validate_init_data(init_data_str):
         return None
     
     try:
+        print(f"[DEBUG] initData (первые 200 символов): {init_data_str[:200]}...")
+        
         # Парсим initData, сохраняя оригинальные значения
         # initData приходит как query string: key1=value1&key2=value2&hash=...
         pairs = init_data_str.split('&')
@@ -242,7 +244,11 @@ def _validate_init_data(init_data_str):
                 # Сохраняем оригинальное значение как есть (URL-encoded или декодированное)
                 params[key] = value
         
+        print(f"[DEBUG] Параметры: {list(params.keys())}")
+        print(f"[DEBUG] Hash: {hash_value[:32] if hash_value else 'None'}...")
+        
         if not hash_value:
+            print("[DEBUG] Hash не найден")
             return None
         
         # Формируем data_check_string: ключи сортируются, разделитель = \n
@@ -251,6 +257,8 @@ def _validate_init_data(init_data_str):
             f"{key}={params[key]}" 
             for key in sorted(params.keys())
         )
+        
+        print(f"[DEBUG] data_check_string (полная): {data_check_string}")
         
         # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
         secret_key = hmac.new(
