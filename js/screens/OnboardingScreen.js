@@ -530,21 +530,9 @@ class OnboardingScreen {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            // СТРОГО ПО ТЗ: POST /api/profile возвращает сохранённый профиль.
-            const telegramUserId = (() => {
-                try {
-                    const uid = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-                    if (uid === undefined || uid === null) return null;
-                    return String(uid);
-                } catch (e) {
-                    return null;
-                }
-            })();
-            if (!telegramUserId) {
-                throw new Error('OPEN_VIA_BOT');
-            }
-
-            const savedProfile = await apiClient.saveProfile(telegramUserId, profileData);
+            // Wallet-like: POST /api/profile возвращает сохранённый профиль.
+            // Backend сам извлекает telegram_user_id из валидированного initData.
+            const savedProfile = await apiClient.saveProfile(profileData);
             if (!savedProfile) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }

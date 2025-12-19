@@ -1,6 +1,6 @@
 /**
  * API клиент для работы с сервером
- * Источник истины = сервер (PostgreSQL)
+ * Wallet-like: только initData, никаких сессий
  */
 
 class ApiClient {
@@ -9,17 +9,32 @@ class ApiClient {
     }
 
     /**
+     * Получить initData из Telegram WebApp
+     */
+    getInitData() {
+        try {
+            return window.Telegram?.WebApp?.initData || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
      * Загрузить профиль пользователя с сервера
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
      */
-    async getProfile(telegramUserId) {
+    async getProfile() {
+        const initData = this.getInitData();
+        if (!initData) {
+            throw new Error('SERVICE_UNAVAILABLE');
+        }
+
         const headers = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': initData
         };
 
-        const tid = String(telegramUserId || '').trim();
-        if (!tid) throw new Error('MISSING_TELEGRAM_USER_ID');
-        const url = `${this.baseUrl}/api/profile?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
+        const url = `${this.baseUrl}/api/profile`;
 
         // Добавляем таймаут для запроса
         const controller = new AbortController();
@@ -57,14 +72,18 @@ class ApiClient {
      * @param {Object} profileData Данные профиля
      * @returns {Promise<Object>} Сохранённый профиль
      */
-    async saveProfile(telegramUserId, profileData) {
+    async saveProfile(profileData) {
+        const initData = this.getInitData();
+        if (!initData) {
+            throw new Error('SERVICE_UNAVAILABLE');
+        }
+
         const headers = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': initData
         };
 
-        const tid = String(telegramUserId || '').trim();
-        if (!tid) throw new Error('MISSING_TELEGRAM_USER_ID');
-        const payload = { telegram_user_id: tid, ...profileData };
+        const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
 
@@ -106,4 +125,3 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 window.apiClient = apiClient;
-

@@ -2,6 +2,7 @@
 """
 Flask сервер для раздачи статических файлов Telegram Web App
 + API для хранения профилей пользователей в PostgreSQL
+Wallet-like architecture: initData only, no sessions/cookies
 """
 from flask import Flask, send_from_directory, send_file, Response, request, jsonify
 from flask_cors import CORS
@@ -14,6 +15,9 @@ from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from functools import lru_cache
 from datetime import date as _date
+import hmac
+import hashlib
+import urllib.parse
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
@@ -199,9 +203,82 @@ def _select_profile(conn, telegram_user_id, colmap):
     cur.close()
     return row
 
-def _require_telegram_user_id_from_query():
-    tid = (request.args.get('telegram_user_id') or '').strip()
-    return tid or None
+def _validate_init_data(init_data_str):
+    """
+    Wallet-like: валидирует Telegram initData через HMAC-SHA256.
+    Возвращает telegram_user_id если валидация успешна, иначе None.
+    """
+    if not init_data_str:
+        return None
+    
+    BOT_TOKEN = os.environ.get('BOT_TOKEN')
+    if not BOT_TOKEN:
+        print("КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не установлен для валидации initData")
+        return None
+    
+    try:
+        # Парсим initData (формат: key1=value1&key2=value2&hash=...)
+        parsed = urllib.parse.parse_qs(init_data_str)
+        
+        # Извлекаем hash
+        hash_value = parsed.get('hash', [None])[0]
+        if not hash_value:
+            return None
+        
+        # Удаляем hash из данных для проверки
+        data_check_string = '&'.join(
+            f"{k}={v[0]}" 
+            for k, v in sorted(parsed.items()) 
+            if k != 'hash'
+        )
+        
+        # Вычисляем секретный ключ
+        secret_key = hmac.new(
+            b"WebAppData",
+            BOT_TOKEN.encode('utf-8'),
+            hashlib.sha256
+        ).digest()
+        
+        # Вычисляем ожидаемый hash
+        expected_hash = hmac.new(
+            secret_key,
+            data_check_string.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Проверяем подпись
+        if not hmac.compare_digest(hash_value, expected_hash):
+            print("Валидация initData: неверная подпись")
+            return None
+        
+        # Извлекаем user из initData
+        user_str = parsed.get('user', [None])[0]
+        if not user_str:
+            return None
+        
+        user_data = json.loads(user_str)
+        telegram_user_id = user_data.get('id')
+        
+        if telegram_user_id is None:
+            return None
+        
+        return str(telegram_user_id)
+    except Exception as e:
+        print(f"Ошибка валидации initData: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def _get_telegram_user_id_from_request(req):
+    """
+    Wallet-like: единственный источник истины = валидированный initData.
+    Извлекает telegram_user_id из X-Telegram-Init-Data header.
+    """
+    init_data = req.headers.get('X-Telegram-Init-Data')
+    if not init_data:
+        return None
+    
+    return _validate_init_data(init_data)
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
@@ -226,20 +303,21 @@ def api_health():
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
 # Источник истины = PostgreSQL
+# Wallet-like: только initData, никаких сессий
 # ============================================
 
 @app.route('/api/profile', methods=['GET'])
 def get_profile():
     """
     Получить профиль пользователя
-    Требует: telegram_user_id в query параметрах
+    Wallet-like: telegram_user_id из валидированного initData
     Возвращает: 200 + profile JSON если есть, 404 если нет
     """
-    print(f"[API] GET /api/profile - запрос получен, args: {request.args}")
+    print(f"[API] GET /api/profile - запрос получен")
     try:
-        telegram_user_id = _require_telegram_user_id_from_query()
+        telegram_user_id = _get_telegram_user_id_from_request(request)
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
+            return {'error': 'Profile not found'}, 404
         
         # Загружаем профиль из БД
         conn = get_db_connection()
@@ -266,19 +344,17 @@ def get_profile():
 def save_profile():
     """
     Сохранить или обновить профиль пользователя (upsert, idempotent)
-    Требует: telegram_user_id и profile данные в JSON body
-    Возвращает: 200 если данные сохранены (даже если частично)
-    Backend игнорирует лишние поля, принимает только нужные
+    Wallet-like: telegram_user_id из валидированного initData
+    Возвращает: 200 + сохранённый профиль
     """
     print(f"[API] POST /api/profile - запрос получен")
     try:
-        data = request.json
-        print(f"[API] POST /api/profile - данные: {data}")
-        if not data:
+        telegram_user_id = _get_telegram_user_id_from_request(request)
+        if not telegram_user_id:
             return {'error': 'Service unavailable'}, 500
         
-        telegram_user_id = (data.get('telegram_user_id') or '').strip()
-        if not telegram_user_id:
+        data = request.json
+        if not data:
             return {'error': 'Service unavailable'}, 500
         
         # Извлекаем данные профиля (игнорируем лишние поля)
@@ -361,7 +437,23 @@ def save_profile():
         traceback.print_exc()
         return {'error': 'Service unavailable'}, 500
 
+# ============================================
+# СТАТИЧЕСКИЕ ФАЙЛЫ
+# ============================================
+
+@app.route('/')
+def index():
+    """Главная страница - отдаём index.html"""
+    return send_file('index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Отдаём статические файлы"""
+    try:
+        return send_from_directory('.', path)
+    except:
+        return {'error': 'Not found'}, 404
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-
+    app.run(host='0.0.0.0', port=5000, debug=False)

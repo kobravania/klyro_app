@@ -1,6 +1,6 @@
 /**
  * KLYRO - Главный файл приложения
- * Полностью переписанный frontend в стиле Apple
+ * Wallet-like architecture: initData only, no activation screens
  */
 
 // Telegram Web App API
@@ -52,43 +52,31 @@ function hideLoadingScreen() {
     }
 }
 
-function showOpenViaBotScreen() {
+function showServiceUnavailable() {
     hideAllScreens();
     const app = document.getElementById('app');
     if (!app) return;
 
-    const existing = document.getElementById('open-via-bot-screen');
+    const existing = document.getElementById('service-unavailable-screen');
     if (existing) existing.remove();
 
-    const botUsername = (window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot').trim();
-    const deepLink = `https://t.me/${botUsername}?start=webapp`;
-
     const screen = document.createElement('div');
-    screen.id = 'open-via-bot-screen';
+    screen.id = 'service-unavailable-screen';
     screen.className = 'screen active';
     screen.style.display = 'flex';
     screen.style.flexDirection = 'column';
     screen.innerHTML = `
         <div class="screen-content">
-            <h1 class="screen-title">Откройте через бота</h1>
+            <h1 class="screen-title">Сервис временно недоступен</h1>
             <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                Откройте приложение через бота, чтобы продолжить
+                Попробуйте позже
             </p>
-            <button class="btn btn-primary btn-block" id="open-via-bot-btn" style="display:flex; align-items:center; justify-content:center;">
-                Открыть через Telegram
+            <button class="btn btn-primary btn-block" onclick="window.initApp && window.initApp()">
+                Повторить
             </button>
         </div>
     `;
     app.appendChild(screen);
-
-    const btn = document.getElementById('open-via-bot-btn');
-    if (btn) {
-        btn.addEventListener('click', () => {
-            try {
-                window.open(deepLink, '_blank');
-            } catch (e) {}
-        });
-    }
 }
 
 // ============================================
@@ -100,45 +88,30 @@ async function initApp() {
     
     showLoadingScreen();
 
-    // Явные состояния приложения
-    let appState = 'loading'; // 'loading' | 'no_profile' | 'has_profile' | 'error'
-
-    // Единственная точка решения: есть ли профиль
-    async function loadProfile(telegramUserId) {
-        console.log('[APP] loadProfile(): GET /api/profile...');
-        const profile = await apiClient.getProfile(telegramUserId); // null on 404, throws on 500
-        console.log('[APP] loadProfile(): received', profile ? '200' : '404');
-        return profile; // Profile | null
-    }
+    // Wallet-like state machine: loading -> (200 dashboard | 404 onboarding | 500 error)
+    let appState = 'loading';
     
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
 
-        // CANONICAL: единственный источник идентификации = initDataUnsafe.user.id
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-        const telegramUserId = tgUser && (tgUser.id !== undefined && tgUser.id !== null) ? String(tgUser.id) : null;
-        if (!telegramUserId) {
-            hideLoadingScreen();
-            showOpenViaBotScreen();
-            return;
-        }
-
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
+        // Backend валидирует initData и извлекает telegram_user_id
         try {
-            const profile = await loadProfile(telegramUserId);
+            console.log('[APP] GET /api/profile...');
+            const profile = await apiClient.getProfile();
             if (profile) {
-                appState = 'has_profile';
+                appState = 'dashboard';
                 await appContext.setUserData(profile);
             } else {
-                appState = 'no_profile';
+                appState = 'onboarding';
                 await appContext.setUserData(null);
             }
         } catch (e) {
-            console.log('[APP] loadProfile(): error', e && (e.code || e.message || String(e)));
+            console.log('[APP] loadProfile(): error', e && (e.message || String(e)));
             appState = 'error';
         }
 
@@ -146,14 +119,14 @@ async function initApp() {
 
         hideLoadingScreen();
 
-        if (appState === 'has_profile') {
+        if (appState === 'dashboard') {
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
             return;
         }
 
-        if (appState === 'no_profile') {
+        if (appState === 'onboarding') {
             navigation.hide();
             onboardingScreen.show();
             return;
@@ -165,69 +138,6 @@ async function initApp() {
         hideLoadingScreen();
         showServiceUnavailable();
     }
-}
-
-function showTemporaryOnboarding() {
-    const app = document.getElementById('app');
-    if (!app) return;
-    
-    const tempScreen = document.createElement('div');
-    tempScreen.id = 'temporary-onboarding';
-    tempScreen.className = 'screen active';
-    tempScreen.style.display = 'flex';
-    tempScreen.style.flexDirection = 'column';
-    tempScreen.innerHTML = `
-        <div class="screen-content">
-            <h1 class="screen-title">Добро пожаловать в Klyro</h1>
-            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                Для начала работы заполните профиль
-            </p>
-            <button class="btn btn-primary btn-block" onclick="window.initApp && window.initApp()">
-                Начать
-            </button>
-        </div>
-    `;
-    app.appendChild(tempScreen);
-}
-
-function showErrorScreen(error) {
-    const app = document.getElementById('app');
-    if (!app) return;
-    
-    hideAllScreens();
-    
-    // Безопасное получение сообщения об ошибке
-    let errorMessage = 'Произошла ошибка при загрузке приложения';
-    if (error) {
-        if (typeof error === 'string') {
-            errorMessage = error;
-        } else if (error.message) {
-            errorMessage = String(error.message);
-        } else if (error.toString) {
-            try {
-                errorMessage = String(error.toString());
-            } catch (e) {
-                errorMessage = 'Неизвестная ошибка';
-            }
-        }
-    }
-    
-    const errorScreen = document.createElement('div');
-    errorScreen.className = 'screen active';
-    errorScreen.style.display = 'flex';
-    errorScreen.style.flexDirection = 'column';
-    errorScreen.innerHTML = `
-        <div class="screen-content">
-            <h1 class="screen-title">Ошибка</h1>
-            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl); white-space: pre-wrap; word-break: break-word;">
-                ${errorMessage}
-            </p>
-            <button class="btn btn-primary btn-block" onclick="location.reload()">
-                Перезагрузить
-            </button>
-        </div>
-    `;
-    app.appendChild(errorScreen);
 }
 
 // ============================================
@@ -266,62 +176,19 @@ window.addEventListener('navChange', (e) => {
     }
 });
 
-// Показать AddFood
+// Добавление еды
 window.addEventListener('showAddFood', () => {
-    console.log('[APP] Показываем AddFood');
     if (typeof addFoodScreen !== 'undefined') {
         addFoodScreen.show();
     }
 });
 
-// ============================================
-// ЗАПУСК ПРИЛОЖЕНИЯ
-// ============================================
-
-// Ждем загрузки DOM и всех скриптов
+// Инициализация при загрузке
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // Даем время на загрузку всех модулей
-        setTimeout(initApp, 100);
-    });
+    document.addEventListener('DOMContentLoaded', initApp);
 } else {
-    setTimeout(initApp, 100);
+    initApp();
 }
 
-function showServiceUnavailable() {
-    hideAllScreens();
-    const unavailableHTML = `
-        <div id="service-unavailable-screen" class="screen active" style="display: flex; align-items: center; justify-content: center; padding: var(--spacing-xl); min-height: 100vh;">
-            <div class="card" style="text-align: center; max-width: 400px;">
-                <div style="font-size: 48px; margin-bottom: var(--spacing-lg);">⚠️</div>
-                <h2 class="screen-title" style="margin-bottom: var(--spacing-md);">Сервис временно недоступен</h2>
-                <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                    Попробуйте позже
-                </p>
-                <div style="display:flex; gap: var(--spacing-md); justify-content:center; flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="window.initApp && window.initApp()" style="min-width: 200px;">
-                        Повторить
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.Telegram?.WebApp?.close?.()" style="min-width: 200px;">
-                        Закрыть
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const app = document.getElementById('app');
-    if (app) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = unavailableHTML;
-        app.appendChild(tempDiv.firstElementChild);
-    }
-}
-
-// Экспортируем функции
-window.hideAllScreens = hideAllScreens;
-window.showLoadingScreen = showLoadingScreen;
-window.hideLoadingScreen = hideLoadingScreen;
-window.showServiceUnavailable = showServiceUnavailable;
+// Экспортируем для глобального доступа
 window.initApp = initApp;
-
