@@ -302,39 +302,36 @@ def get_profile():
     Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если нет сессии
     """
     print(f"[API] GET /api/profile - запрос получен")
-    print(f"[API] Headers: {dict(request.headers)}")
+    
+    # СТРОГАЯ ПРОВЕРКА: нет сессии → 401 (не 500)
+    session_id = request.headers.get('X-Klyro-Session')
+    print(f"[API] Session ID из заголовка: {session_id}")
+    
+    if not session_id:
+        print("[API] GET /api/profile: нет заголовка X-Klyro-Session → 401")
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    # Проверяем сессию в БД
+    telegram_user_id = _get_telegram_user_id_from_session(session_id)
+    print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
+    
+    if not telegram_user_id:
+        print("[API] GET /api/profile: сессия не найдена или истекла → 401")
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    # Загружаем профиль из БД
+    conn = get_db_connection()
     try:
-        session_id = _get_session_id_from_request(request)
-        print(f"[API] Session ID из заголовка: {session_id}")
+        ensure_schema_ready(conn)
+        colmap = _profiles_column_map()
+        row = _select_profile(conn, telegram_user_id, colmap)
         
-        telegram_user_id = _get_telegram_user_id_from_request(request)
-        print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
-        
-        if not telegram_user_id:
-            # Нет сессии → 401
-            print("[API] GET /api/profile: нет сессии или сессия невалидна → 401")
-            return {'error': 'Unauthorized'}, 401
-        
-        # Загружаем профиль из БД
-        conn = get_db_connection()
-        
-        try:
-            ensure_schema_ready(conn)
-            colmap = _profiles_column_map()
-            row = _select_profile(conn, telegram_user_id, colmap)
-            
-            if row:
-                return jsonify(_row_to_profile(row)), 200
-            else:
-                return {'error': 'Profile not found'}, 404
-        finally:
-            conn.close()
-            
-    except Exception as e:
-        print(f"Ошибка при получении профиля: {e}")
-        import traceback
-        traceback.print_exc()
-        return {'error': 'Service unavailable'}, 500
+        if row:
+            return jsonify(_row_to_profile(row)), 200
+        else:
+            return {'error': 'Profile not found'}, 404
+    finally:
+        conn.close()
 
 @app.route('/api/profile', methods=['POST'])
 def save_profile():
@@ -344,22 +341,26 @@ def save_profile():
     Возвращает: 200 + сохранённый профиль, 401 если нет сессии
     """
     print(f"[API] POST /api/profile - запрос получен")
-    print(f"[API] Headers: {dict(request.headers)}")
-    try:
-        session_id = _get_session_id_from_request(request)
-        print(f"[API] Session ID из заголовка: {session_id}")
-        
-        telegram_user_id = _get_telegram_user_id_from_request(request)
-        print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
-        
-        if not telegram_user_id:
-            # Нет сессии → 401
-            print("[API] POST /api/profile: нет сессии или сессия невалидна → 401")
-            return {'error': 'Unauthorized'}, 401
-        
-        data = request.json
-        if not data:
-            return {'error': 'Service unavailable'}, 500
+    
+    # СТРОГАЯ ПРОВЕРКА: нет сессии → 401 (не 500)
+    session_id = request.headers.get('X-Klyro-Session')
+    print(f"[API] Session ID из заголовка: {session_id}")
+    
+    if not session_id:
+        print("[API] POST /api/profile: нет заголовка X-Klyro-Session → 401")
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    # Проверяем сессию в БД
+    telegram_user_id = _get_telegram_user_id_from_session(session_id)
+    print(f"[API] Telegram User ID из сессии: {telegram_user_id}")
+    
+    if not telegram_user_id:
+        print("[API] POST /api/profile: сессия не найдена или истекла → 401")
+        return jsonify({'error': 'unauthorized'}), 401
+    
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Service unavailable'}), 500
         
         # Извлекаем данные профиля (игнорируем лишние поля)
         birth_date = data.get('birth_date') or data.get('dateOfBirth')
@@ -369,23 +370,22 @@ def save_profile():
         
         # Минимальная валидация - только проверяем наличие обязательных полей
         if not birth_date or not gender or not height_cm or not weight_kg:
-            return {'error': 'Service unavailable'}, 500
+            return jsonify({'error': 'Service unavailable'}), 500
         
         # Нормализация gender
         gender = str(gender).lower().strip()
         if gender not in ('male', 'female'):
-            return {'error': 'Service unavailable'}, 500
+            return jsonify({'error': 'Service unavailable'}), 500
         
         # Преобразование типов
         try:
             height_cm = int(height_cm)
             weight_kg = int(weight_kg)
         except (ValueError, TypeError):
-            return {'error': 'Service unavailable'}, 500
+            return jsonify({'error': 'Service unavailable'}), 500
         
         # Сохраняем в БД (upsert)
         conn = get_db_connection()
-        
         try:
             ensure_schema_ready(conn)
             colmap = _profiles_column_map()
@@ -430,16 +430,10 @@ def save_profile():
             # Возвращаем профиль, считанный из БД (реальный источник истины)
             row = _select_profile(conn, telegram_user_id, colmap)
             if not row:
-                return {'error': 'Service unavailable'}, 500
+                return jsonify({'error': 'Service unavailable'}), 500
             return jsonify(_row_to_profile(row)), 200
         finally:
             conn.close()
-            
-    except Exception as e:
-        print(f"Ошибка при сохранении профиля: {e}")
-        import traceback
-        traceback.print_exc()
-        return {'error': 'Service unavailable'}, 500
 
 # ============================================
 # СТАТИЧЕСКИЕ ФАЙЛЫ
