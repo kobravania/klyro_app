@@ -134,45 +134,22 @@ async function initApp() {
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
-        // Проверяем, есть ли уже профиль в контексте (например, после успешного сохранения)
-        const existingProfile = appContext.getUserData();
-        if (existingProfile && existingProfile.birth_date && existingProfile.gender) {
-            console.log('[APP] Профиль уже есть в контексте, переходим в dashboard');
-            appState = 'dashboard';
-            hideLoadingScreen();
-            navigation.show();
-            dashboardScreen.show();
-            navigation.switchTab('home');
-            return;
-        }
-
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
         // Backend получает user_id из валидированного initData (X-Telegram-Init-Data)
         try {
-            console.log('[APP] Проверка initData перед запросом профиля...');
-            const initData = apiClient.getInitData();
-            console.log('[APP] initData длина:', initData ? initData.length : 0);
-            
             const profile = await apiClient.getProfile();
-            console.log('[APP] Получен профиль:', profile ? 'найден' : 'не найден');
-            
             if (profile) {
                 appState = 'dashboard';
                 await appContext.setUserData(profile);
-                console.log('[APP] Профиль найден, переходим в dashboard');
             } else {
                 appState = 'onboarding';
                 await appContext.setUserData(null);
-                console.log('[APP] Профиль не найден, показываем онбординг');
             }
         } catch (e) {
-            console.error('[APP] Ошибка при загрузке профиля:', e.message);
             if (e.message === 'AUTH_REQUIRED') {
                 appState = 'activation';
-                console.log('[APP] Требуется авторизация, показываем activation screen');
             } else {
                 appState = 'error';
-                console.log('[APP] Ошибка сервиса, показываем error screen');
             }
         }
 

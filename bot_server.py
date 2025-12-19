@@ -367,11 +367,9 @@ def get_profile():
     Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если initData невалидна
     """
     print(f"[API] GET /api/profile - запрос получен")
-    print(f"[API] GET /api/profile - заголовки: {dict(request.headers)}")
     
     # СТРОГАЯ ПРОВЕРКА: нет initData или невалидна → 401 (не 500)
     telegram_user_id = _get_telegram_user_id_from_request(request)
-    print(f"[API] GET /api/profile - извлечённый telegram_user_id: {telegram_user_id}")
     
     if not telegram_user_id:
         print("[API] GET /api/profile: initData отсутствует или невалидна → 401")
@@ -404,11 +402,9 @@ def save_profile():
     Возвращает: 200 + сохранённый профиль, 401 если initData невалидна
     """
     print(f"[API] POST /api/profile - запрос получен")
-    print(f"[API] POST /api/profile - заголовки: {dict(request.headers)}")
     
     # СТРОГАЯ ПРОВЕРКА: нет initData или невалидна → 401 (не 500)
     telegram_user_id = _get_telegram_user_id_from_request(request)
-    print(f"[API] POST /api/profile - извлечённый telegram_user_id: {telegram_user_id}")
     
     if not telegram_user_id:
         print("[API] POST /api/profile: initData отсутствует или невалидна → 401")
@@ -490,12 +486,8 @@ def save_profile():
         # Возвращаем профиль, считанный из БД (реальный источник истины)
         row = _select_profile(conn, telegram_user_id, colmap)
         if not row:
-            print(f"[API] POST /api/profile: профиль не найден после сохранения для user_id {telegram_user_id} → 500")
             return jsonify({'error': 'Service unavailable'}), 500
-        
-        profile_data = _row_to_profile(row)
-        print(f"[API] POST /api/profile: профиль успешно сохранён и возвращён для user_id {telegram_user_id}")
-        return jsonify(profile_data), 200
+        return jsonify(_row_to_profile(row)), 200
     finally:
         conn.close()
 
