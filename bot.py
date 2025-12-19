@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
 Telegram бот для Klyro
-Создает сессии при /start и отправляет кнопку с startapp
+Отправляет кнопки с WebApp (Menu Button и InlineKeyboardButton)
 """
 import os
 import logging
-import uuid
-import psycopg2
-from datetime import datetime, timedelta
-from telegram import Update, WebAppInfo
+from telegram import Update, WebAppInfo, MenuButtonWebApp
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Настройка логирования
@@ -88,7 +85,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при обработке /start для пользователя {telegram_user_id}: {e}", exc_info=True)
         if update.message:
-            await update.message.reply_text("❌ Ошибка при создании сессии. Попробуйте позже.")
+            await update.message.reply_text("❌ Ошибка при отправке сообщения. Попробуйте позже.")
         raise
 
 def main() -> None:
