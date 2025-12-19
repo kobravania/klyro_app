@@ -518,12 +518,27 @@ class OnboardingScreen {
         }
         
         try {
+            // Валидация данных перед отправкой
+            if (!this.formData.dateOfBirth || !this.formData.gender || 
+                !this.formData.height || !this.formData.weight ||
+                !this.formData.activity || !this.formData.goal) {
+                throw new Error('VALIDATION_ERROR');
+            }
+
             // Собираем данные из формы в формате API
+            const height_cm = parseInt(this.formData.height);
+            const weight_kg = parseFloat(this.formData.weight);
+            
+            // Проверяем, что преобразование прошло успешно
+            if (isNaN(height_cm) || height_cm <= 0 || isNaN(weight_kg) || weight_kg <= 0) {
+                throw new Error('VALIDATION_ERROR');
+            }
+
             const profileData = {
                 birth_date: String(this.formData.dateOfBirth).trim(),
                 gender: String(this.formData.gender).toLowerCase().trim(),
-                height_cm: parseInt(this.formData.height),
-                weight_kg: parseInt(this.formData.weight)
+                height_cm: height_cm,
+                weight_kg: weight_kg
             };
             
             if (typeof apiClient === 'undefined') {
@@ -532,23 +547,38 @@ class OnboardingScreen {
 
             // InitData-based: POST /api/profile возвращает сохранённый профиль.
             // Backend сам извлекает telegram_user_id из валидированного initData.
+            console.log('[ONBOARDING] Отправка данных профиля:', profileData);
             const savedProfile = await apiClient.saveProfile(profileData);
+            console.log('[ONBOARDING] Получен сохранённый профиль:', savedProfile);
+            
             if (!savedProfile) {
+                console.error('[ONBOARDING] Профиль не был сохранён (savedProfile = null)');
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
+            // Сохраняем профиль в контекст приложения
             await appContext.setUserData(savedProfile);
+            console.log('[ONBOARDING] Профиль сохранён в appContext');
             
             this.hapticFeedback('medium');
             
-            // Переходим в Dashboard
+            // Переходим в Dashboard напрямую, без повторной проверки
+            console.log('[ONBOARDING] Переход в Dashboard...');
             hideAllScreens();
             navigation.show();
             dashboardScreen.show();
             navigation.switchTab('home');
+            console.log('[ONBOARDING] Переход в Dashboard завершён');
         } catch (error) {
-            // При любой ошибке показываем нейтральный экран
-            this.showServiceUnavailable();
+            console.error('[ONBOARDING] Ошибка при сохранении профиля:', error);
+            
+            // При ошибке валидации показываем сообщение поверх формы
+            if (error.message === 'VALIDATION_ERROR') {
+                this.showError('Пожалуйста, заполните все поля формы');
+            } else {
+                // При других ошибках показываем сообщение, но не сбрасываем форму
+                this.showError('Не удалось сохранить профиль. Проверьте подключение и попробуйте снова.');
+            }
         } finally {
             if (nextBtn) {
                 nextBtn.disabled = false;
@@ -557,45 +587,77 @@ class OnboardingScreen {
         }
     }
 
-    showServiceUnavailable() {
-        // Скрываем форму онбординга
+    showError(message) {
+        // Показываем ошибку поверх формы, не скрывая её
         const screen = document.getElementById('onboarding-screen');
-        if (screen) {
-            screen.style.display = 'none';
+        if (!screen) return;
+        
+        // Удаляем старое сообщение об ошибке, если есть
+        const oldError = screen.querySelector('.onboarding-error');
+        if (oldError) {
+            oldError.remove();
         }
         
-        // Показываем нейтральный экран
-        const unavailableHTML = `
-            <div id="service-unavailable-screen" class="screen active" style="display: flex; align-items: center; justify-content: center; padding: var(--spacing-xl);">
-                <div class="card" style="text-align: center; max-width: 400px;">
-                    <div style="font-size: 48px; margin-bottom: var(--spacing-lg);">⚠️</div>
-                    <h2 class="screen-title" style="margin-bottom: var(--spacing-md);">Сервис временно недоступен</h2>
-                    <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
-                        Попробуйте позже
-                    </p>
-                    <div style="display:flex; gap: var(--spacing-md); justify-content:center; flex-wrap:wrap;">
-                        <button class="btn btn-primary" onclick="window.initApp && window.initApp()" style="min-width: 200px;">
-                            Повторить
-                        </button>
-                        <button class="btn btn-secondary" onclick="window.Telegram?.WebApp?.close?.()" style="min-width: 200px;">
-                            Закрыть
-                        </button>
-                    </div>
-                </div>
+        // Создаем новое сообщение об ошибке
+        const errorHTML = `
+            <div class="onboarding-error" style="
+                background: var(--error-bg, #fee);
+                border: 1px solid var(--error-border, #fcc);
+                border-radius: var(--radius-md);
+                padding: var(--spacing-md);
+                margin-bottom: var(--spacing-md);
+                color: var(--error-text, #c33);
+                text-align: center;
+                animation: slideDown 0.3s ease-out;
+            ">
+                <div style="font-weight: 500; margin-bottom: var(--spacing-xs);">⚠️ Ошибка</div>
+                <div style="font-size: 14px;">${message}</div>
             </div>
         `;
         
-        const app = document.getElementById('app');
-        if (app) {
-            // Удаляем старый экран если есть
-            const oldScreen = document.getElementById('service-unavailable-screen');
-            if (oldScreen) {
-                oldScreen.remove();
-            }
-            
+        const screenContent = screen.querySelector('.screen-content');
+        if (screenContent) {
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = unavailableHTML;
-            app.appendChild(tempDiv.firstElementChild);
+            tempDiv.innerHTML = errorHTML;
+            // Вставляем ошибку в начало контента
+            screenContent.insertBefore(tempDiv.firstElementChild, screenContent.firstChild);
+            
+            // Автоматически скрываем ошибку через 5 секунд
+            setTimeout(() => {
+                const error = screen.querySelector('.onboarding-error');
+                if (error) {
+                    error.style.animation = 'slideUp 0.3s ease-out';
+                    setTimeout(() => error.remove(), 300);
+                }
+            }, 5000);
+        }
+        
+        // Прокручиваем к началу формы, чтобы пользователь увидел ошибку
+        screen.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    showServiceUnavailable() {
+        // НЕ скрываем форму - показываем ошибку поверх формы
+        // Это позволяет пользователю увидеть свои данные и попробовать снова
+        this.showError('Сервис временно недоступен. Проверьте подключение и попробуйте снова.');
+        
+        // Добавляем кнопку "Повторить попытку" в сообщение об ошибке
+        const screen = document.getElementById('onboarding-screen');
+        if (screen) {
+            const errorDiv = screen.querySelector('.onboarding-error');
+            if (errorDiv) {
+                // Добавляем кнопку повтора в сообщение об ошибке
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'btn btn-primary';
+                retryBtn.textContent = 'Повторить попытку';
+                retryBtn.style.marginTop = 'var(--spacing-md)';
+                retryBtn.style.width = '100%';
+                retryBtn.onclick = () => {
+                    // Просто повторяем сохранение формы
+                    this.completeOnboarding();
+                };
+                errorDiv.appendChild(retryBtn);
+            }
         }
     }
 }

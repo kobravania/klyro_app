@@ -2,7 +2,7 @@
 """
 Flask сервер для раздачи статических файлов Telegram Web App
 + API для хранения профилей пользователей в PostgreSQL
-Session-based architecture: только через /start → startapp → сессия
+InitData-based architecture: только через X-Telegram-Init-Data header
 """
 from flask import Flask, send_from_directory, send_file, Response, request, jsonify
 from flask_cors import CORS
@@ -78,11 +78,23 @@ def init_db():
                     birth_date DATE NOT NULL,
                     gender TEXT CHECK (gender IN ('male','female')) NOT NULL,
                     height_cm INTEGER NOT NULL,
-                    weight_kg INTEGER NOT NULL,
+                    weight_kg NUMERIC(5,1) NOT NULL,
                     created_at TIMESTAMP DEFAULT now(),
                     updated_at TIMESTAMP DEFAULT now()
                 )
             """)
+            
+            # Миграция: изменяем тип weight_kg с INTEGER на NUMERIC(5,1) если таблица уже существует
+            # Это безопасно, так как PostgreSQL автоматически преобразует INTEGER в NUMERIC
+            try:
+                cur.execute("""
+                    ALTER TABLE public.profiles 
+                    ALTER COLUMN weight_kg TYPE NUMERIC(5,1) 
+                    USING weight_kg::NUMERIC(5,1)
+                """)
+            except Exception as e:
+                # Игнорируем ошибку, если колонка уже имеет правильный тип или таблицы нет
+                pass
             
             # Детерминированная проверка схемы
             cur.execute("SELECT to_regclass('public.profiles') AS reg")
@@ -190,11 +202,19 @@ def _row_to_profile(row):
     else:
         birth_date_out = str(bd)
     # IMPORTANT: client must not see telegram_user_id.
+    # weight_kg может быть дробным (NUMERIC), преобразуем в float
+    weight_value = row['weight_value']
+    if isinstance(weight_value, (int, float)):
+        weight_kg = float(weight_value)
+    else:
+        # Если это Decimal или другой тип, преобразуем через float
+        weight_kg = float(str(weight_value))
+    
     return {
         'birth_date': birth_date_out,
         'gender': row['gender'],
         'height_cm': int(row['height_value']),
-        'weight_kg': int(row['weight_value'])
+        'weight_kg': weight_kg
     }
 
 def _select_profile(conn, telegram_user_id, colmap):
@@ -336,7 +356,7 @@ def api_health():
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
 # Источник истины = PostgreSQL
-# Session-based: только через X-Klyro-Session
+# InitData-based: только через X-Telegram-Init-Data
 # ============================================
 
 @app.route('/api/profile', methods=['GET'])
@@ -347,9 +367,11 @@ def get_profile():
     Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если initData невалидна
     """
     print(f"[API] GET /api/profile - запрос получен")
+    print(f"[API] GET /api/profile - заголовки: {dict(request.headers)}")
     
     # СТРОГАЯ ПРОВЕРКА: нет initData или невалидна → 401 (не 500)
     telegram_user_id = _get_telegram_user_id_from_request(request)
+    print(f"[API] GET /api/profile - извлечённый telegram_user_id: {telegram_user_id}")
     
     if not telegram_user_id:
         print("[API] GET /api/profile: initData отсутствует или невалидна → 401")
@@ -382,9 +404,11 @@ def save_profile():
     Возвращает: 200 + сохранённый профиль, 401 если initData невалидна
     """
     print(f"[API] POST /api/profile - запрос получен")
+    print(f"[API] POST /api/profile - заголовки: {dict(request.headers)}")
     
     # СТРОГАЯ ПРОВЕРКА: нет initData или невалидна → 401 (не 500)
     telegram_user_id = _get_telegram_user_id_from_request(request)
+    print(f"[API] POST /api/profile - извлечённый telegram_user_id: {telegram_user_id}")
     
     if not telegram_user_id:
         print("[API] POST /api/profile: initData отсутствует или невалидна → 401")
@@ -402,6 +426,7 @@ def save_profile():
     
     # Минимальная валидация - только проверяем наличие обязательных полей
     if not birth_date or not gender or not height_cm or not weight_kg:
+        print(f"[API] POST /api/profile: отсутствуют обязательные поля - birth_date={birth_date}, gender={gender}, height_cm={height_cm}, weight_kg={weight_kg}")
         return jsonify({'error': 'Service unavailable'}), 500
     
     # Нормализация gender
@@ -412,8 +437,11 @@ def save_profile():
     # Преобразование типов
     try:
         height_cm = int(height_cm)
-        weight_kg = int(weight_kg)
+        weight_kg = float(weight_kg)  # Вес может быть дробным
+        # Округляем до 1 знака после запятой для хранения
+        weight_kg = round(weight_kg, 1)
     except (ValueError, TypeError):
+        print(f"[API] POST /api/profile: ошибка преобразования типов - height_cm={height_cm}, weight_kg={weight_kg}")
         return jsonify({'error': 'Service unavailable'}), 500
     
     # Сохраняем в БД (upsert)
@@ -462,8 +490,12 @@ def save_profile():
         # Возвращаем профиль, считанный из БД (реальный источник истины)
         row = _select_profile(conn, telegram_user_id, colmap)
         if not row:
+            print(f"[API] POST /api/profile: профиль не найден после сохранения для user_id {telegram_user_id} → 500")
             return jsonify({'error': 'Service unavailable'}), 500
-        return jsonify(_row_to_profile(row)), 200
+        
+        profile_data = _row_to_profile(row)
+        print(f"[API] POST /api/profile: профиль успешно сохранён и возвращён для user_id {telegram_user_id}")
+        return jsonify(profile_data), 200
     finally:
         conn.close()
 
