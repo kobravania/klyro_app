@@ -18,6 +18,8 @@ function initTelegramWebApp() {
         tg.expand();
         tgReady = true;
         console.log('[APP] Telegram WebApp инициализирован');
+        console.log('[APP] initDataUnsafe:', tg.initDataUnsafe);
+        console.log('[APP] start_param:', tg.initDataUnsafe?.start_param);
     } else {
         console.warn('[APP] Telegram WebApp API не найден');
         tgReady = false;

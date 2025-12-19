@@ -17,10 +17,20 @@ class ApiClient {
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 const initDataUnsafe = tg.initDataUnsafe || {};
-                return initDataUnsafe.start_param || '';
+                const sessionId = initDataUnsafe.start_param || '';
+                console.log('[API] getSessionId():', {
+                    hasTelegram: !!window.Telegram,
+                    hasWebApp: !!tg,
+                    hasInitDataUnsafe: !!initDataUnsafe,
+                    start_param: sessionId,
+                    initDataUnsafe_keys: Object.keys(initDataUnsafe)
+                });
+                return sessionId;
             }
+            console.warn('[API] getSessionId(): Telegram.WebApp не доступен');
             return '';
         } catch (e) {
+            console.error('[API] getSessionId(): ошибка', e);
             return '';
         }
     }
@@ -32,7 +42,9 @@ class ApiClient {
      */
     async getProfile() {
         const sessionId = this.getSessionId();
+        console.log('[API] getProfile(): sessionId =', sessionId);
         if (!sessionId) {
+            console.error('[API] getProfile(): sessionId пустой, выбрасываем AUTH_REQUIRED');
             throw new Error('AUTH_REQUIRED');
         }
 
@@ -40,6 +52,7 @@ class ApiClient {
             'Content-Type': 'application/json',
             'X-Klyro-Session': sessionId
         };
+        console.log('[API] getProfile(): отправляем заголовки', headers);
 
         const url = `${this.baseUrl}/api/profile`;
 
@@ -85,7 +98,9 @@ class ApiClient {
      */
     async saveProfile(profileData) {
         const sessionId = this.getSessionId();
+        console.log('[API] saveProfile(): sessionId =', sessionId);
         if (!sessionId) {
+            console.error('[API] saveProfile(): sessionId пустой, выбрасываем AUTH_REQUIRED');
             throw new Error('AUTH_REQUIRED');
         }
 
@@ -93,6 +108,7 @@ class ApiClient {
             'Content-Type': 'application/json',
             'X-Klyro-Session': sessionId
         };
+        console.log('[API] saveProfile(): отправляем заголовки', headers);
 
         const payload = { ...profileData };
 
