@@ -137,7 +137,6 @@ async function initApp() {
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
         // Backend получает user_id из сессии (X-Klyro-Session)
         try {
-            console.log('[APP] GET /api/profile...');
             const profile = await apiClient.getProfile();
             if (profile) {
                 appState = 'dashboard';
@@ -147,15 +146,12 @@ async function initApp() {
                 await appContext.setUserData(null);
             }
         } catch (e) {
-            console.log('[APP] loadProfile(): error', e && (e.message || String(e)));
             if (e.message === 'AUTH_REQUIRED') {
                 appState = 'activation';
             } else {
                 appState = 'error';
             }
         }
-
-        console.log('[APP] decision:', appState);
 
         hideLoadingScreen();
 
