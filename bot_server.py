@@ -216,39 +216,44 @@ def _validate_init_data(init_data_str):
         print("КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не установлен для валидации initData")
         return None
     
+    # Очистка BOT_TOKEN от пробелов и кавычек
+    BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
+    if not BOT_TOKEN:
+        print("КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN пустой после очистки")
+        return None
+    
     try:
         # Парсим initData (формат: key1=value1&key2=value2&hash=...)
-        parsed = urllib.parse.parse_qs(init_data_str)
+        parsed = urllib.parse.parse_qs(init_data_str, keep_blank_values=True)
         
-        # Извлекаем hash
-        hash_value = parsed.get('hash', [None])[0]
+        # Извлекаем hash и удаляем из parsed
+        hash_value = parsed.pop('hash', [None])[0]
         if not hash_value:
             return None
         
-        # Удаляем hash из данных для проверки
-        data_check_string = '&'.join(
-            f"{k}={v[0]}" 
-            for k, v in sorted(parsed.items()) 
-            if k != 'hash'
+        # Формируем data_check_string: ключи сортируются, разделитель = \n (не &)
+        data_check_string = '\n'.join(
+            f"{key}={value[0]}" 
+            for key, value in sorted(parsed.items())
         )
         
-        # Вычисляем секретный ключ
+        # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
         secret_key = hmac.new(
             b"WebAppData",
             BOT_TOKEN.encode('utf-8'),
             hashlib.sha256
         ).digest()
         
-        # Вычисляем ожидаемый hash
+        # Вычисляем ожидаемый hash: HMAC-SHA256(secret_key, data_check_string)
         expected_hash = hmac.new(
             secret_key,
             data_check_string.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
         
-        # Проверяем подпись
+        # Проверяем подпись (constant-time сравнение)
         if not hmac.compare_digest(hash_value, expected_hash):
-            print("Валидация initData: неверная подпись")
+            print(f"Валидация initData: неверная подпись (получен: {hash_value[:16]}..., ожидался: {expected_hash[:16]}...)")
             return None
         
         # Извлекаем user из initData
