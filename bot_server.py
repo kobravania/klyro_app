@@ -265,7 +265,11 @@ def _validate_init_data(init_data_str):
         
         # Проверяем подпись (constant-time сравнение)
         if not hmac.compare_digest(hash_value, expected_hash):
-            print(f"Валидация initData: неверная подпись (получен: {hash_value[:16]}..., ожидался: {expected_hash[:16]}...)")
+            print(f"Валидация initData: неверная подпись")
+            print(f"  Получен hash: {hash_value[:32]}...")
+            print(f"  Ожидался hash: {expected_hash[:32]}...")
+            print(f"  data_check_string (первые 100 символов): {data_check_string[:100]}...")
+            print(f"  Параметры: {list(params.keys())}")
             return None
         
         # Извлекаем user из initData (нужно декодировать URL-encoded значение)
@@ -295,6 +299,16 @@ def _get_telegram_user_id_from_request(req):
     init_data = req.headers.get('X-Telegram-Init-Data')
     if not init_data:
         return None
+    
+    # Если initData приходит в заголовке, он может быть дополнительно URL-encoded
+    # Пробуем декодировать один раз (на случай двойного encoding)
+    try:
+        decoded = urllib.parse.unquote(init_data)
+        # Если декодирование изменило строку, используем декодированную версию
+        if decoded != init_data:
+            init_data = decoded
+    except:
+        pass  # Если не получилось декодировать, используем оригинал
     
     return _validate_init_data(init_data)
 
