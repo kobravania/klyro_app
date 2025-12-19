@@ -285,9 +285,74 @@ def _get_telegram_user_id_from_request(req):
     if not init_data:
         return None
     
-    # Telegram.WebApp.initData содержит URL-encoded значения
-    # Используем их как есть для валидации
-    return _validate_init_data(init_data)
+    # Пробуем оба варианта:
+    # 1. Браузер декодировал значения (используем parse_qsl)
+    result = _validate_init_data(init_data)
+    if result:
+        return result
+    
+    # 2. Браузер НЕ декодировал значения (используем оригинальные URL-encoded)
+    # Парсим вручную, сохраняя оригинальные значения
+    try:
+        pairs = init_data.split('&')
+        params = {}
+        hash_value = None
+        
+        for pair in pairs:
+            if '=' not in pair:
+                continue
+            key, value = pair.split('=', 1)
+            if key == 'hash':
+                hash_value = value
+            else:
+                params[key] = value
+        
+        if not hash_value:
+            return None
+        
+        BOT_TOKEN = os.environ.get('BOT_TOKEN')
+        if not BOT_TOKEN:
+            return None
+        BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
+        if not BOT_TOKEN:
+            return None
+        
+        # Формируем data_check_string с оригинальными URL-encoded значениями
+        data_check_string = '\n'.join(
+            f"{key}={params[key]}" 
+            for key in sorted(params.keys())
+        )
+        
+        secret_key = hmac.new(
+            b"WebAppData",
+            BOT_TOKEN.encode('utf-8'),
+            hashlib.sha256
+        ).digest()
+        
+        expected_hash = hmac.new(
+            secret_key,
+            data_check_string.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(hash_value, expected_hash):
+            return None
+        
+        # Извлекаем user (нужно декодировать)
+        user_encoded = params.get('user')
+        if not user_encoded:
+            return None
+        
+        user_str = urllib.parse.unquote(user_encoded)
+        user_data = json.loads(user_str)
+        telegram_user_id = user_data.get('id')
+        
+        if telegram_user_id is None:
+            return None
+        
+        return str(telegram_user_id)
+    except:
+        return None
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
