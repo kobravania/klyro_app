@@ -9,6 +9,24 @@ class ApiClient {
     }
 
     /**
+     * Ожидание готовности Telegram.WebApp.initData
+     * Гарантированное ожидание до 5 секунд
+     */
+    async _waitForInitData(maxWaitMs = 5000) {
+        const startTime = Date.now();
+        while (Date.now() - startTime < maxWaitMs) {
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
+                const tg = window.Telegram.WebApp;
+                if (tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
+                    return true;
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return false;
+    }
+
+    /**
      * Получить session_id из start_param
      * Единственный источник session_id = Telegram.WebApp.initDataUnsafe.start_param
      */
@@ -18,19 +36,10 @@ class ApiClient {
                 const tg = window.Telegram.WebApp;
                 const initDataUnsafe = tg.initDataUnsafe || {};
                 const sessionId = initDataUnsafe.start_param || '';
-                console.log('[API] getSessionId():', {
-                    hasTelegram: !!window.Telegram,
-                    hasWebApp: !!tg,
-                    hasInitDataUnsafe: !!initDataUnsafe,
-                    start_param: sessionId,
-                    initDataUnsafe_keys: Object.keys(initDataUnsafe)
-                });
                 return sessionId;
             }
-            console.warn('[API] getSessionId(): Telegram.WebApp не доступен');
             return '';
         } catch (e) {
-            console.error('[API] getSessionId(): ошибка', e);
             return '';
         }
     }
@@ -41,10 +50,14 @@ class ApiClient {
      * @throws {Error} 'AUTH_REQUIRED' если 401, 'SERVICE_UNAVAILABLE' если 500
      */
     async getProfile() {
+        // ОБЯЗАТЕЛЬНО: ждем готовности initData перед запросом
+        const initDataReady = await this._waitForInitData(5000);
+        if (!initDataReady) {
+            throw new Error('AUTH_REQUIRED');
+        }
+
         const sessionId = this.getSessionId();
-        console.log('[API] getProfile(): sessionId =', sessionId);
         if (!sessionId) {
-            console.error('[API] getProfile(): sessionId пустой, выбрасываем AUTH_REQUIRED');
             throw new Error('AUTH_REQUIRED');
         }
 
@@ -52,7 +65,6 @@ class ApiClient {
             'Content-Type': 'application/json',
             'X-Klyro-Session': sessionId
         };
-        console.log('[API] getProfile(): отправляем заголовки', headers);
 
         const url = `${this.baseUrl}/api/profile`;
 
@@ -97,10 +109,14 @@ class ApiClient {
      * @throws {Error} 'AUTH_REQUIRED' если 401, 'SERVICE_UNAVAILABLE' если 500
      */
     async saveProfile(profileData) {
+        // ОБЯЗАТЕЛЬНО: ждем готовности initData перед запросом
+        const initDataReady = await this._waitForInitData(5000);
+        if (!initDataReady) {
+            throw new Error('AUTH_REQUIRED');
+        }
+
         const sessionId = this.getSessionId();
-        console.log('[API] saveProfile(): sessionId =', sessionId);
         if (!sessionId) {
-            console.error('[API] saveProfile(): sessionId пустой, выбрасываем AUTH_REQUIRED');
             throw new Error('AUTH_REQUIRED');
         }
 
@@ -108,7 +124,6 @@ class ApiClient {
             'Content-Type': 'application/json',
             'X-Klyro-Session': sessionId
         };
-        console.log('[API] saveProfile(): отправляем заголовки', headers);
 
         const payload = { ...profileData };
 

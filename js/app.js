@@ -17,11 +17,7 @@ function initTelegramWebApp() {
         tg.ready();
         tg.expand();
         tgReady = true;
-        console.log('[APP] Telegram WebApp инициализирован');
-        console.log('[APP] initDataUnsafe:', tg.initDataUnsafe);
-        console.log('[APP] start_param:', tg.initDataUnsafe?.start_param);
     } else {
-        console.warn('[APP] Telegram WebApp API не найден');
         tgReady = false;
     }
 }
@@ -97,7 +93,7 @@ function showActivationScreen() {
     const existing = document.getElementById('activation-screen');
     if (existing) existing.remove();
 
-    const botUsername = window.KLYRO_BOT_USERNAME || 'klyro_bot';
+    const botUsername = window.KLYRO_BOT_USERNAME || 'klyro_nutrition_bot';
     const startLink = `https://t.me/${botUsername}?start=webapp`;
 
     const screen = document.createElement('div');
