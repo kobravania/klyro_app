@@ -315,6 +315,7 @@ def _get_telegram_user_id_from_request(req):
     """
     init_data_str = req.headers.get('X-Telegram-Init-Data')
     if not init_data_str:
+        print("[INITDATA] X-Telegram-Init-Data заголовок отсутствует")
         return None
     
     bot_token = os.environ.get('BOT_TOKEN')
@@ -331,6 +332,8 @@ def _get_telegram_user_id_from_request(req):
     user_id = _get_telegram_user_id_from_init_data(init_data_str)
     if user_id:
         print(f"[INITDATA] Валидация пройдена, user_id: {user_id}")
+    else:
+        print("[INITDATA] Не удалось извлечь user_id из initData")
     return user_id
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
