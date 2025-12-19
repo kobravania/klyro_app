@@ -228,23 +228,14 @@ def _validate_init_data(init_data_str):
     try:
         print(f"[DEBUG] initData (первые 200 символов): {init_data_str[:200]}...")
         
-        # Парсим initData, сохраняя оригинальные значения
-        # initData приходит как query string: key1=value1&key2=value2&hash=...
-        pairs = init_data_str.split('&')
-        params = {}
-        hash_value = None
+        # Парсим initData используя parse_qsl для сохранения оригинальных значений
+        # parse_qsl сохраняет URL-encoded значения как есть
+        data = dict(urllib.parse.parse_qsl(init_data_str, keep_blank_values=True))
         
-        for pair in pairs:
-            if '=' not in pair:
-                continue
-            key, value = pair.split('=', 1)  # split только по первому =
-            if key == 'hash':
-                hash_value = value
-            else:
-                # Сохраняем оригинальное значение как есть (URL-encoded или декодированное)
-                params[key] = value
+        # Извлекаем hash и удаляем из данных
+        hash_value = data.pop('hash', None)
         
-        print(f"[DEBUG] Параметры: {list(params.keys())}")
+        print(f"[DEBUG] Параметры: {list(data.keys())}")
         print(f"[DEBUG] Hash: {hash_value[:32] if hash_value else 'None'}...")
         
         if not hash_value:
@@ -252,10 +243,10 @@ def _validate_init_data(init_data_str):
             return None
         
         # Формируем data_check_string: ключи сортируются, разделитель = \n
-        # Используем значения как есть (Telegram подписывает оригинальные значения)
+        # Используем значения как есть (parse_qsl сохраняет оригинальные URL-encoded значения)
         data_check_string = '\n'.join(
-            f"{key}={params[key]}" 
-            for key in sorted(params.keys())
+            f"{key}={value}" 
+            for key, value in sorted(data.items())
         )
         
         print(f"[DEBUG] data_check_string (полная): {data_check_string}")
@@ -285,8 +276,8 @@ def _validate_init_data(init_data_str):
             return None
         
         # Извлекаем user из initData
-        # Значение может быть уже декодировано или требовать декодирования
-        user_str = params.get('user')
+        # parse_qsl может декодировать значения, поэтому пробуем декодировать если нужно
+        user_str = data.get('user')
         if not user_str:
             return None
         
