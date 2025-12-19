@@ -268,11 +268,12 @@ def _validate_init_data(init_data_str):
         
         # Проверяем подпись (constant-time сравнение)
         if not hmac.compare_digest(hash_value, expected_hash):
-            print(f"[DEBUG] Валидация initData: hash не совпадает")
-            print(f"  Получен: {hash_value[:32]}...")
-            print(f"  Ожидался: {expected_hash[:32]}...")
+            print(f"Валидация initData: неверная подпись")
+            print(f"  Получен hash: {hash_value[:32]}...")
+            print(f"  Ожидался hash: {expected_hash[:32]}...")
             print(f"  data_check_string (первые 200 символов): {data_check_string[:200]}...")
             print(f"  Параметры: {list(params.keys())}")
+            print(f"  BOT_TOKEN (первые/последние 10): {BOT_TOKEN[:10]}...{BOT_TOKEN[-10:]}")
             return None
         
         # Извлекаем user из initData
