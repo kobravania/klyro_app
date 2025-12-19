@@ -1,6 +1,6 @@
 /**
  * KLYRO - Главный файл приложения
- * Session-based architecture: только через /start → startapp → сессия
+ * InitData-based architecture: валидация initData, работа без /start
  */
 
 // Telegram Web App API
@@ -135,7 +135,7 @@ async function initApp() {
         await appContext.loadData();
 
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
-        // Backend получает user_id из сессии (X-Klyro-Session)
+        // Backend получает user_id из валидированного initData (X-Telegram-Init-Data)
         try {
             const profile = await apiClient.getProfile();
             if (profile) {
