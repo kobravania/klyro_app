@@ -361,79 +361,79 @@ def save_profile():
     data = request.json
     if not data:
         return jsonify({'error': 'Service unavailable'}), 500
+    
+    # Извлекаем данные профиля (игнорируем лишние поля)
+    birth_date = data.get('birth_date') or data.get('dateOfBirth')
+    gender = data.get('gender')
+    height_cm = data.get('height_cm') or data.get('height')
+    weight_kg = data.get('weight_kg') or data.get('weight')
+    
+    # Минимальная валидация - только проверяем наличие обязательных полей
+    if not birth_date or not gender or not height_cm or not weight_kg:
+        return jsonify({'error': 'Service unavailable'}), 500
+    
+    # Нормализация gender
+    gender = str(gender).lower().strip()
+    if gender not in ('male', 'female'):
+        return jsonify({'error': 'Service unavailable'}), 500
+    
+    # Преобразование типов
+    try:
+        height_cm = int(height_cm)
+        weight_kg = int(weight_kg)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Service unavailable'}), 500
+    
+    # Сохраняем в БД (upsert)
+    conn = get_db_connection()
+    try:
+        ensure_schema_ready(conn)
+        colmap = _profiles_column_map()
+        telegram_user_id = str(telegram_user_id)
+        cur = conn.cursor()
+        # Используем INSERT ... ON CONFLICT для upsert
+        height_col = colmap['height']
+        weight_col = colmap['weight']
+
+        # updated_at может отсутствовать в старой схеме — тогда не трогаем
+        has_updated = colmap.get('has_updated_at', False)
+        insert_cols = ["telegram_user_id", "birth_date", "gender", height_col, weight_col]
+        insert_vals = ["%s", "%s", "%s", "%s", "%s"]
+        params = [telegram_user_id, birth_date, gender, height_cm, weight_kg]
+
+        if has_updated:
+            insert_cols.append("updated_at")
+            insert_vals.append("now()")
+
+        update_sets = [
+            "birth_date = EXCLUDED.birth_date",
+            "gender = EXCLUDED.gender",
+            f"{height_col} = EXCLUDED.{height_col}",
+            f"{weight_col} = EXCLUDED.{weight_col}",
+        ]
+        if has_updated:
+            update_sets.append("updated_at = now()")
+
+        cur.execute(
+            f"""
+            INSERT INTO public.profiles ({', '.join(insert_cols)})
+            VALUES ({', '.join(insert_vals)})
+            ON CONFLICT (telegram_user_id)
+            DO UPDATE SET {', '.join(update_sets)}
+            """,
+            tuple(params)
+        )
         
-        # Извлекаем данные профиля (игнорируем лишние поля)
-        birth_date = data.get('birth_date') or data.get('dateOfBirth')
-        gender = data.get('gender')
-        height_cm = data.get('height_cm') or data.get('height')
-        weight_kg = data.get('weight_kg') or data.get('weight')
+        conn.commit()
+        cur.close()
         
-        # Минимальная валидация - только проверяем наличие обязательных полей
-        if not birth_date or not gender or not height_cm or not weight_kg:
+        # Возвращаем профиль, считанный из БД (реальный источник истины)
+        row = _select_profile(conn, telegram_user_id, colmap)
+        if not row:
             return jsonify({'error': 'Service unavailable'}), 500
-        
-        # Нормализация gender
-        gender = str(gender).lower().strip()
-        if gender not in ('male', 'female'):
-            return jsonify({'error': 'Service unavailable'}), 500
-        
-        # Преобразование типов
-        try:
-            height_cm = int(height_cm)
-            weight_kg = int(weight_kg)
-        except (ValueError, TypeError):
-            return jsonify({'error': 'Service unavailable'}), 500
-        
-        # Сохраняем в БД (upsert)
-        conn = get_db_connection()
-        try:
-            ensure_schema_ready(conn)
-            colmap = _profiles_column_map()
-            telegram_user_id = str(telegram_user_id)
-            cur = conn.cursor()
-            # Используем INSERT ... ON CONFLICT для upsert
-            height_col = colmap['height']
-            weight_col = colmap['weight']
-
-            # updated_at может отсутствовать в старой схеме — тогда не трогаем
-            has_updated = colmap.get('has_updated_at', False)
-            insert_cols = ["telegram_user_id", "birth_date", "gender", height_col, weight_col]
-            insert_vals = ["%s", "%s", "%s", "%s", "%s"]
-            params = [telegram_user_id, birth_date, gender, height_cm, weight_kg]
-
-            if has_updated:
-                insert_cols.append("updated_at")
-                insert_vals.append("now()")
-
-            update_sets = [
-                "birth_date = EXCLUDED.birth_date",
-                "gender = EXCLUDED.gender",
-                f"{height_col} = EXCLUDED.{height_col}",
-                f"{weight_col} = EXCLUDED.{weight_col}",
-            ]
-            if has_updated:
-                update_sets.append("updated_at = now()")
-
-            cur.execute(
-                f"""
-                INSERT INTO public.profiles ({', '.join(insert_cols)})
-                VALUES ({', '.join(insert_vals)})
-                ON CONFLICT (telegram_user_id)
-                DO UPDATE SET {', '.join(update_sets)}
-                """,
-                tuple(params)
-            )
-            
-            conn.commit()
-            cur.close()
-            
-            # Возвращаем профиль, считанный из БД (реальный источник истины)
-            row = _select_profile(conn, telegram_user_id, colmap)
-            if not row:
-                return jsonify({'error': 'Service unavailable'}), 500
-            return jsonify(_row_to_profile(row)), 200
-        finally:
-            conn.close()
+        return jsonify(_row_to_profile(row)), 200
+    finally:
+        conn.close()
 
 # ============================================
 # СТАТИЧЕСКИЕ ФАЙЛЫ
