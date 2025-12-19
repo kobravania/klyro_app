@@ -129,17 +129,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "Нажми кнопку ниже, чтобы открыть Klyro:"
         )
         
-        # Создаем WebApp кнопку с startapp параметром
-        # Telegram автоматически передаст startapp=<session_id> в initDataUnsafe.start_param
-        # при открытии Mini App через эту кнопку
-        webapp_url = f"{WEB_APP_URL.rstrip('/')}?startapp={session_id}"
+        # Создаем WebApp кнопку
+        # startapp параметр передается через специальный формат URL для WebApp
+        # Формат: https://t.me/<bot_username>?startapp=<session_id>
+        # Но для WebApp кнопки нужно использовать прямой URL Mini App
+        # session_id будет передан через startapp ссылку, которую пользователь откроет
+        webapp_url = WEB_APP_URL.rstrip('/')
         
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        # Используем обычную ссылку на startapp, чтобы start_param был доступен
+        startapp_link = f"https://t.me/{bot_username}?startapp={session_id}"
         
         keyboard = [[
             InlineKeyboardButton(
                 text="🚀 ОТКРЫТЬ KLYRO",
-                web_app=WebAppInfo(url=webapp_url)
+                url=startapp_link
             )
         ]]
         
