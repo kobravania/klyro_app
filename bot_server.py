@@ -223,6 +223,10 @@ def _validate_init_data(init_data_str):
         return None
     
     try:
+        # DEBUG: логируем входящий initData (первые 200 символов)
+        print(f"[DEBUG] initData (первые 200 символов): {init_data_str[:200]}...")
+        print(f"[DEBUG] BOT_TOKEN (первые/последние 10 символов): {BOT_TOKEN[:10]}...{BOT_TOKEN[-10:]}")
+        
         # Парсим initData вручную, сохраняя оригинальные значения для валидации
         # initData приходит как URL-encoded query string
         pairs = init_data_str.split('&')
@@ -239,7 +243,11 @@ def _validate_init_data(init_data_str):
                 # Сохраняем оригинальное URL-encoded значение для валидации
                 params[key] = value
         
+        print(f"[DEBUG] Параметры в initData: {list(params.keys())}")
+        print(f"[DEBUG] Hash из initData: {hash_value[:32] if hash_value else 'None'}...")
+        
         if not hash_value:
+            print("[DEBUG] Hash не найден в initData")
             return None
         
         # Формируем data_check_string: ключи сортируются, разделитель = \n
@@ -248,6 +256,9 @@ def _validate_init_data(init_data_str):
             f"{key}={params[key]}" 
             for key in sorted(params.keys())
         )
+        
+        print(f"[DEBUG] data_check_string (полная): {data_check_string}")
+        print(f"[DEBUG] data_check_string bytes length: {len(data_check_string.encode('utf-8'))}")
         
         # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
         secret_key = hmac.new(
@@ -263,12 +274,15 @@ def _validate_init_data(init_data_str):
             hashlib.sha256
         ).hexdigest()
         
+        print(f"[DEBUG] Ожидаемый hash: {expected_hash}")
+        print(f"[DEBUG] Полученный hash: {hash_value}")
+        
         # Проверяем подпись (constant-time сравнение)
         if not hmac.compare_digest(hash_value, expected_hash):
             print(f"Валидация initData: неверная подпись")
             print(f"  Получен hash: {hash_value[:32]}...")
             print(f"  Ожидался hash: {expected_hash[:32]}...")
-            print(f"  data_check_string (первые 100 символов): {data_check_string[:100]}...")
+            print(f"  data_check_string (первые 200 символов): {data_check_string[:200]}...")
             print(f"  Параметры: {list(params.keys())}")
             return None
         
