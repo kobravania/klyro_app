@@ -223,18 +223,30 @@ def _validate_init_data(init_data_str):
         return None
     
     try:
-        # Парсим initData (формат: key1=value1&key2=value2&hash=...)
-        parsed = urllib.parse.parse_qs(init_data_str, keep_blank_values=True)
+        # Парсим initData вручную, сохраняя оригинальные значения для валидации
+        # initData приходит как URL-encoded query string
+        pairs = init_data_str.split('&')
+        params = {}
+        hash_value = None
         
-        # Извлекаем hash и удаляем из parsed
-        hash_value = parsed.pop('hash', [None])[0]
+        for pair in pairs:
+            if '=' not in pair:
+                continue
+            key, value = pair.split('=', 1)  # split только по первому =
+            if key == 'hash':
+                hash_value = value
+            else:
+                # Сохраняем оригинальное URL-encoded значение для валидации
+                params[key] = value
+        
         if not hash_value:
             return None
         
-        # Формируем data_check_string: ключи сортируются, разделитель = \n (не &)
+        # Формируем data_check_string: ключи сортируются, разделитель = \n
+        # Используем оригинальные URL-encoded значения
         data_check_string = '\n'.join(
-            f"{key}={value[0]}" 
-            for key, value in sorted(parsed.items())
+            f"{key}={params[key]}" 
+            for key in sorted(params.keys())
         )
         
         # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
@@ -256,11 +268,12 @@ def _validate_init_data(init_data_str):
             print(f"Валидация initData: неверная подпись (получен: {hash_value[:16]}..., ожидался: {expected_hash[:16]}...)")
             return None
         
-        # Извлекаем user из initData
-        user_str = parsed.get('user', [None])[0]
-        if not user_str:
+        # Извлекаем user из initData (нужно декодировать URL-encoded значение)
+        user_encoded = params.get('user')
+        if not user_encoded:
             return None
         
+        user_str = urllib.parse.unquote(user_encoded)
         user_data = json.loads(user_str)
         telegram_user_id = user_data.get('id')
         
