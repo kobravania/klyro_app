@@ -530,8 +530,8 @@ class OnboardingScreen {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
-            // Wallet-like: POST /api/profile возвращает сохранённый профиль.
-            // Backend сам извлекает telegram_user_id из валидированного initData.
+            // Session-based: POST /api/profile возвращает сохранённый профиль.
+            // Backend сам извлекает telegram_user_id из сессии (X-Klyro-Session).
             const savedProfile = await apiClient.saveProfile(profileData);
             if (!savedProfile) {
                 throw new Error('SERVICE_UNAVAILABLE');

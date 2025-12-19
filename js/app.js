@@ -1,6 +1,6 @@
 /**
  * KLYRO - Главный файл приложения
- * Wallet-like architecture: initData only, no activation screens
+ * Session-based architecture: только через /start → startapp → сессия
  */
 
 // Telegram Web App API
@@ -79,6 +79,44 @@ function showServiceUnavailable() {
     app.appendChild(screen);
 }
 
+function showActivationScreen() {
+    hideAllScreens();
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    // Скрываем навигацию и FAB
+    if (typeof navigation !== 'undefined') {
+        navigation.hide();
+    }
+    if (typeof fab !== 'undefined') {
+        fab.hide();
+    }
+
+    const existing = document.getElementById('activation-screen');
+    if (existing) existing.remove();
+
+    const botUsername = window.KLYRO_BOT_USERNAME || 'klyro_bot';
+    const startLink = `https://t.me/${botUsername}?start=webapp`;
+
+    const screen = document.createElement('div');
+    screen.id = 'activation-screen';
+    screen.className = 'screen active';
+    screen.style.display = 'flex';
+    screen.style.flexDirection = 'column';
+    screen.innerHTML = `
+        <div class="screen-content">
+            <h1 class="screen-title">Откройте приложение через бота</h1>
+            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-xl);">
+                Для работы приложения необходимо открыть его через команду /start в боте
+            </p>
+            <a href="${startLink}" class="btn btn-primary btn-block" style="text-decoration: none; display: block; text-align: center;">
+                Открыть через бота
+            </a>
+        </div>
+    `;
+    app.appendChild(screen);
+}
+
 // ============================================
 // ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ
 // ============================================
@@ -88,7 +126,7 @@ async function initApp() {
     
     showLoadingScreen();
 
-    // Wallet-like state machine: loading -> (200 dashboard | 404 onboarding | 500 error)
+    // Session-based state machine: loading -> (200 dashboard | 404 onboarding | 401 activation | 500 error)
     let appState = 'loading';
     
     try {
@@ -99,7 +137,7 @@ async function initApp() {
         await appContext.loadData();
 
         // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
-        // Backend валидирует initData и извлекает telegram_user_id
+        // Backend получает user_id из сессии (X-Klyro-Session)
         try {
             console.log('[APP] GET /api/profile...');
             const profile = await apiClient.getProfile();
@@ -112,7 +150,11 @@ async function initApp() {
             }
         } catch (e) {
             console.log('[APP] loadProfile(): error', e && (e.message || String(e)));
-            appState = 'error';
+            if (e.message === 'AUTH_REQUIRED') {
+                appState = 'activation';
+            } else {
+                appState = 'error';
+            }
         }
 
         console.log('[APP] decision:', appState);
@@ -129,6 +171,11 @@ async function initApp() {
         if (appState === 'onboarding') {
             navigation.hide();
             onboardingScreen.show();
+            return;
+        }
+
+        if (appState === 'activation') {
+            showActivationScreen();
             return;
         }
 

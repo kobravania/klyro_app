@@ -1,6 +1,6 @@
 /**
  * API клиент для работы с сервером
- * Wallet-like: только initData, никаких сессий
+ * Session-based: только через X-Klyro-Session header
  */
 
 class ApiClient {
@@ -9,13 +9,15 @@ class ApiClient {
     }
 
     /**
-     * Получить initData из Telegram WebApp
+     * Получить session_id из start_param
+     * Единственный источник session_id = Telegram.WebApp.initDataUnsafe.start_param
      */
-    getInitData() {
+    getSessionId() {
         try {
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
-                return tg.initData || '';
+                const initDataUnsafe = tg.initDataUnsafe || {};
+                return initDataUnsafe.start_param || '';
             }
             return '';
         } catch (e) {
@@ -23,36 +25,26 @@ class ApiClient {
         }
     }
 
-    async _waitForInitData(timeoutMs = 5000) {
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const initData = this.getInitData();
-            if (initData && initData.length > 0) return initData;
-            await new Promise(r => setTimeout(r, 50));
-        }
-        return '';
-    }
-
     /**
      * Загрузить профиль пользователя с сервера
      * @returns {Promise<Object|null>} Профиль пользователя или null если не найден
+     * @throws {Error} 'AUTH_REQUIRED' если 401, 'SERVICE_UNAVAILABLE' если 500
      */
     async getProfile() {
-        const initData = await this._waitForInitData(5000);
-        if (!initData) {
-            throw new Error('SERVICE_UNAVAILABLE');
+        const sessionId = this.getSessionId();
+        if (!sessionId) {
+            throw new Error('AUTH_REQUIRED');
         }
 
         const headers = {
             'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData
+            'X-Klyro-Session': sessionId
         };
 
         const url = `${this.baseUrl}/api/profile`;
 
-        // Добавляем таймаут для запроса
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         try {
             const response = await fetch(url, {
@@ -62,6 +54,10 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
+
+            if (response.status === 401) {
+                throw new Error('AUTH_REQUIRED');
+            }
 
             if (response.status === 404) {
                 return null;
@@ -85,25 +81,25 @@ class ApiClient {
      * Сохранить профиль пользователя на сервер
      * @param {Object} profileData Данные профиля
      * @returns {Promise<Object>} Сохранённый профиль
+     * @throws {Error} 'AUTH_REQUIRED' если 401, 'SERVICE_UNAVAILABLE' если 500
      */
     async saveProfile(profileData) {
-        const initData = await this._waitForInitData(5000);
-        if (!initData) {
-            throw new Error('SERVICE_UNAVAILABLE');
+        const sessionId = this.getSessionId();
+        if (!sessionId) {
+            throw new Error('AUTH_REQUIRED');
         }
 
         const headers = {
             'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData
+            'X-Klyro-Session': sessionId
         };
 
         const payload = { ...profileData };
 
         const url = `${this.baseUrl}/api/profile`;
 
-        // Добавляем таймаут для запроса
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
             const response = await fetch(url, {
@@ -114,6 +110,10 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
+
+            if (response.status === 401) {
+                throw new Error('AUTH_REQUIRED');
+            }
 
             if (!response.ok) {
                 throw new Error('SERVICE_UNAVAILABLE');

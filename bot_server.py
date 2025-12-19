@@ -2,7 +2,7 @@
 """
 Flask сервер для раздачи статических файлов Telegram Web App
 + API для хранения профилей пользователей в PostgreSQL
-Wallet-like architecture: initData only, no sessions/cookies
+Session-based architecture: только через /start → startapp → сессия
 """
 from flask import Flask, send_from_directory, send_file, Response, request, jsonify
 from flask_cors import CORS
@@ -12,12 +12,9 @@ import json
 import psycopg2
 from psycopg2 import errors as psycopg2_errors
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 from datetime import date as _date
-import hmac
-import hashlib
-import urllib.parse
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)  # Разрешаем CORS для API запросов
@@ -49,7 +46,7 @@ def get_db_connection():
         sys.exit(1)
 
 def init_db():
-    """Инициализировать таблицу profiles. FAIL-FAST: выходит если не удалось."""
+    """Инициализировать таблицы profiles и sessions. FAIL-FAST: выходит если не удалось."""
     conn = get_db_connection()
     
     try:
@@ -59,8 +56,19 @@ def init_db():
         cur = conn.cursor()
 
         # Глобальная блокировка на уровне БД (одна на весь кластер)
-        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_profiles_v1'))")
+        cur.execute("SELECT pg_advisory_lock(hashtext('klyro_init_db_v1'))")
         try:
+            # Таблица sessions для startapp-сессий
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS public.sessions (
+                    session_id TEXT PRIMARY KEY,
+                    telegram_user_id TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT now(),
+                    expires_at TIMESTAMP NOT NULL
+                )
+            """)
+            
+            # Таблица profiles
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS public.profiles (
                     telegram_user_id TEXT PRIMARY KEY,
@@ -72,18 +80,22 @@ def init_db():
                     updated_at TIMESTAMP DEFAULT now()
                 )
             """)
-            # Детерминированная проверка схемы: таблица должна быть доступна
+            
+            # Детерминированная проверка схемы
             cur.execute("SELECT to_regclass('public.profiles') AS reg")
-            reg = cur.fetchone()[0]
-            if reg is None:
-                raise RuntimeError("Таблица public.profiles не создана/не видна")
+            reg_profiles = cur.fetchone()[0]
+            cur.execute("SELECT to_regclass('public.sessions') AS reg")
+            reg_sessions = cur.fetchone()[0]
+            
+            if reg_profiles is None or reg_sessions is None:
+                raise RuntimeError("Таблицы не созданы/не видны")
         finally:
-            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_profiles_v1'))")
+            cur.execute("SELECT pg_advisory_unlock(hashtext('klyro_init_db_v1'))")
 
-        print("✓ Таблица profiles инициализирована")
+        print("✓ Таблицы profiles и sessions инициализированы")
         cur.close()
     except Exception as e:
-        print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицу: {e}")
+        print(f"КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать таблицы: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
@@ -92,14 +104,16 @@ def init_db():
 
 def ensure_schema_ready(conn):
     """
-    Fail-fast: если схема не готова (нет таблицы profiles) — сервер не должен работать.
+    Fail-fast: если схема не готова (нет таблиц profiles и sessions) — сервер не должен работать.
     """
     try:
         cur = conn.cursor()
         cur.execute("SELECT to_regclass('public.profiles') AS reg")
-        reg = cur.fetchone()[0]
-        if reg is None:
-            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблицы public.profiles)")
+        reg_profiles = cur.fetchone()[0]
+        cur.execute("SELECT to_regclass('public.sessions') AS reg")
+        reg_sessions = cur.fetchone()[0]
+        if reg_profiles is None or reg_sessions is None:
+            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблиц public.profiles или public.sessions)")
             sys.exit(1)
         cur.close()
     except Exception as e:
@@ -203,160 +217,56 @@ def _select_profile(conn, telegram_user_id, colmap):
     cur.close()
     return row
 
-def _validate_init_data(init_data_str):
+def _get_session_id_from_request(req):
     """
-    Wallet-like: валидирует Telegram initData через HMAC-SHA256.
-    Возвращает telegram_user_id если валидация успешна, иначе None.
-    
-    Согласно официальной документации Telegram, для валидации нужно использовать
-    оригинальные URL-encoded значения из initData как есть.
+    Извлекает session_id из заголовка X-Klyro-Session.
+    Единственный источник истины для аутентификации.
     """
-    if not init_data_str:
+    return req.headers.get('X-Klyro-Session')
+
+def _get_telegram_user_id_from_session(session_id):
+    """
+    Получает telegram_user_id из таблицы sessions по session_id.
+    Проверяет, что сессия не истекла.
+    Возвращает telegram_user_id или None.
+    """
+    if not session_id:
         return None
     
-    BOT_TOKEN = os.environ.get('BOT_TOKEN')
-    if not BOT_TOKEN:
-        return None
-    
-    BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
-    if not BOT_TOKEN:
-        return None
-    
+    conn = get_db_connection()
     try:
-        # Парсим initData вручную, сохраняя оригинальные URL-encoded значения
-        pairs = init_data_str.split('&')
-        params = {}
-        hash_value = None
+        ensure_schema_ready(conn)
+        cur = conn.cursor()
         
-        for pair in pairs:
-            if '=' not in pair:
-                continue
-            key, value = pair.split('=', 1)
-            if key == 'hash':
-                hash_value = value
-            else:
-                # Сохраняем оригинальное значение как есть (URL-encoded)
-                params[key] = value
+        # Проверяем, существует ли сессия и не истекла ли она
+        cur.execute("""
+            SELECT telegram_user_id
+            FROM public.sessions
+            WHERE session_id = %s AND expires_at > now()
+        """, (session_id,))
         
-        if not hash_value:
-            return None
+        row = cur.fetchone()
+        cur.close()
         
-        # Формируем data_check_string: ключи сортируются, разделитель = \n
-        # Используем оригинальные URL-encoded значения
-        data_check_string = '\n'.join(
-            f"{key}={params[key]}" 
-            for key in sorted(params.keys())
-        )
-        
-        # Вычисляем секретный ключ: HMAC-SHA256("WebAppData", bot_token)
-        secret_key = hmac.new(
-            b"WebAppData",
-            BOT_TOKEN.encode('utf-8'),
-            hashlib.sha256
-        ).digest()
-        
-        # Вычисляем ожидаемый hash: HMAC-SHA256(secret_key, data_check_string)
-        expected_hash = hmac.new(
-            secret_key,
-            data_check_string.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Проверяем подпись (constant-time сравнение)
-        if not hmac.compare_digest(hash_value, expected_hash):
-            return None
-        
-        # Извлекаем user из initData (нужно декодировать URL-encoded значение)
-        user_encoded = params.get('user')
-        if not user_encoded:
-            return None
-        
-        user_str = urllib.parse.unquote(user_encoded)
-        user_data = json.loads(user_str)
-        telegram_user_id = user_data.get('id')
-        
-        if telegram_user_id is None:
-            return None
-        
-        return str(telegram_user_id)
-    except:
+        if row:
+            return str(row[0])
         return None
+    except Exception as e:
+        print(f"Ошибка при получении user_id из сессии: {e}")
+        return None
+    finally:
+        conn.close()
 
 def _get_telegram_user_id_from_request(req):
     """
-    Wallet-like: единственный источник истины = валидированный initData.
-    Извлекает telegram_user_id из X-Telegram-Init-Data header.
-    
-    Telegram.WebApp.initData содержит URL-encoded значения.
-    При передаче в HTTP заголовке браузер может декодировать их.
-    Пробуем оба варианта: сначала с оригинальными значениями, потом с декодированными.
+    Единственный источник истины = сессия из X-Klyro-Session.
+    Нет сессии → None (вернет 401)
     """
-    init_data = req.headers.get('X-Telegram-Init-Data')
-    if not init_data:
+    session_id = _get_session_id_from_request(req)
+    if not session_id:
         return None
     
-    # Вариант 1: Браузер НЕ декодировал значения (используем оригинальные URL-encoded)
-    result = _validate_init_data(init_data)
-    if result:
-        return result
-    
-    # Вариант 2: Браузер декодировал значения (нужно закодировать обратно)
-    # Если значения уже декодированы, пробуем их закодировать обратно
-    try:
-        # Парсим декодированные значения
-        params = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
-        hash_value = params.pop('hash', None)
-        if not hash_value:
-            return None
-        
-        # Кодируем значения обратно для валидации
-        encoded_params = {}
-        for key, value in params.items():
-            # Кодируем значение обратно в URL-encoded формат
-            encoded_params[key] = urllib.parse.quote(value, safe='')
-        
-        # Формируем data_check_string с закодированными значениями
-        data_check_string = '\n'.join(
-            f"{key}={encoded_params[key]}" 
-            for key in sorted(encoded_params.keys())
-        )
-        
-        BOT_TOKEN = os.environ.get('BOT_TOKEN')
-        if not BOT_TOKEN:
-            return None
-        BOT_TOKEN = BOT_TOKEN.strip().strip('"').strip("'")
-        if not BOT_TOKEN:
-            return None
-        
-        secret_key = hmac.new(
-            b"WebAppData",
-            BOT_TOKEN.encode('utf-8'),
-            hashlib.sha256
-        ).digest()
-        
-        expected_hash = hmac.new(
-            secret_key,
-            data_check_string.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-        
-        if not hmac.compare_digest(hash_value, expected_hash):
-            return None
-        
-        # Извлекаем user (уже декодирован)
-        user_str = params.get('user')
-        if not user_str:
-            return None
-        
-        user_data = json.loads(user_str)
-        telegram_user_id = user_data.get('id')
-        
-        if telegram_user_id is None:
-            return None
-        
-        return str(telegram_user_id)
-    except:
-        return None
+    return _get_telegram_user_id_from_session(session_id)
 
 # Инициализация БД теперь выполняется через gunicorn hook (gunicorn_config.py)
 # Это предотвращает гонки условий при параллельной инициализации worker'ов
@@ -381,22 +291,22 @@ def api_health():
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
 # Источник истины = PostgreSQL
-# Wallet-like: только initData, никаких сессий
+# Session-based: только через X-Klyro-Session
 # ============================================
 
 @app.route('/api/profile', methods=['GET'])
 def get_profile():
     """
     Получить профиль пользователя
-    Wallet-like: telegram_user_id из валидированного initData
-    Возвращает: 200 + profile JSON если есть, 404 если нет
+    Session-based: telegram_user_id из сессии (X-Klyro-Session)
+    Возвращает: 200 + profile JSON если есть, 404 если нет, 401 если нет сессии
     """
     print(f"[API] GET /api/profile - запрос получен")
     try:
         telegram_user_id = _get_telegram_user_id_from_request(request)
         if not telegram_user_id:
-            print("[API] GET /api/profile: telegram_user_id не получен из initData")
-            return {'error': 'Service unavailable'}, 500
+            # Нет сессии → 401
+            return {'error': 'Unauthorized'}, 401
         
         # Загружаем профиль из БД
         conn = get_db_connection()
@@ -423,14 +333,15 @@ def get_profile():
 def save_profile():
     """
     Сохранить или обновить профиль пользователя (upsert, idempotent)
-    Wallet-like: telegram_user_id из валидированного initData
-    Возвращает: 200 + сохранённый профиль
+    Session-based: telegram_user_id из сессии (X-Klyro-Session)
+    Возвращает: 200 + сохранённый профиль, 401 если нет сессии
     """
     print(f"[API] POST /api/profile - запрос получен")
     try:
         telegram_user_id = _get_telegram_user_id_from_request(request)
         if not telegram_user_id:
-            return {'error': 'Service unavailable'}, 500
+            # Нет сессии → 401
+            return {'error': 'Unauthorized'}, 401
         
         data = request.json
         if not data:
