@@ -144,7 +144,9 @@ async function initApp() {
         try {
             console.log('[APP] Вызов /api/init...');
             const initData = apiClient.getInitData();
+            console.log('[APP] initData длина:', initData ? initData.length : 0);
             
+            // ГАРАНТИРОВАННЫЙ ЗАПРОС - отправляется ВСЕГДА
             const initResponse = await fetch('/api/init', {
                 method: 'POST',
                 headers: {
@@ -153,7 +155,7 @@ async function initApp() {
                 }
             });
             
-            console.log('[APP] /api/init получил ответ:', initResponse.status);
+            console.log('[APP] /api/init получил ответ:', initResponse.status, initResponse.statusText);
             
             if (initResponse.status === 401) {
                 appState = 'activation';
