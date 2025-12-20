@@ -1,115 +1,54 @@
+version: '3.8'
+
 services:
-  # PostgreSQL база данных
-  # Используем другой порт для БД, чтобы не конфликтовать с существующей БД
   postgres:
     image: postgres:15-alpine
-    container_name: klyro_postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-klyro}
-      POSTGRES_USER: ${POSTGRES_USER:-klyro}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: klyro
+      POSTGRES_USER: klyro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-klyro_password}
     volumes:
-      - klyro_postgres_data:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5433:5432"  # Используем порт 5433 вместо 5432
-    networks:
-      - klyro_network
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-klyro}"]
+      test: ["CMD-SHELL", "pg_isready -U klyro"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Backend API (Flask)
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: klyro_backend
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5000:5000"
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      - FLASK_ENV=production
-      - PORT=5000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-klyro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-klyro}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-klyro}
-      - POSTGRES_USER=${POSTGRES_USER:-klyro}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - BOT_TOKEN=${BOT_TOKEN}
+      POSTGRES_DB: klyro
+      POSTGRES_USER: klyro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-klyro_password}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      BOT_TOKEN: ${BOT_TOKEN}
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-change-me}
+      DEBUG: ${DEBUG:-False}
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - klyro_network
     volumes:
-      - ./data:/app/data:ro
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    command: sh -c "python manage.py migrate --noinput && gunicorn klyro_backend.wsgi:application --bind 0.0.0.0:8000 --workers 2"
 
-  # Telegram Bot (отдельный сервис)
-  bot:
-    build:
-      context: .
-      dockerfile: bot/Dockerfile
-    container_name: klyro_bot
-    restart: unless-stopped
-    environment:
-      - BOT_TOKEN=${BOT_TOKEN}
-      - WEB_APP_URL=${WEB_APP_URL:-${DOMAIN:-https://klyro.69-67-173-216.sslip.io}}
-      - WEBHOOK_URL=${WEBHOOK_URL:-https://klyro.app/webhook}
-      - BACKEND_URL=http://backend:5000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-klyro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-klyro}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-klyro}
-      - POSTGRES_USER=${POSTGRES_USER:-klyro}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    depends_on:
-      - postgres
-      - backend
-    networks:
-      - klyro_network
-
-  # Frontend (Nginx для статики)
-  # Используем порты 8080/8443 чтобы не конфликтовать с существующим проектом
-  # Основной Nginx на сервере будет проксировать поддомен на эти порты
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: klyro_frontend
-    restart: unless-stopped
+      context: ./frontend
+      dockerfile: Dockerfile
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/certbot/conf:/etc/letsencrypt:ro
-      - ./nginx/certbot/www:/var/www/certbot:ro
+      - ./frontend:/app
+      - /app/node_modules
     ports:
-      - "8080:80"
-      - "8443:443"
-    depends_on:
-      - backend
-    networks:
-      - klyro_network
-
-  # Certbot для HTTPS (запускается только по необходимости через docker-compose run)
-  # Используется для первоначального получения и обновления сертификатов
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend:8000
 
 volumes:
-  klyro_postgres_data:
-    # Pin volume name to avoid accidental data resets when compose project name changes.
-    name: klyro_postgres_data
-    driver: local
-
-networks:
-  klyro_network:
-    driver: bridge
+  postgres_data:
 
