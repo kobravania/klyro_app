@@ -19,7 +19,8 @@ function InitScreen({ onComplete }: InitScreenProps) {
 
       try {
         // Отправляем initData на backend
-        const response = await fetch('/api/init', {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+        const response = await fetch(`${apiUrl}/api/init`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -37,7 +38,8 @@ function InitScreen({ onComplete }: InitScreenProps) {
 
         if (has_profile) {
           // Загружаем профиль
-          const profileResponse = await fetch('/api/profile', {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+          const profileResponse = await fetch(`${apiUrl}/api/profile`, {
             method: 'GET',
             headers: {
               'X-Telegram-Init-Data': initData,

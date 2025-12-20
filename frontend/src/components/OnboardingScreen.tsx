@@ -26,8 +26,9 @@ function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
     try {
       const initData = window.Telegram?.WebApp?.initData || ''
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
       
-      const response = await fetch('/api/profile', {
+      const response = await fetch(`${apiUrl}/api/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
