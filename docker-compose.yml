@@ -44,11 +44,50 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - VITE_API_URL=http://backend:8000
     depends_on:
+      - backend
+    networks:
+      - default
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: klyro
+      POSTGRES_USER: klyro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-klyro_password}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      BOT_TOKEN: ${BOT_TOKEN}
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-change-me}
+      DEBUG: ${DEBUG:-False}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    expose:
+      - "8000"
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    networks:
+      - default
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
       - backend
     networks:
       - default
