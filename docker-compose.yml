@@ -34,6 +34,8 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    networks:
+      - default
 
   frontend:
     build:
@@ -45,9 +47,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://backend:8000
     depends_on:
       - backend
+    networks:
+      - default
 
 volumes:
   postgres_data:

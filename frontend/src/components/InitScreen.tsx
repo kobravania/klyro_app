@@ -18,9 +18,8 @@ function InitScreen({ onComplete }: InitScreenProps) {
       }
 
       try {
-        // Отправляем initData на backend
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-        const response = await fetch(`${apiUrl}/api/init`, {
+        // Отправляем initData на backend через прокси Vite
+        const response = await fetch('/api/init', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -37,9 +36,8 @@ function InitScreen({ onComplete }: InitScreenProps) {
         const { has_profile } = data
 
         if (has_profile) {
-          // Загружаем профиль
-          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-          const profileResponse = await fetch(`${apiUrl}/api/profile`, {
+          // Загружаем профиль через прокси Vite
+          const profileResponse = await fetch('/api/profile', {
             method: 'GET',
             headers: {
               'X-Telegram-Init-Data': initData,
