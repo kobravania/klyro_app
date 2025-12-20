@@ -131,6 +131,20 @@ async function initApp() {
         // ГАРАНТИРОВАННЫЙ ЗАПРОС: делаем запрос сразу после ready(), БЕЗ условий
         if (window.Telegram && window.Telegram.WebApp) {
             window.Telegram.WebApp.ready();
+            
+            // ГАРАНТИРОВАННЫЙ ТЕСТОВЫЙ ЗАПРОС для проверки связи с backend
+            console.log('[APP] Отправка гарантированного тестового запроса к /api/profile');
+            fetch("/api/profile", {
+                method: "GET",
+                headers: {
+                    "X-Debug": "force-profile-call",
+                    "Content-Type": "application/json"
+                }
+            }).then(response => {
+                console.log('[APP] Гарантированный запрос получил ответ:', response.status);
+            }).catch(error => {
+                console.error('[APP] Гарантированный запрос ошибка:', error);
+            });
         }
 
         // Загружаем локальные данные (без профиля)
