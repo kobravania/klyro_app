@@ -30,18 +30,10 @@ def when_ready(server):
 
 def post_worker_init(worker):
     """
-    Дополнительная защита: если по какой-то причине when_ready не выполнился,
-    гарантируем инициализацию схемы в каждом worker.
-    init_db защищён advisory-lock'ом, поэтому гонок/конфликтов не будет.
+    УБРАНА ИНИЦИАЛИЗАЦИЯ БД: инициализация выполняется ОДИН РАЗ в when_ready.
+    Воркеры только проверяют, что схема готова, но не создают таблицы.
     """
-    try:
-        if '/app' not in sys.path:
-            sys.path.insert(0, '/app')
-        from bot_server import init_db
-        init_db()
-    except Exception:
-        # Fail-fast: worker не должен работать без схемы
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    # Инициализация БД выполняется только в when_ready (master процесс)
+    # Воркеры не должны создавать таблицы - это вызывает гонки
+    pass
 

@@ -128,48 +128,59 @@ async function initApp() {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
         
-        // ГАРАНТИРОВАННЫЙ ЗАПРОС: делаем запрос сразу после ready(), БЕЗ условий
+        // ОБЯЗАТЕЛЬНО: вызываем Telegram.WebApp.ready()
         if (window.Telegram && window.Telegram.WebApp) {
             window.Telegram.WebApp.ready();
-            
-            // ГАРАНТИРОВАННЫЙ ТЕСТОВЫЙ ЗАПРОС для проверки связи с backend
-            console.log('[APP] Отправка гарантированного тестового запроса к /api/profile');
-            fetch("/api/profile", {
-                method: "GET",
-                headers: {
-                    "X-Debug": "force-profile-call",
-                    "Content-Type": "application/json"
-                }
-            }).then(response => {
-                console.log('[APP] Гарантированный запрос получил ответ:', response.status);
-            }).catch(error => {
-                console.error('[APP] Гарантированный запрос ошибка:', error);
-            });
         }
 
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
-        // ГАРАНТИРОВАННЫЙ ЗАПРОС К API - БЕЗ БЛОКИРОВОК
-        let profile = null;
+        // ЕДИНСТВЕННАЯ ТОЧКА РЕШЕНИЯ: вызываем /api/init
+        // Mini App НЕ ИМЕЕТ ПРАВА показывать интерфейс до успешного ответа
         let appState = 'loading';
+        let hasProfile = false;
         
         try {
-            profile = await apiClient.getProfile();
-            if (profile) {
-                appState = 'dashboard';
-                await appContext.setUserData(profile);
+            console.log('[APP] Вызов /api/init...');
+            const initData = apiClient.getInitData();
+            
+            const initResponse = await fetch('/api/init', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': initData || ''
+                }
+            });
+            
+            console.log('[APP] /api/init получил ответ:', initResponse.status);
+            
+            if (initResponse.status === 401) {
+                appState = 'activation';
+            } else if (!initResponse.ok) {
+                appState = 'error';
             } else {
-                appState = 'onboarding';
-                await appContext.setUserData(null);
+                const initResult = await initResponse.json();
+                hasProfile = initResult.has_profile || false;
+                console.log('[APP] /api/init: has_profile =', hasProfile);
+                
+                if (hasProfile) {
+                    // Загружаем полный профиль
+                    const profile = await apiClient.getProfile();
+                    if (profile) {
+                        await appContext.setUserData(profile);
+                        appState = 'dashboard';
+                    } else {
+                        appState = 'onboarding';
+                    }
+                } else {
+                    appState = 'onboarding';
+                    await appContext.setUserData(null);
+                }
             }
         } catch (e) {
-            console.log('[APP] Ошибка при загрузке профиля:', e.message);
-            if (e.message === 'AUTH_REQUIRED') {
-                appState = 'activation';
-            } else {
-                appState = 'error';
-            }
+            console.error('[APP] Ошибка при инициализации:', e);
+            appState = 'error';
         }
 
         hideLoadingScreen();

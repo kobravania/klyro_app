@@ -119,7 +119,8 @@ def init_db():
 
 def ensure_schema_ready(conn):
     """
-    Fail-fast: если схема не готова (нет таблиц profiles и sessions) — сервер не должен работать.
+    Проверяет, что схема готова. НЕ создаёт таблицы - только проверяет.
+    Инициализация выполняется один раз в when_ready.
     """
     try:
         cur = conn.cursor()
@@ -128,14 +129,17 @@ def ensure_schema_ready(conn):
         cur.execute("SELECT to_regclass('public.sessions') AS reg")
         reg_sessions = cur.fetchone()[0]
         if reg_profiles is None or reg_sessions is None:
-            print("КРИТИЧЕСКАЯ ОШИБКА: схема БД не готова (нет таблиц public.profiles или public.sessions)")
-            sys.exit(1)
+            # Если схема не готова, пытаемся инициализировать (только если не было инициализации)
+            print("⚠️ Схема БД не готова, пытаемся инициализировать...")
+            try:
+                init_db()
+            except Exception as init_error:
+                print(f"КРИТИЧЕСКАЯ ОШИБКА: не удалось инициализировать схему БД: {init_error}")
+                sys.exit(1)
         cur.close()
     except Exception as e:
-        print(f"КРИТИЧЕСКАЯ ОШИБКА: не удалось проверить схему БД: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        print(f"ОШИБКА при проверке схемы БД: {e}")
+        # Не падаем сразу - возможно, это временная проблема подключения
 
 @lru_cache(maxsize=1)
 def _profiles_column_map():
@@ -314,6 +318,7 @@ def _get_telegram_user_id_from_request(req):
     Нет initData или невалидна → None (вернет 401)
     """
     init_data_str = req.headers.get('X-Telegram-Init-Data')
+    print(init_data_str)
     if not init_data_str:
         print("[INITDATA] X-Telegram-Init-Data заголовок отсутствует")
         return None
@@ -355,6 +360,55 @@ def health():
 @app.route('/api/health')
 def api_health():
     return {'status': 'ok'}, 200
+
+# ============================================
+# INIT ENDPOINT - ЕДИНСТВЕННАЯ ТОЧКА ИНИЦИАЛИЗАЦИИ
+# ============================================
+
+@app.route('/api/init', methods=['POST'])
+def init_user():
+    """
+    ЕДИНСТВЕННЫЙ обязательный init-endpoint для Mini App.
+    Принимает initData ТОЛЬКО из Telegram WebApp.
+    Валидирует initData, извлекает telegram_user_id, проверяет наличие профиля.
+    Возвращает: {has_profile: true|false, telegram_user_id: str}
+    """
+    print(f"[API] POST /api/init - запрос получен")
+    
+    # Получаем initData из заголовка
+    init_data_str = request.headers.get('X-Telegram-Init-Data')
+    if not init_data_str:
+        print("[API] POST /api/init: X-Telegram-Init-Data отсутствует → 401")
+        return jsonify({'error': 'initData required'}), 401
+    
+    # Валидируем и извлекаем telegram_user_id
+    telegram_user_id = _get_telegram_user_id_from_request(request)
+    if not telegram_user_id:
+        print("[API] POST /api/init: initData невалидна → 401")
+        return jsonify({'error': 'invalid initData'}), 401
+    
+    print(f"[API] POST /api/init: telegram_user_id = {telegram_user_id}")
+    
+    # Проверяем наличие профиля в БД
+    conn = get_db_connection()
+    try:
+        ensure_schema_ready(conn)
+        colmap = _profiles_column_map()
+        row = _select_profile(conn, telegram_user_id, colmap)
+        
+        has_profile = row is not None
+        
+        print(f"[API] POST /api/init: has_profile = {has_profile} для user_id {telegram_user_id}")
+        
+        return jsonify({
+            'has_profile': has_profile,
+            'telegram_user_id': telegram_user_id
+        }), 200
+    except Exception as e:
+        print(f"[API] POST /api/init: ошибка БД для user_id {telegram_user_id}: {e}")
+        return jsonify({'error': 'Service unavailable'}), 500
+    finally:
+        conn.close()
 
 # ============================================
 # API ДЛЯ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ
@@ -473,6 +527,7 @@ def save_profile():
         if has_updated:
             update_sets.append("updated_at = now()")
 
+        # UPSERT: если профиль уже существует, обновляем; если нет - создаём
         cur.execute(
             f"""
             INSERT INTO public.profiles ({', '.join(insert_cols)})
@@ -486,11 +541,17 @@ def save_profile():
         conn.commit()
         cur.close()
         
+        print(f"[API] POST /api/profile: профиль сохранён/обновлён в БД для user_id {telegram_user_id}")
+        
         # Возвращаем профиль, считанный из БД (реальный источник истины)
         row = _select_profile(conn, telegram_user_id, colmap)
         if not row:
+            print(f"[API] POST /api/profile: КРИТИЧЕСКАЯ ОШИБКА - профиль не найден после сохранения для user_id {telegram_user_id}")
             return jsonify({'error': 'Service unavailable'}), 500
-        return jsonify(_row_to_profile(row)), 200
+        
+        profile_data = _row_to_profile(row)
+        print(f"[API] POST /api/profile: профиль успешно сохранён для user_id {telegram_user_id}, следующий /api/init вернёт has_profile=true")
+        return jsonify(profile_data), 200
     finally:
         conn.close()
 
