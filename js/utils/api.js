@@ -48,28 +48,26 @@ class ApiClient {
      * @throws {Error} 'AUTH_REQUIRED' если 401, 'SERVICE_UNAVAILABLE' если 500
      */
     async getProfile() {
-        // ОБЯЗАТЕЛЬНО: ждем готовности initData перед запросом
-        const initDataReady = await this._waitForInitData(5000);
-        if (!initDataReady) {
-            throw new Error('AUTH_REQUIRED');
-        }
-
+        // УБРАНА БЛОКИРОВКА: запрос идёт ВСЕГДА, даже если initData нет
+        // Backend сам вернёт 401 если initData невалидна
         const initData = this.getInitData();
-        if (!initData) {
-            throw new Error('AUTH_REQUIRED');
-        }
 
         const headers = {
-            'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData
+            'Content-Type': 'application/json'
         };
+        
+        // Добавляем initData только если он есть
+        if (initData) {
+            headers['X-Telegram-Init-Data'] = initData;
+        }
 
         const url = `${this.baseUrl}/api/profile`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
+            console.log('[API] GET /api/profile - отправка запроса');
             const response = await fetch(url, {
                 method: 'GET',
                 headers: headers,
@@ -77,6 +75,7 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
+            console.log('[API] GET /api/profile - получен ответ:', response.status);
 
             if (response.status === 401) {
                 throw new Error('AUTH_REQUIRED');
@@ -93,6 +92,7 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
+            console.error('[API] GET /api/profile - ошибка:', error);
             if (error.name === 'AbortError' || error.message === 'SERVICE_UNAVAILABLE' || (error.message && error.message.includes('Failed to fetch'))) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
@@ -107,21 +107,17 @@ class ApiClient {
      * @throws {Error} 'AUTH_REQUIRED' если 401, 'SERVICE_UNAVAILABLE' если 500
      */
     async saveProfile(profileData) {
-        // ОБЯЗАТЕЛЬНО: ждем готовности initData перед запросом
-        const initDataReady = await this._waitForInitData(5000);
-        if (!initDataReady) {
-            throw new Error('AUTH_REQUIRED');
-        }
-
+        // УБРАНА БЛОКИРОВКА: запрос идёт ВСЕГДА
         const initData = this.getInitData();
-        if (!initData) {
-            throw new Error('AUTH_REQUIRED');
-        }
 
         const headers = {
-            'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData
+            'Content-Type': 'application/json'
         };
+        
+        // Добавляем initData только если он есть
+        if (initData) {
+            headers['X-Telegram-Init-Data'] = initData;
+        }
 
         const payload = { ...profileData };
 
@@ -131,6 +127,7 @@ class ApiClient {
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
+            console.log('[API] POST /api/profile - отправка запроса');
             const response = await fetch(url, {
                 method: 'POST',
                 headers: headers,
@@ -139,6 +136,7 @@ class ApiClient {
             });
 
             clearTimeout(timeoutId);
+            console.log('[API] POST /api/profile - получен ответ:', response.status);
 
             if (response.status === 401) {
                 throw new Error('AUTH_REQUIRED');
@@ -151,6 +149,7 @@ class ApiClient {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
+            console.error('[API] POST /api/profile - ошибка:', error);
             if (error.name === 'AbortError') {
                 throw new Error('SERVICE_UNAVAILABLE');
             }

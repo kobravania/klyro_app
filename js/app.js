@@ -124,20 +124,24 @@ async function initApp() {
     
     showLoadingScreen();
 
-    // Session-based state machine: loading -> (200 dashboard | 404 onboarding | 401 activation | 500 error)
-    let appState = 'loading';
-    
     try {
         // Инициализируем Telegram WebApp
         initTelegramWebApp();
+        
+        // ГАРАНТИРОВАННЫЙ ЗАПРОС: делаем запрос сразу после ready(), БЕЗ условий
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+        }
 
         // Загружаем локальные данные (без профиля)
         await appContext.loadData();
 
-        // ЕДИНСТВЕННАЯ точка решения — ответ backend на GET /api/profile
-        // Backend получает user_id из валидированного initData (X-Telegram-Init-Data)
+        // ГАРАНТИРОВАННЫЙ ЗАПРОС К API - БЕЗ БЛОКИРОВОК
+        let profile = null;
+        let appState = 'loading';
+        
         try {
-            const profile = await apiClient.getProfile();
+            profile = await apiClient.getProfile();
             if (profile) {
                 appState = 'dashboard';
                 await appContext.setUserData(profile);
@@ -146,6 +150,7 @@ async function initApp() {
                 await appContext.setUserData(null);
             }
         } catch (e) {
+            console.log('[APP] Ошибка при загрузке профиля:', e.message);
             if (e.message === 'AUTH_REQUIRED') {
                 appState = 'activation';
             } else {
@@ -176,6 +181,7 @@ async function initApp() {
         // 500 -> error
         showServiceUnavailable();
     } catch (error) {
+        console.error('[APP] Критическая ошибка:', error);
         hideLoadingScreen();
         showServiceUnavailable();
     }

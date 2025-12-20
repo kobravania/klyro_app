@@ -532,16 +532,20 @@ class OnboardingScreen {
 
             // InitData-based: POST /api/profile возвращает сохранённый профиль.
             // Backend сам извлекает telegram_user_id из валидированного initData.
+            console.log('[ONBOARDING] Отправка POST /api/profile');
             const savedProfile = await apiClient.saveProfile(profileData);
+            console.log('[ONBOARDING] Получен ответ от POST /api/profile:', savedProfile);
+            
             if (!savedProfile) {
                 throw new Error('SERVICE_UNAVAILABLE');
             }
 
             await appContext.setUserData(savedProfile);
+            console.log('[ONBOARDING] Профиль сохранён в appContext, переход в Dashboard');
             
             this.hapticFeedback('medium');
             
-            // Переходим в Dashboard
+            // Переходим в Dashboard БЕЗ повторного GET
             hideAllScreens();
             navigation.show();
             dashboardScreen.show();
